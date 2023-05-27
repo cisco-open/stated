@@ -1,92 +1,141 @@
 const jsonata = require('jsonata');
+var pointer = require('json-pointer');
+const _ = require('lodash');
+const {set} = require("lodash/object");
 
 (async () => {
 
-    const input = {
 
-        "a": "${b & '_pulledBy_a'}",
-        "b": "${c & '_pulledBy_c'}",
-        "c": {"d":"${ 'the magic numbner is ' & e }"},
-        "e":42,
-        "f":"${a & b & c.d[foo='bar']}"
+    const template = {
+
+        "a": "${b & '<< a '}",
+        "b": "${c.d & '<< b '}",
+        "c": {"d":"${ e & '<< c.d' }"},
+        "e":null,
+        "f":"${a &', ' & b &', ' & c.d & '<< f'}"
 
     };
+ /*
+    const template = {
+        "name": "AwsRegionMap",
+        "vz": "${ name }"
+    };
+
+  */
     //note - there isn't any compelling reason to write this xprExtractorProgram in jsonata. It might as well be written
     //in jS but whatever. This program will yank out all the expressions and their json pointers
-    const exprExtractorProgram = "(\n" +
-        "    $getPaths := function($o, $acc, $path){\n" +
-        "        $spread($o)~>$reduce(function($acc, $item){(\n" +
-        "            $k := $keys($item)[0];\n" +
-        "            $v := $lookup($item, $k);\n" +
-        "            $nextPath := $append($path, $k);           \n" +
-        "            $match := /\\s*\\$\\{(.+)\\}\\s*$/($v);\n" +
-        "            $count($match) > 0 \n" +
-        "                ?$append($acc,{\"expr\":$match[0].groups[0], \"jsonPointer\":$nextPath})                     \n" +
-        "                :$type($v)=\"object\"\n" +
-        "                  ?$getPaths($v, $acc, $nextPath)\n" +
-        "                  :$acc\n" +
-        "            )}, $acc)\n" +
-        "    };\n" +
-        "    $getPaths($, [], [])\n" +
-        ")"
+    const exprExtractorProgram =`(
+        $getPaths := function($o, $acc, $path){
+            $spread($o)~>$reduce(function($acc, $item){
+                (
+                    $k := $keys($item)[0];
+                    $v := $lookup($item, $k);
+                    $nextPath := $append($path, $k);
+                    $match := /\\s*\\$\\{(.+)\\}\\s*$/($v);
+                    $count($match) > 0
+                        ? $append($acc, { "expr__": $match[0].groups[0], "jsonPointer__": $nextPath, "dependees__": [] })
+                        : $type($v)="object"
+                            ? $getPaths($v, $acc, $nextPath)
+                            : $acc
+                )
+            }, $acc)
+        };
+        $getPaths($, [], [])
+    )`;
     const exprExtractor = jsonata(exprExtractorProgram);
-    const exprs = await exprExtractor.evaluate(input);
+    const exprs = await exprExtractor.evaluate(template);
 
-    const compiledPathFinder = jsonata("**[type='path'].[steps.value]");
+    //search expression AST to find path steps (a.b.c)
+    const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
     var exprsWithDeps = await Promise.all(exprs.map(async e => {
-        const compiledExpr = jsonata(e.expr);
-        e.dependencies  = await compiledPathFinder.evaluate(compiledExpr.ast());
+        const compiledExpr = jsonata(e.expr__);
+        e.dependencies__  = await compiledPathFinder.evaluate(compiledExpr.ast());
         return e;
     }));
-    //jam them into a map keyed by path
-    exprsWithDeps = exprsWithDeps.reduce((a,i)=>{
-        const path = i.jsonPointer.join(".");
-        a[path]=i;
-        i.dependees = [];
-        return a;
-    },{})
-    const template = {"template":input,  "exprs":exprsWithDeps};
-    /* At this point we have a map of structures like this, one for every expression.For each expr, we are keeping
-       track of which fields of the object this particular expression depends on. Meaning, when one of these
-       dependencies changes, we must rerun our expr
-     {
-      "expr": "a & b & c.d[foo='bar']",
-      "jsonPointer": [
-        "f"
-      ],
-      "dependencies": [
-        [
-          "a"
-        ],
-        [
-          "b"
-        ],
-        [
-          "c",
-          "d"
-        ]
-      ]
-    }
-    Now we are going to process all of ^^^ to collect a set of *outgoing* 'dependees'. These are the other fields
-    of the object, not that this field depends on, but who depend on this field. In this way, when we change the data
-    for this field, we have an immediately accessible list of other fields that we must transit to and recompute.
-    */
+    const templateMeta = JSON.parse(JSON.stringify(template));
 
-    exprsWithDeps = Object.keys(exprsWithDeps).reduce((acc, k)=>{
-        exprsWithDeps[k].dependencies.forEach(d=>{
-            var jsonPointer = d;
-            if(Array.isArray(d)){
-                jsonPointer = d.join(".");
-            }
-            if(acc[jsonPointer] != null){
-                acc[jsonPointer].dependees.push(jsonPointer)
-            }else{
-                acc[jsonPointer] = {"dependees":[jsonPointer]}
-            }
+    //convert paths to json pointers
+    exprsWithDeps = exprsWithDeps.map(i=>{
+        i.jsonPointer__ = pointer.compile(i.jsonPointer__);
+        i.dependencies__ = i.dependencies__.map(d=>{
+            return pointer.compile(d)
         });
-        return acc;
-    }, exprsWithDeps);
-    console.log(JSON.stringify(exprsWithDeps, null, 2));
+        pointer.set(templateMeta, i.jsonPointer__, i);
+        return i;
+    });
+    //const template = {"template":input,  "exprs":exprsWithDeps};
+
+    //take original object structure and update each object with this 'meta' information we have gathered
+    exprsWithDeps.forEach(i=>{
+        i.dependencies__?.forEach(ptr=>{
+            var target = pointer.get(templateMeta, ptr);
+
+            if(!(target instanceof Object) || target.jsonPointer__ === undefined){ //if the field had no expression target would be something like "42" or some ordinary object. We need to replace it with one of our bookeepers
+                target = {"dependees__":[], "dependencies__":[], "jsonPointer__":ptr};
+            }
+            target.dependees__.push(i.jsonPointer__);
+            pointer.set(templateMeta, ptr, target)
+        });
+    })
+
+    async function evaluateNode(templateMeta, template, jsonPtr, data) {
+        if (!pointer.has(templateMeta, jsonPtr)) { //init the metadata node of needed
+            pointer.set(templateMeta, jsonPtr, {"dependees__": [], "dependencies__": [], "jsonPointer__": jsonPtr});
+        }
+        if (data === undefined) {
+            // data was not passed into this node, so we must evaluate the expression
+            const {expr__} = pointer.get(templateMeta, jsonPtr);
+            if (typeof expr__ !== 'undefined') {
+                data = await jsonata(expr__).evaluate(template);
+                pointer.set(template, jsonPtr, data); // Set the data into the actual template
+            }else{
+                data = pointer.get(template, jsonPtr); //get the data from the template, since there is no expression
+            }
+        }else{
+            pointer.set(template, jsonPtr, data);
+        }
+        pointer.set(templateMeta, jsonPtr + "/data__", data); // Set the data into the meta world (we just keep it here for debugging purpose. It's source of truth remains in the template)
+        return pointer.get(templateMeta, jsonPtr);
+    }
+
+    const evaluateNodeAndDeps = async function(templateMeta, template, jsonPtr, data) {
+        const meta = await evaluateNode(templateMeta, template, jsonPtr, data);
+
+        return Promise.all(meta.dependees__.map(async (jsonPtr) => {
+            await evaluateNodeAndDeps(templateMeta, template, jsonPtr); // Await the recursive call to setData
+        }));
+    };
+
+    await evaluateNodeAndDeps(templateMeta, template, "/e", 42);
+    console.log(JSON.stringify(templateMeta, null, 2));
+
+    async function depOrder(templateMeta) {
+        const sortedItems = [];
+        const visited = new Set();
+
+        function visit(jsonPtr) {
+            if (!visited.has(jsonPtr)) {
+                visited.add(jsonPtr);
+                const dependencies = pointer.get(templateMeta, jsonPtr).dependencies__;
+                dependencies.forEach(dependency => visit(dependency));
+                sortedItems.push(jsonPtr);
+            }
+        }
+
+        const ptrs = await jsonata("**[jsonPointer__].jsonPointer__").evaluate(templateMeta);
+        ptrs.forEach(ptr => visit(ptr));
+
+        return sortedItems;
+    }
+
+    const depOrderedNodePtrs = await depOrder(templateMeta);
+    console.log(depOrderedNodePtrs);
+    for (const ptr of depOrderedNodePtrs) {
+        await evaluateNode(templateMeta, template, ptr);
+    }
+    console.log(JSON.stringify(templateMeta, null, 2));
+
+
 
 })();
 
