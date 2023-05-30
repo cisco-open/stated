@@ -3,9 +3,10 @@ const jp = require('json-pointer');
 
 class TemplateProcessor {
     constructor(template) {
-        this.template = template;
+        this.output = template;
         this.templateMeta = null;
         this.depOrder = null;
+        this.input = JSON.parse(JSON.stringify(template));;
     }
 
     async initialize() {
@@ -28,7 +29,7 @@ class TemplateProcessor {
         )`;
 
         const metaInfProcessor = jsonata(metaInfProducerJsonataProgram);
-        let metaInfos = await metaInfProcessor.evaluate(this.template);
+        let metaInfos = await metaInfProcessor.evaluate(this.output);
 
         // For each metaInf about a piece of the template, analyze any embedded ${} and deduce the object traversal path steps like 'a.b.c' it took.
         // These are the dependencies__ of the expression
@@ -42,7 +43,7 @@ class TemplateProcessor {
         }));
 
         // Copy the given template
-        this.templateMeta = JSON.parse(JSON.stringify(this.template));
+        this.templateMeta = JSON.parse(JSON.stringify(this.output));
 
         // Place each meta data about each field into templateMeta, replacing its "real" peer that came from the template.
         // Also, produce true jsonPointers from what had been just arrays of individual path segments.
@@ -70,10 +71,10 @@ class TemplateProcessor {
         const nodePtrList = this.topologicalSort(metaInfos);
 
         // Evaluate the expressions in the correct order using a for loop
-        await this.evaluateDependenciesInOrder(nodePtrList);
+        await this.evaluateJsonPointersInOrder(nodePtrList);
     }
 
-    async evaluateDependenciesInOrder(jsonPtrList) {
+    async evaluateJsonPointersInOrder(jsonPtrList) {
         for (const jsonPtr of jsonPtrList) {
             try {
                 await this.evaluateNode(jsonPtr);
@@ -85,10 +86,11 @@ class TemplateProcessor {
 
     async evaluateNode(jsonPtr, data) {
         const templateMeta = this.templateMeta;
-        const template = this.template;
+        const template = this.output;
 
         if (!jp.has(templateMeta, jsonPtr)) {
-            throw Error("The templateMeta was missing " + jsonPtr);
+            jp.set(template, jsonPtr, data); //this is just the weird case of setting something into the template that has no affect on any expressions
+            return;
         }
 
         if (data === undefined) {
@@ -135,6 +137,9 @@ class TemplateProcessor {
             orderedJsonPointers.push(node.jsonPointer__);
         }
 
+        if(!(nodes instanceof Set || Array.isArray(nodes))){
+            nodes = [nodes];
+        }
         // Perform topological sort
         nodes.forEach(node => {
             if (!visited.has(node.jsonPointer__)) {
@@ -145,25 +150,41 @@ class TemplateProcessor {
         return orderedJsonPointers;
     }
     async setData(jsonPtr, data) {
+        if(!jp.has(this.output, jsonPtr)){ //node doesn't exist yet, so just create it and return
+            await this.evaluateNode(jsonPtr, data);
+            return;
+        }
         // Check if the node contains an expression. If so, print a warning and return.
         const metaInf = jp.get(this.templateMeta, jsonPtr);
         if (metaInf.expr__ !== undefined) {
             console.warn(`Attempted to set data on a node that contains an expression at ${jsonPtr}. This operation is ignored.`);
             return;
         }
-        const effectedNodesSet = this.getDependeesRecursive(jsonPtr);
-        const sortedJsonPtrs =     this.topologicalSort(effectedNodesSet);
+        const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr, data);
         await this.evaluateNode(jsonPtr, data); // Evaluate the node provided
-        sortedJsonPtrs.shift(); // Remove it from the list of nodes (it will always be the first one), since we just handled its update
-        await this.evaluateDependenciesInOrder(sortedJsonPtrs); // Evaluate all other affected nodes, in optimal evaluation order
+        await this.evaluateJsonPointersInOrder(sortedJsonPtrs); // Evaluate all other affected nodes, in optimal evaluation order
     }
 
-    getDependeesRecursive(jsonPtr, dependees = new Set()) {
+    getDependentsTransitiveExecutionPlan(jsonPtr, data) {
+        const effectedNodesSet = this.getDependentsRecursive(jsonPtr);
+        //const sortedJsonPtrs = this.topologicalSort(effectedNodesSet);
+        return [...effectedNodesSet].map(n=>n.jsonPointer__);
+    }
+
+    getDependents(jsonPtr){
+        if(jp.has(this.templateMeta, jsonPtr)){
+            return jp.get(this.templateMeta, jsonPtr).dependees__
+        }else{
+            return [];
+        }
+    }
+
+    getDependentsRecursive(jsonPtr, dependees = new Set()) {
         const metaInf = jp.get(this.templateMeta, jsonPtr);
         if (metaInf.dependees__) {
             metaInf.dependees__.forEach(dependee => {
                 dependees.add(jp.get(this.templateMeta, dependee));
-                this.getDependeesRecursive(dependee, dependees);
+                this.getDependentsRecursive(dependee, dependees);
             });
         }
 
@@ -175,11 +196,48 @@ class TemplateProcessor {
         if (parentPtrParts.length > 0) {
             let parentPtr = jp.compile(parentPtrParts);
             // recursively process the parent node
-            this.getDependeesRecursive(parentPtr, dependees);
+            this.getDependentsRecursive(parentPtr, dependees);
         }
 
         return dependees;
     }
+
+    getDependencies(jsonPtr){
+        if(jp.has(this.templateMeta, jsonPtr)){
+            return jp.get(this.templateMeta, jsonPtr).dependencies__
+        }else{
+            return [];
+        }
+    }
+    /*
+    getDependenciesRecursive(jsonPtr, visited = new Set()) {
+        if (jp.has(this.templateMeta, jsonPtr)) {
+            const dependencies = jp.get(this.templateMeta, jsonPtr).dependencies__;
+            const recursiveDependencies = [];
+
+            for (const dependency of dependencies) {
+                if (!visited.has(dependency)) {
+                    visited.add(dependency);
+                    const subDependencies = this.getDependenciesRecursive(dependency, visited);
+                    recursiveDependencies.push(...subDependencies);
+                }
+            }
+
+            return [...dependencies, ...recursiveDependencies];
+        }
+
+        return [];
+    }
+
+     */
+    getDependenciesTransitiveExecutionPlan(jsonPtr, data) {
+        if (jp.has(this.templateMeta, jsonPtr)) {
+            const node = jp.get(this.templateMeta, jsonPtr);
+            return this.topologicalSort(node);
+        }
+        return sortedJsonPtrs;
+    }
+
 }
 /*
 const template = {
