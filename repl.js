@@ -105,7 +105,7 @@ r.defineCommand('from', {
     action(args) {
         if (templateProcessor) {
             const [jsonPtr, option] = args.split(' ');
-            const dependents = option === '--plan' ? templateProcessor.getDependentsTransitiveExecutionPlan(jsonPtr) : templateProcessor.getDependents(jsonPtr);
+            const dependents = option === '--shallow' ? templateProcessor.getDependents(jsonPtr): templateProcessor.getDependentsTransitiveExecutionPlan(jsonPtr) ;
             console.log(JSON.stringify(dependents, null, 2));
         } else {
             console.error('Error: Initialize the template first.');
@@ -119,7 +119,7 @@ r.defineCommand('to', {
     action(args) {
         if (templateProcessor) {
             const [jsonPtr, option] = args.split(' ');
-            const dependencies = option === '--plan' ? templateProcessor.getDependenciesTransitiveExecutionPlan(jsonPtr) : templateProcessor.getDependencies(jsonPtr);
+            const dependencies = option === '--shallow' ? templateProcessor.getDependencies(jsonPtr):templateProcessor.getDependenciesTransitiveExecutionPlan(jsonPtr);
             console.log(JSON.stringify(Array.from(dependencies), null, 2));
         } else {
             console.error('Error: Initialize the template first.');

@@ -205,37 +205,17 @@ class TemplateProcessor {
     getDependencies(jsonPtr){
         if(jp.has(this.templateMeta, jsonPtr)){
             return jp.get(this.templateMeta, jsonPtr).dependencies__
-        }else{
-            return [];
         }
-    }
-    /*
-    getDependenciesRecursive(jsonPtr, visited = new Set()) {
-        if (jp.has(this.templateMeta, jsonPtr)) {
-            const dependencies = jp.get(this.templateMeta, jsonPtr).dependencies__;
-            const recursiveDependencies = [];
-
-            for (const dependency of dependencies) {
-                if (!visited.has(dependency)) {
-                    visited.add(dependency);
-                    const subDependencies = this.getDependenciesRecursive(dependency, visited);
-                    recursiveDependencies.push(...subDependencies);
-                }
-            }
-
-            return [...dependencies, ...recursiveDependencies];
-        }
-
         return [];
+
     }
 
-     */
     getDependenciesTransitiveExecutionPlan(jsonPtr, data) {
         if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr);
             return this.topologicalSort(node);
         }
-        return sortedJsonPtrs;
+        return [];
     }
 
 }
