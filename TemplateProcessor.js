@@ -1,78 +1,92 @@
 const jsonata = require('jsonata');
 const jp = require('json-pointer');
+const _ = require('lodash');
+const metaInfoProducer = require('./nodeInfoAnalyzer');
 
 class TemplateProcessor {
     constructor(template) {
-        this.output = template;
-        this.templateMeta = null;
-        this.depOrder = null;
-        this.input = JSON.parse(JSON.stringify(template));;
+        this.output = template; //initial output is input template
+        this.input = JSON.parse(JSON.stringify(template));
+        this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
     }
 
     async initialize() {
-        const metaInfProducerJsonataProgram = `( $getPaths := function($o, $acc, $path){
-                $spread($o)~>$reduce(function($acc, $item){
-                    (
-                        $k := $keys($item)[0];
-                        $v := $lookup($item, $k);
-                        $nextPath := $append($path, $k);
-                        $match := /\\s*\\$\\{(.+)\\}\\s*$/($v); 
-                        $count($match) > 0
-                            ? $append($acc, { "expr__": $match[0].groups[0], "jsonPointer__": $nextPath, "dependees__": []})
-                            : $type($v)="object"
-                                ? $getPaths($v, $append($acc, { "jsonPointer__": $nextPath, "dependees__": [], "dependencies__":[]}), $nextPath)
-                                : $append($acc, { "jsonPointer__": $nextPath, "dependees__": [], "dependencies__":[], "data__":$v } )
-                    )
-                }, $acc)
-            }; 
-            $getPaths($, [], []); 
-        )`;
+        let metaInfos = await this.processMetaInfos();
+        this.sortMetaInfos(metaInfos);
+        this.populateTemplateMeta(metaInfos);
+        this.buildDependenciesGraph(metaInfos);
+        await this.evaluateDependencies(metaInfos);
+    }
 
-        const metaInfProcessor = jsonata(metaInfProducerJsonataProgram);
+    async processMetaInfos() {
+        const metaInfProcessor = jsonata(metaInfoProducer);
         let metaInfos = await metaInfProcessor.evaluate(this.output);
 
-        // For each metaInf about a piece of the template, analyze any embedded ${} and deduce the object traversal path steps like 'a.b.c' it took.
-        // These are the dependencies__ of the expression
         const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
         metaInfos = await Promise.all(metaInfos.map(async e => {
             if (e.expr__ !== undefined) {
-                const compiledExpr = jsonata(e.expr__);
-                e.dependencies__ = await compiledPathFinder.evaluate(compiledExpr.ast());
+                e.compiledExpr__  = jsonata(e.expr__);
+                e.dependencies__ = await compiledPathFinder.evaluate(e.compiledExpr__ .ast());
             }
             return e;
         }));
 
-        // Copy the given template
-        this.templateMeta = JSON.parse(JSON.stringify(this.output));
+        return metaInfos;
+    }
 
-        // Place each meta data about each field into templateMeta, replacing its "real" peer that came from the template.
-        // Also, produce true jsonPointers from what had been just arrays of individual path segments.
+    sortMetaInfos(metaInfos) {
+        metaInfos.sort((a, b) => a.jsonPointer__ < b.jsonPointer__ ? -1 : (a.jsonPointer__ > b.jsonPointer__ ? 1 : 0));
+    }
+
+    populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
+            meta.dependencies__ = this.convertDollarsToAbsoluteJsonPointer(meta).map(jp.compile);
             meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
-            meta.dependencies__ = meta.dependencies__.map(d => jp.compile(d));
-            jp.set(this.templateMeta, meta.jsonPointer__, meta);
+            meta.jsonPointer__ !== "" && jp.set(this.templateMeta, meta.jsonPointer__, meta);
         });
+    }
 
-        // For each dependency, find the thing it depends on and push onto its dependees. Now we have a graph in which each metaInfo
-        // holds a list of whom it needs to get data from (dependencies__) as well as whom it needs to push data to (dependees__)
-        // when its data__ changes.
+    buildDependenciesGraph(metaInfos) {
         metaInfos.forEach(i => {
             i.dependencies__?.forEach(ptr => {
-                // Dependency in an expression on an as-yet nonexistent node, so create that metaInfo node
                 if (!jp.has(this.templateMeta, ptr)) {
                     jp.set(this.templateMeta, ptr, { "jsonPointer__": ptr, "dependees__": [], "dependencies__": [] });
                 }
-                // Now update the metaInfo node with its detected dependee
                 jp.get(this.templateMeta, ptr).dependees__.push(i.jsonPointer__);
             });
         });
+    }
 
-        // Evaluate the dependencies
+    async evaluateDependencies(metaInfos) {
         const nodePtrList = this.topologicalSort(metaInfos);
-
-        // Evaluate the expressions in the correct order using a for loop
         await this.evaluateJsonPointersInOrder(nodePtrList);
     }
+
+
+    convertDollarsToAbsoluteJsonPointer(metaInfo) {
+        // Extract dependencies__ and jsonPointer__ from metaInfo
+        const { dependencies__, jsonPointer__ } = metaInfo;
+
+        // Iterate through each depsArray in dependencies__ using reduce function
+        return dependencies__.reduce((result, depsArray) => {
+            // Create a new array by mapping depsArray. If element is "", replace it with the parent json pointer
+            // If element is not "$", add it as is.
+            const mappedValues = depsArray.reduce((acc, d) => {
+                if (d === "") { // for some reason Jsonata compiler converts $ to ""
+                    acc.push(...jsonPointer__.slice(0, -1));
+                } else if (d !== "$") { // ...and $$ to $ in path steps
+                    acc.push(d);
+                }
+                return acc;
+            }, []);
+
+            // Push mappedValues to the result and return
+            result.push(mappedValues);
+            return result;
+        }, []);
+    }
+
+
 
     async evaluateJsonPointersInOrder(jsonPtrList) {
         for (const jsonPtr of jsonPtrList) {
@@ -90,15 +104,14 @@ class TemplateProcessor {
 
         if (!jp.has(templateMeta, jsonPtr)) {
             jp.set(template, jsonPtr, data); //this is just the weird case of setting something into the template that has no affect on any expressions
-            return;
+            return false;
         }
-
+        const { expr__, compiledExpr__, treeHasExpressions__ } = jp.get(templateMeta, jsonPtr);
         if (data === undefined) {
-            const { expr__ } = jp.get(templateMeta, jsonPtr);
 
             if (typeof expr__ !== 'undefined') {
                 try {
-                    data = await jsonata(expr__).evaluate(template);
+                    data = await compiledExpr__.evaluate(template);
                     jp.set(template, jsonPtr, data);
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);
@@ -113,11 +126,22 @@ class TemplateProcessor {
                 }
             }
         } else {
-            jp.set(template, jsonPtr, data);
+            if(treeHasExpressions__){
+                console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
+                return false;
+            }
+            const existingData = jp.get(template, jsonPtr);
+            if(!_.isEqual(existingData, data)){
+                jp.set(template, jsonPtr, data);
+            }else{
+                console.log(`data added to ${jsonPtr} did not change. Data flow will be short circuited.`);
+                return false;
+            }
+
         }
 
         jp.set(templateMeta, jsonPtr + "/data__", data);
-        return jp.get(templateMeta, jsonPtr);
+        return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
     topologicalSort(nodes) {
@@ -161,8 +185,10 @@ class TemplateProcessor {
             return;
         }
         const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr, data);
-        await this.evaluateNode(jsonPtr, data); // Evaluate the node provided
-        await this.evaluateJsonPointersInOrder(sortedJsonPtrs); // Evaluate all other affected nodes, in optimal evaluation order
+        const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
+        if(isChanged) {
+            await this.evaluateJsonPointersInOrder(sortedJsonPtrs); // Evaluate all other affected nodes, in optimal evaluation order
+        }
     }
 
     getDependentsTransitiveExecutionPlan(jsonPtr, data) {
@@ -188,7 +214,7 @@ class TemplateProcessor {
             });
         }
 
-        // Get parent node
+        // Get parent node. Ancestors are considered implicit dependents
         let parentPtrParts = jp.parse(jsonPtr);
         parentPtrParts.pop();
 

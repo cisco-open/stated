@@ -49,10 +49,36 @@ r.defineCommand('set', {
     help: 'Set data to a JSON pointer path',
     async action(args) {
         const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
-        const [path, data] = options;
+        let [path, data] = options;
+
+        if (path === '-f') {
+            try {
+                // Read file
+                const fileContent = await fs.promises.readFile(data, 'utf8');
+                const tmp = JSON.parse(fileContent);
+                path = tmp.path; // Assumes the file contains an object with 'path' and 'data' properties
+                data = tmp.data;
+            } catch (err) {
+                console.error('Error reading file:', err);
+                this.displayPrompt();
+                return;
+            }
+        } else {
+            try {
+                data = JSON.parse(data);
+            } catch (err) {
+                console.error('Error parsing JSON data:', err);
+                this.displayPrompt();
+                return;
+            }
+        }
+
         if (templateProcessor) {
             try {
-                await templateProcessor.setData(path, JSON.parse(data));
+                console.time('setData Execution Time');
+                await templateProcessor.setData(path, data);
+                console.timeEnd('setData Execution Time');
+
                 console.log(JSON.stringify(templateProcessor.output, null, 2));
             } catch (err) {
                 console.error('Error setting data:', err);
@@ -63,6 +89,7 @@ r.defineCommand('set', {
         this.displayPrompt();
     },
 });
+
 
 r.defineCommand('in', {
     help: 'Show the input template',
@@ -92,7 +119,13 @@ r.defineCommand('state', {
     help: 'Show the current state of the templateMeta',
     action() {
         if (templateProcessor) {
-            console.log(JSON.stringify(templateProcessor.templateMeta, null, 2));
+            const omitCompiledExpressionsFromPrint = (key, value) => {
+                if (key === 'compiledExpr__') {
+                    return undefined;
+                }
+                return value;
+            }
+            console.log(JSON.stringify(templateProcessor.templateMeta, omitCompiledExpressionsFromPrint, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }

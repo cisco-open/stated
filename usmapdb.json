@@ -1,0 +1,50 @@
+{
+  "name": "SVG",
+  "[def]": {
+    "state": {
+      "selectedState": ""
+    },
+    "foobar": "AK",
+    "mutations": {
+      "setSelectedNode": "$ ~> |t.state | {\"selectedNode\": $$.eventData }|"
+    },
+    "datasources": {
+      "svg": {
+        "type": "rest",
+        "options": {
+          "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/usmap.json",
+          "headers": {
+            "Accept": "application/json"
+          }
+        }
+      },
+      "selectedState": {
+        "type": "jsonata",
+        "options": {
+          "jsonataExp": "$shuffle([\"MA\",\"MN\",\"MT\",\"ND\",\"HI\",\"ID\",\"WA\",\"AZ\",\"CA\",\"CO\",\"NV\",\"NM\",\"OR\",\"UT\",\"WY\",\"AR\",\"IA\",\"KS\",\"MO\",\"NE\",\"OK\",\"SD\",\"LA\",\"TX\",\"CT\",\"NH\",\"RI\",\"VT\",\"AL\",\"FL\",\"GA\",\"MS\",\"SC\",\"IL\",\"IN\",\"KY\",\"NC\",\"OH\",\"TN\",\"VA\",\"WI\",\"WV\",\"DE\",\"DC\",\"MD\",\"NJ\",\"NY\", \"PA\", \"ME\", \"MI\", \"AK\"])[0]"
+        },
+        "refetchInterval": 2000
+      }
+    },
+    "[return]": [
+      {
+        "instanceOf": "P",
+        "children": ["${\"Selected State:\" & state.selectedNode.attributes.id }"]
+      },
+      {
+        "instanceOf": "Div",
+        "children": [
+          {
+            "instanceOf": "SvgJson",
+            "props": {
+              "content": "${ ($clickedState :=state.selectedNode.attributes.id;$randomState:= data.selectedState.data; $elem := data.svg.data.children[attributes.id in [$clickedState, $randomState]]~> |attributes| {\"style\":\"fill:#9B5FF5;stroke:#FCBC38;\"}|; $newChildren := data.svg.data.children ~> $append($elem); data.svg.data ~>|$|{\"children\":$newChildren}| ) }"
+            },
+            "events": {
+              "onClick": "${ mutations.setSelectedNode }"
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

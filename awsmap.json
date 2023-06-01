@@ -1,0 +1,27 @@
+{
+  "name": "AwsRegionMap",
+  "[def]": {
+    "props":{
+      "attrs":{
+        "Oregon":{"style":"visibility:visible", "fill":"red"},
+        "N. California": {"style":"visibility:visible", "fill":"blue"}
+      }
+    },
+    "datasources": {
+      "map": {
+        "type": "rest",
+        "options": {
+          "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/awsmap.svg.json"
+        }
+      }
+    },
+    "[return]": [
+      {
+        "instanceOf": "SvgJson",
+        "props": {
+          "content": "${ $$.`[def]`.props.attrs~>$keys~>$reduce(function($a,$i){$a~>|children.children[attributes[`inkscape:label`=$i]].children.children[attributes[fill]].attributes|$$.props.attrs~>$lookup($i)|}, $$.data.map.data)  }"
+        }
+      }
+    ]
+  }
+}
