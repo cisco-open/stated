@@ -5,5 +5,8 @@
     "json-pointer": "^0.6.2",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0"
   }
 }

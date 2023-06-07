@@ -2,6 +2,7 @@ const jsonata = require('jsonata');
 const jp = require('json-pointer');
 const _ = require('lodash');
 const metaInfoProducer = require('./nodeInfoAnalyzer');
+const DependencyFinder=require('./DependencyFinder');
 
 class TemplateProcessor {
     constructor(template) {
@@ -23,12 +24,13 @@ class TemplateProcessor {
         let metaInfos = await metaInfProcessor.evaluate(this.output);
 
         const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
-        metaInfos = await Promise.all(metaInfos.map(async e => {
-            if (e.expr__ !== undefined) {
-                e.compiledExpr__  = jsonata(e.expr__);
-                e.dependencies__ = await compiledPathFinder.evaluate(e.compiledExpr__ .ast());
+        metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
+            if (metaInfo.expr__ !== undefined) {
+                const depFinder = new DependencyFinder(metaInfo.expr__);
+                metaInfo.compiledExpr__  = depFinder.compiledExpression;
+                metaInfo.dependencies__ = depFinder.findDependencies();//await compiledPathFinder.evaluate(metaInfo.compiledExpr__ .ast());
             }
-            return e;
+            return metaInfo;
         }));
 
         return metaInfos;
@@ -72,9 +74,9 @@ class TemplateProcessor {
             // Create a new array by mapping depsArray. If element is "", replace it with the parent json pointer
             // If element is not "$", add it as is.
             const mappedValues = depsArray.reduce((acc, d) => {
-                if (d === "") { // for some reason Jsonata compiler converts $ to ""
+                if (d === "") { // '$' means "variable whose name is empty string"..like, it's really $''
                     acc.push(...jsonPointer__.slice(0, -1));
-                } else if (d !== "$") { // ...and $$ to $ in path steps
+                } else if (d !== "$") { // ...and $$ means "the variable whose name is $"
                     acc.push(d);
                 }
                 return acc;
@@ -86,9 +88,57 @@ class TemplateProcessor {
         }, []);
     }
 
+    topologicalSort(nodes) {
+        const visited = new Set();
+        const orderedJsonPointers = [];
+        const templateMeta = this.templateMeta;
 
+        function listDependencies(node) {
+            visited.add(node.jsonPointer__);
 
-    async evaluateJsonPointersInOrder(jsonPtrList) {
+            for (const dependency of node.dependencies__) {
+                if (!visited.has(dependency)) {
+                    listDependencies(jp.get(templateMeta, dependency));
+                }
+            }
+
+            orderedJsonPointers.push(node.jsonPointer__);
+        }
+
+        if(!(nodes instanceof Set || Array.isArray(nodes))){
+            nodes = [nodes];
+        }
+        // Perform topological sort
+        nodes.forEach(node => {
+            if (!visited.has(node.jsonPointer__)) {
+                listDependencies(node);
+            }
+        });
+
+        return orderedJsonPointers;
+    }
+    async setData(jsonPtr, data) {
+        //get all the jsonPtrs we need to update, including this one, to percolate the change
+        const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr);
+        await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
+    }
+
+    async evaluateJsonPointersInOrder(jsonPtrList, data) {
+        const jsonPtr = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
+        if(!jp.has(this.output, jsonPtr)){ //node doesn't exist yet, so just create it and return
+            await this.evaluateNode(jsonPtr, data);
+        }
+        // Check if the node contains an expression. If so, print a warning and return.
+        const metaInf = jp.get(this.templateMeta, jsonPtr);
+        if (metaInf.expr__ !== undefined) {
+            console.warn(`Attempted to replace expressions with data under ${jsonPtr}. This operation is ignored.`);
+            return;
+        }
+        const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
+        if(!isChanged) {
+            console.log(`data did not change for ${jsonPtr}, short circuiting dependents.`);
+            return false;
+        }
         for (const jsonPtr of jsonPtrList) {
             try {
                 await this.evaluateNode(jsonPtr);
@@ -134,7 +184,7 @@ class TemplateProcessor {
             if(!_.isEqual(existingData, data)){
                 jp.set(template, jsonPtr, data);
             }else{
-                console.log(`data added to ${jsonPtr} did not change. Data flow will be short circuited.`);
+                console.log(`data to be set at ${jsonPtr} did not change, ignored. `);
                 return false;
             }
 
@@ -144,57 +194,11 @@ class TemplateProcessor {
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    topologicalSort(nodes) {
-        const visited = new Set();
-        const orderedJsonPointers = [];
-        const templateMeta = this.templateMeta;
-
-        function listDependencies(node) {
-            visited.add(node.jsonPointer__);
-
-            for (const dependency of node.dependencies__) {
-                if (!visited.has(dependency)) {
-                    listDependencies(jp.get(templateMeta, dependency));
-                }
-            }
-
-            orderedJsonPointers.push(node.jsonPointer__);
-        }
-
-        if(!(nodes instanceof Set || Array.isArray(nodes))){
-            nodes = [nodes];
-        }
-        // Perform topological sort
-        nodes.forEach(node => {
-            if (!visited.has(node.jsonPointer__)) {
-                listDependencies(node);
-            }
-        });
-
-        return orderedJsonPointers;
-    }
-    async setData(jsonPtr, data) {
-        if(!jp.has(this.output, jsonPtr)){ //node doesn't exist yet, so just create it and return
-            await this.evaluateNode(jsonPtr, data);
-            return;
-        }
-        // Check if the node contains an expression. If so, print a warning and return.
-        const metaInf = jp.get(this.templateMeta, jsonPtr);
-        if (metaInf.expr__ !== undefined) {
-            console.warn(`Attempted to set data on a node that contains an expression at ${jsonPtr}. This operation is ignored.`);
-            return;
-        }
-        const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr, data);
-        const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
-        if(isChanged) {
-            await this.evaluateJsonPointersInOrder(sortedJsonPtrs); // Evaluate all other affected nodes, in optimal evaluation order
-        }
-    }
-
-    getDependentsTransitiveExecutionPlan(jsonPtr, data) {
+    getDependentsTransitiveExecutionPlan(jsonPtr) {
         const effectedNodesSet = this.getDependentsRecursive(jsonPtr);
         //const sortedJsonPtrs = this.topologicalSort(effectedNodesSet);
-        return [...effectedNodesSet].map(n=>n.jsonPointer__);
+        return [jsonPtr, ...[...effectedNodesSet].map(n=>n.jsonPointer__)];
+
     }
 
     getDependents(jsonPtr){
@@ -242,6 +246,13 @@ class TemplateProcessor {
             return this.topologicalSort(node);
         }
         return [];
+    }
+
+    setDataChangeCallback(jsonPtr, cbFn){
+        if (jp.has(this.templateMeta, jsonPtr)) {
+            const node = jp.get(this.templateMeta, jsonPtr);
+            node.callback__ = cbFn;
+        }
     }
 
 }
