@@ -12,18 +12,18 @@ class TemplateProcessor {
     }
 
     async initialize() {
-        let metaInfos = await this.processMetaInfos();
+        let metaInfos = await this.createMetaInfos();
         this.sortMetaInfos(metaInfos);
         this.populateTemplateMeta(metaInfos);
         this.buildDependenciesGraph(metaInfos);
         await this.evaluateDependencies(metaInfos);
     }
 
-    async processMetaInfos() {
+    async createMetaInfos() {
         const metaInfProcessor = jsonata(metaInfoProducer);
-        let metaInfos = await metaInfProcessor.evaluate(this.output);
+        let metaInfos = await metaInfProcessor.evaluate(this.input);
 
-        const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
+        //const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
             if (metaInfo.expr__ !== undefined) {
                 const depFinder = new DependencyFinder(metaInfo.expr__);
@@ -156,13 +156,13 @@ class TemplateProcessor {
             jp.set(template, jsonPtr, data); //this is just the weird case of setting something into the template that has no affect on any expressions
             return false;
         }
-        const { expr__, compiledExpr__, treeHasExpressions__ } = jp.get(templateMeta, jsonPtr);
+        const { expr__, compiledExpr__, treeHasExpressions__, callback__ } = jp.get(templateMeta, jsonPtr);
         if (data === undefined) {
 
             if (typeof expr__ !== 'undefined') {
                 try {
                     data = await compiledExpr__.evaluate(template);
-                    jp.set(template, jsonPtr, data);
+                    this._setData(template, jsonPtr, data, callback__);
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);
                     data = undefined;
@@ -182,7 +182,7 @@ class TemplateProcessor {
             }
             const existingData = jp.get(template, jsonPtr);
             if(!_.isEqual(existingData, data)){
-                jp.set(template, jsonPtr, data);
+                this._setData(template, jsonPtr, data, callback__);
             }else{
                 console.log(`data to be set at ${jsonPtr} did not change, ignored. `);
                 return false;
@@ -190,8 +190,13 @@ class TemplateProcessor {
 
         }
 
-        jp.set(templateMeta, jsonPtr + "/data__", data);
+        jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
+    }
+
+    _setData(template, jsonPtr, data, callback){
+        jp.set(template, jsonPtr, data);
+        callback && callback(data, jsonPtr);
     }
 
     getDependentsTransitiveExecutionPlan(jsonPtr) {
@@ -256,23 +261,5 @@ class TemplateProcessor {
     }
 
 }
-/*
-const template = {
-    "a": "${b & '<< a '}",
-    "b": "${c.d & '<< b '}",
-    "c": { "d": "${ e & '<< c.d' }" }, // intentionally referencing 'e', an as-yet non-existent node
-    "f": "${'['& a &', ' & b &', ' & c.d & ']<< f'}",
-    "g": 10,
-    "h": "${'g=' & g & ', c='& c}",
 
-};
-
-(async () => {
-    const templateProcessor = new TemplateProcessor(template);
-    await templateProcessor.initialize();
-    await templateProcessor.setData("/e", 42);
-    console.log(JSON.stringify(templateProcessor.templateMeta, null, 2));
-})();
-
- */
 module.exports = TemplateProcessor;
