@@ -28,6 +28,24 @@ class TemplateProcessor {
             if (metaInfo.expr__ !== undefined) {
                 const depFinder = new DependencyFinder(metaInfo.expr__);
                 metaInfo.compiledExpr__  = depFinder.compiledExpression;
+                metaInfo.compiledExpr__.assign("path", (path) => { //create the $path(<path>) function
+                    if(path){
+                        if(!path.match(/(\.\.\/)+/)){
+                            throw new Error(`Path ${path} is malformatted`);
+                        }
+                        const levelsUp = path.split("/").filter(Boolean).length; // so ../../ would be 2 levelsUp
+                        const parsedExistingPter = jp.parse(metaInfo.parentJsonPointer__);
+                        if(levelsUp > (parsedExistingPter.length)){
+                            return undefined;
+                        }
+                        const absoluteJsonPtr = jp.compile(jp.parse(metaInfo.parentJsonPointer__).slice(0, -levelsUp));
+                        if(!jp.has(this.output, absoluteJsonPtr)){
+                            return undefined;
+                        }
+                        return jp.get(this.output, absoluteJsonPtr);
+                    }
+                    return undefined;
+                });
                 metaInfo.dependencies__ = depFinder.findDependencies();//await compiledPathFinder.evaluate(metaInfo.compiledExpr__ .ast());
             }
             return metaInfo;
@@ -42,7 +60,8 @@ class TemplateProcessor {
 
     populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
-            meta.dependencies__ = this.convertDollarsToAbsoluteJsonPointer(meta).map(jp.compile);
+            meta.dependencies__ = this.removeLeadingDollarsFromDependencies(meta).map(jp.compile);
+            meta.parentJsonPointer__ = jp.compile(meta.jsonPointer__.slice(0, -1));
             meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
             meta.jsonPointer__ !== "" && jp.set(this.templateMeta, meta.jsonPointer__, meta);
         });
@@ -65,27 +84,17 @@ class TemplateProcessor {
     }
 
 
-    convertDollarsToAbsoluteJsonPointer(metaInfo) {
+    removeLeadingDollarsFromDependencies(metaInfo) {
         // Extract dependencies__ and jsonPointer__ from metaInfo
-        const { dependencies__, jsonPointer__ } = metaInfo;
-
+        const { dependencies__, } = metaInfo;
         // Iterate through each depsArray in dependencies__ using reduce function
-        return dependencies__.reduce((result, depsArray) => {
-            // Create a new array by mapping depsArray. If element is "", replace it with the parent json pointer
-            // If element is not "$", add it as is.
-            const mappedValues = depsArray.reduce((acc, d) => {
-                if (d === "") { // '$' means "variable whose name is empty string"..like, it's really $''
-                    acc.push(...jsonPointer__.slice(0, -1));
-                } else if (d !== "$") { // ...and $$ means "the variable whose name is $"
-                    acc.push(d);
-                }
-                return acc;
-            }, []);
-
-            // Push mappedValues to the result and return
-            result.push(mappedValues);
-            return result;
-        }, []);
+        dependencies__.forEach((depsArray) => {
+            const root = depsArray[0];
+            if(root === "" || root === "$"){
+                depsArray.shift();
+            }
+        });
+        return dependencies__;
     }
 
     topologicalSort(nodes) {
@@ -156,12 +165,13 @@ class TemplateProcessor {
             jp.set(template, jsonPtr, data); //this is just the weird case of setting something into the template that has no affect on any expressions
             return false;
         }
-        const { expr__, compiledExpr__, treeHasExpressions__, callback__ } = jp.get(templateMeta, jsonPtr);
+        const { expr__, compiledExpr__, treeHasExpressions__, callback__ , parentJsonPointer__} = jp.get(templateMeta, jsonPtr);
         if (data === undefined) {
 
             if (typeof expr__ !== 'undefined') {
                 try {
-                    data = await compiledExpr__.evaluate(template);
+                    const target = jp.get(template, parentJsonPointer__); //an expression is always relative to a target
+                    data = await compiledExpr__.evaluate(target);
                     this._setData(template, jsonPtr, data, callback__);
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);

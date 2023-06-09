@@ -34,9 +34,9 @@ module.exports = `
                     )
     
                     :(
-                        $match := /\\s*\\$\\{(.+)\\}\\s*$/($o); 
+                        $match := /\\s*((\\.\\.\\/)*)\\$\\{(.+)\\}\\s*$/($o); 
                         $match
-                                ? $setInfo($acc, { "expr__": $match[0].groups[0], "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
+                                ? $setInfo($acc, { "relativePath__":$match[0].groups[0], "expr__": $match[0].groups[2], "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
                                 : $setInfo($acc, { "jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
                     )
       ) }; 
