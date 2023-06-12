@@ -42,6 +42,48 @@ If your environment is set up correctly with the path for Node.js, you can simpl
 ```bash
 ./jeep.js
 ````
+#Using JEEP
+JEEP brings the data manipulation powers of JSONata to JSON templating. The JEEP repl let's you experiment with 
+templates.
+```bash
+> .init -f "example/ex03.json"
+{
+  "data": {
+    "fn": [
+      "john",
+      "jane"
+    ],
+    "ln": [
+      "doe",
+      "smith"
+    ]
+  },
+  "names": "${ $zip(data.fn, data.ln) }"
+}
+> .out
+{
+  "data": {
+    "fn": [
+      "john",
+      "jane"
+    ],
+    "ln": [
+      "doe",
+      "smith"
+    ]
+  },
+  "names": [
+    [
+      "john",
+      "doe"
+    ],
+    [
+      "jane",
+      "smith"
+    ]
+  ]
+}
+```
 
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated 
 expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when 
@@ -83,46 +125,7 @@ JEEP helps you track and debug transitive dependencies in your templates. You ca
 ]
 ```
 
-JEEP brings the data manipulation powers of JSONata:
-```bash
-> .init -f "example/ex03.json"
-{
-  "data": {
-    "fn": [
-      "john",
-      "jane"
-    ],
-    "ln": [
-      "doe",
-      "smith"
-    ]
-  },
-  "names": "${ $zip(data.fn, data.ln) }"
-}
-> .out
-{
-  "data": {
-    "fn": [
-      "john",
-      "jane"
-    ],
-    "ln": [
-      "doe",
-      "smith"
-    ]
-  },
-  "names": [
-    [
-      "john",
-      "doe"
-    ],
-    [
-      "jane",
-      "smith"
-    ]
-  ]
-}
-```
+
 JEEP let's you define and call functions
 ```bash
 > .init -f "example/ex05.json"
