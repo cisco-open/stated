@@ -17,6 +17,27 @@ ghendrey$ jeep.js
 "msg": "hello world"
 }
 ````
+
+## Getting Started
+
+1. **Installation**: Clone the repo, then install JEEP by running the following command:
+
+```bash
+yarn install
+````
+
+2. **Start JEEP**: Once installed, you can start using JEEP by running the following command:
+
+```bash
+node jeep.js
+````
+
+If your environment is set up correctly with the path for Node.js, you can simply run:
+
+```bash
+./jeep.js
+````
+
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated 
 expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when 
 fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression 
@@ -111,37 +132,7 @@ JEEP let's you define and call functions
   "to": "dave",
   "greeting": "hello dave"
 }
-> .set /to "Dr. David Bowman"
-setData Execution Time: 0.423ms
-{
-  "hello": "{function:}",
-  "to": "Dr. David Bowman",
-  "greeting": "hello Dr. David Bowman"
-}
-
-
-
 ```
-## Getting Started
-
-1. **Installation**: Clone the repo, then install JEEP by running the following command:
-
-```bash
-yarn install
-````
-
-2. **Start JEEP**: Once installed, you can start using JEEP by running the following command:
-
-```bash
-node jeep.js
-````
-
-If your environment is set up correctly with the path for Node.js, you can simply run:
-
-```bash
-./jeep.js
-````
-
 
 
 ### Setting Values in the JEEP CLI
@@ -149,12 +140,12 @@ If your environment is set up correctly with the path for Node.js, you can simpl
 The JEEP CLI also allows you to manually set values in your templates, further aiding in debugging and development:
 
 ```bash
-> .set /a 100
-setData Execution Time: 0.881ms
+> .set /to "Dr. David Bowman"
+setData Execution Time: 0.423ms
 {
-"a": 100,
-"b": 100,
-"c": "the answer is: 100"
+  "hello": "{function:}",
+  "to": "Dr. David Bowman",
+  "greeting": "hello Dr. David Bowman"
 }
 ````
 
