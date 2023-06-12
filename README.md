@@ -20,7 +20,12 @@ ghendrey$ jeep.js
 
 ## Getting Started
 
-1. **Installation**: Clone the repo, then install JEEP by running the following command:
+1. **Installation**: Clone the repo
+```bash
+git clone ssh://git@bitbucket.corp.appdynamics.com:7999/arch/templates.git;
+ce templates
+```
+3. then install JEEP by running the following command:
 
 ```bash
 yarn install
