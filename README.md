@@ -42,7 +42,7 @@ If your environment is set up correctly with the path for Node.js, you can simpl
 ```bash
 ./jeep.js
 ````
-# Using JEEP
+## Using JEEP
 JEEP brings the data manipulation powers of JSONata to JSON templating. The JEEP repl let's you experiment with 
 templates.
 ```bash
