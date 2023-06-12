@@ -100,13 +100,16 @@ JEEP let's you define and call functions
 > .init -f "example/ex05.json"
 {
   "hello": "${ (function($to){'hello ' & $to})}",
-  "greeting": "${ hello('dave')}"
+  "to": "dave",
+  "greeting": "${ hello(to)}"
 }
 > .out
 {
   "hello": "{function:}",
+  "to": "dave",
   "greeting": "hello dave"
 }
+
 
 ```
 ## Getting Started
@@ -177,17 +180,26 @@ You can reroot an expression in a different part of the document using `../${}` 
 ```bash
 > .init -f "example/ex04.json"
 {
-  "hello": "${ (function($to){'hello ' & $to})}",
-  "to": "dave",
-  "greeting": "${ hello(to)}"
+  "greeting": "hello",
+  "other": {
+    "msg": "../${greeting & ' there!'}",
+    "other": {
+      "msg1": "../../${greeting & ' from msg1'}",
+      "msg2": "${msg1 & '(from msg2)'}"
+    }
+  }
 }
 > .out
 {
-  "hello": "{function:}",
-  "to": "dave",
-  "greeting": "hello dave"
+  "greeting": "hello",
+  "other": {
+    "msg": "hello there!",
+    "other": {
+      "msg1": "hello from msg1",
+      "msg2": "hello from msg1(from msg2)"
+    }
+  }
 }
-
 > 
 
 ```
