@@ -25,28 +25,16 @@ class TemplateProcessor {
 
         //const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
+            metaInfo.parentJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
+            const cdUpPath = metaInfo.exprRootPath__;
+            if(cdUpPath) {
+                const cdUpParts = cdUpPath.match(/\.\.\//g);
+                metaInfo.parentJsonPointer__ = metaInfo.parentJsonPointer__.slice(0, -cdUpParts.length);
+            }
             if (metaInfo.expr__ !== undefined) {
-                const depFinder = new DependencyFinder(metaInfo.expr__);
+                const depFinder = new DependencyFinder(metaInfo.expr__, metaInfo);
                 metaInfo.compiledExpr__  = depFinder.compiledExpression;
-                metaInfo.compiledExpr__.assign("path", (path) => { //create the $path(<path>) function
-                    if(path){
-                        if(!path.match(/(\.\.\/)+/)){
-                            throw new Error(`Path ${path} is malformatted`);
-                        }
-                        const levelsUp = path.split("/").filter(Boolean).length; // so ../../ would be 2 levelsUp
-                        const parsedExistingPter = jp.parse(metaInfo.parentJsonPointer__);
-                        if(levelsUp > (parsedExistingPter.length)){
-                            return undefined;
-                        }
-                        const absoluteJsonPtr = jp.compile(jp.parse(metaInfo.parentJsonPointer__).slice(0, -levelsUp));
-                        if(!jp.has(this.output, absoluteJsonPtr)){
-                            return undefined;
-                        }
-                        return jp.get(this.output, absoluteJsonPtr);
-                    }
-                    return undefined;
-                });
-                metaInfo.dependencies__ = depFinder.findDependencies();//await compiledPathFinder.evaluate(metaInfo.compiledExpr__ .ast());
+                metaInfo.dependencies__ = depFinder.findDependencies();
             }
             return metaInfo;
         }));
@@ -60,18 +48,35 @@ class TemplateProcessor {
 
     populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
-            meta.dependencies__ = this.removeLeadingDollarsFromDependencies(meta).map(jp.compile);
-            meta.parentJsonPointer__ = jp.compile(meta.jsonPointer__.slice(0, -1));
-            meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
-            meta.jsonPointer__ !== "" && jp.set(this.templateMeta, meta.jsonPointer__, meta);
+            //these initialDependenciesPathParts may have "../" meta instructions like ["../", "../", "a", "b", "c"]
+            const initialDependenciesPathParts = this.removeLeadingDollarsFromDependencies(meta);
+            //we need the cdUp operation to remove the "../" meta instructions and process them by shortening
+            // the parentPathParts. The cdUp method mutates both the initalDependenciesPathParts and the parentJsonPointer
+            //TemplateProcessor.cdUp(meta.parentJsonPointer__, initialDependenciesPathParts);
+            meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.parentJsonPointer__, initialDependenciesPathParts);
+            meta.dependencies__ = initialDependenciesPathParts;
+            //so if we will never allow replacement of the entire root document. But modulo that if-statement we can setup the templateMeta
+            if(meta.jsonPointer__.length > 0 ){
+                //if we are here then the templateMetaData can be set to the meta we just populated
+                jp.set(this.templateMeta, meta.jsonPointer__, meta);
+            }
+            TemplateProcessor.compileToJsonPointer(meta);
         });
+    }
+
+    //mutates all the pieces of metaInf that are path parts and turns them into JSON Pointer syntax
+    static compileToJsonPointer(meta){
+        meta.absoluteDependencies__ = meta.absoluteDependencies__.map(jp.compile);
+        meta.dependencies__ = meta.dependencies__.map(jp.compile);
+        meta.parentJsonPointer__ = jp.compile(meta.parentJsonPointer__);
+        meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
     }
 
     buildDependenciesGraph(metaInfos) {
         metaInfos.forEach(i => {
-            i.dependencies__?.forEach(ptr => {
+            i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
-                    jp.set(this.templateMeta, ptr, { "jsonPointer__": ptr, "dependees__": [], "dependencies__": [] });
+                    jp.set(this.templateMeta, ptr, { "jsonPointer__": ptr, "dependees__": [], "dependencies__": [], "absoluteDependencies__": [] });
                 }
                 jp.get(this.templateMeta, ptr).dependees__.push(i.jsonPointer__);
             });
@@ -83,6 +88,11 @@ class TemplateProcessor {
         await this.evaluateJsonPointersInOrder(nodePtrList);
     }
 
+    makeDepsAbsolute(parentJsonPtr, localJsonPtrs){
+        return localJsonPtrs.map(localJsonPtr =>{ //both parentJsonPtr and localJsonPtr are like ["a", "b", "c"] (array of parts)
+            return [...parentJsonPtr, ...localJsonPtr]
+        })
+    }
 
     removeLeadingDollarsFromDependencies(metaInfo) {
         // Extract dependencies__ and jsonPointer__ from metaInfo
@@ -105,7 +115,7 @@ class TemplateProcessor {
         function listDependencies(node) {
             visited.add(node.jsonPointer__);
 
-            for (const dependency of node.dependencies__) {
+            for (const dependency of node.absoluteDependencies__) {
                 if (!visited.has(dependency)) {
                     listDependencies(jp.get(templateMeta, dependency));
                 }

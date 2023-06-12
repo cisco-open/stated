@@ -1,0 +1,7 @@
+{
+  "data": {
+    "fn": ["john", "jane"],
+    "ln": ["doe", "smith"]
+  },
+  "names": "${ $zip(data.fn, data.ln) }"
+}

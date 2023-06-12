@@ -1,14 +1,16 @@
 const _ = require('lodash');
 const jsonata = require("jsonata");
+const jp = require("json-pointer");
 
 class DependencyFinder {
-    constructor(program) {
+    constructor(program, metaInfo) { //second argument is needed when $path() function is in the program
         this.compiledExpression = jsonata(program);
         this.ast = this.compiledExpression.ast();
         this.currentSteps = [];
         this.paths = [];
         this.exprStack = [];
         this.pathInterrupts = 0;
+        this.metaInfo = metaInfo;
     }
 
     findDependencies(node = this.ast) {
@@ -27,11 +29,12 @@ class DependencyFinder {
                 type,
                 update,
                 pattern,
-                value,
                 predicate,
-                stages
+                stages,
+                procedure,
+                arguments:args
             } = node;
-            this.capturePathExpressions(type, value)
+            this.capturePathExpressions(node)
             this.exprStack.push(type);
             let children;
             switch (type) {
@@ -69,6 +72,7 @@ class DependencyFinder {
 
             //now we are coming out of the recursion, so the swtich below is over the just-finished subtree
             switch (type) {
+                //case "pathFunction":
                 case "path":
                     this.emitPaths();
                     break;
@@ -100,8 +104,9 @@ class DependencyFinder {
         return children;
     }
 
-    capturePathExpressions(type, value) {
-        if (type !== "name" && type !== "variable") {
+    capturePathExpressions(node) {
+        const {type, value, function:func} = node;
+        if (type !== "name" && type !== "variable" && type !== "pathFunction") { // $path(../) must be detected here too
             return;
         }
         if (this.isRootedIn$$(value)) { //if the root of the expression is $$ then we will always accept the navigation downwards
@@ -140,11 +145,6 @@ class DependencyFinder {
     }
 
 
-//returns true when we are processing the lhs of a ~>
-    isFirstPatternExpressionInTransormChain() {
-        const s = this.exprStack
-        return "pattern" === _.last(s) && s.filter(type => type === "apply").length === 1
-    }
 
     isInsideAScopeWhere$IsLocal() {
         return this.exprStack.some(type => type === "transform")
@@ -164,7 +164,9 @@ class DependencyFinder {
         this.currentSteps = [];
 
     }
+
 }
+
 
 module.exports = DependencyFinder;
 

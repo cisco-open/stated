@@ -1,0 +1,4 @@
+{
+  "a": "nothing to see here",
+  "b": {"to": "world", "msg": "${ 'hello' & to }"}
+}

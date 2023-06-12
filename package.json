@@ -1,5 +1,5 @@
 {
-  "name": "jsonataexperiments",
+  "name": "jeep",
   "version": "1.0.0",
   "dependencies": {
     "json-pointer": "^0.6.2",

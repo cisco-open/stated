@@ -1,0 +1,10 @@
+{
+  "greeting": "hello",
+  "other": {
+     "msg": "../${greeting & ' there!'}",
+     "other": {
+        "msg1": "../../${greeting & ' from msg1'}",
+        "msg2": "${msg1 & '(from msg2)'}"
+     }
+  }
+}

@@ -3,7 +3,7 @@ const repl = require('repl');
 const fs = require('fs');
 const util = require('util');
 const readFile = util.promisify(fs.readFile);
-const TemplateProcessor = require('./TemplateProcessor');
+const TemplateProcessor = require('./src/TemplateProcessor');
 
 let templateProcessor;
 
