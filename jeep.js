@@ -7,9 +7,29 @@ const TemplateProcessor = require('./src/TemplateProcessor');
 
 let templateProcessor;
 
+
+const disableCommand = (replServer, command) => {
+    replServer.defineCommand(command, {
+        help: `The ${command} command is disabled.`,
+        action() {
+            this.clearBufferedCommand();
+            console.log(`Command '${command}' is disabled.`);
+            this.displayPrompt();
+        },
+    });
+};
+
+const disableCommands = (replServer, commands) => {
+    for (const command of commands) {
+        disableCommand(replServer, command);
+    }
+};
+
+const disabledCommands = ['break', 'clear','save', 'load', 'editor'];
 const r = repl.start({
     prompt: '> ',
 });
+disableCommands(r, disabledCommands);
 const printFunc = function(key, value) {
     // if value is a function, ignore it
     if (value?._jsonata_lambda) {
@@ -175,3 +195,5 @@ r.defineCommand('help', {
         this.displayPrompt();
     },
 });
+
+
