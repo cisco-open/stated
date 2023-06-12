@@ -165,27 +165,8 @@ provides a way to have a pure JSON document, with many embedded JSONata expressi
 is supported.
 
 The embedded JSONata expressions take their enclosing object or array as their JSONata input. JEEP temlates are easy 
-to understand because the JSONata expressions assign their value directly to the field where they reside.
-
-```bash
-> .init -f "example/ex02.json"
-{
-  "a": "nothing to see here",
-  "b": {
-    "to": "world",
-    "msg": "${ 'hello' & to }"
-  }
-}
-> .out
-{
-  "a": "nothing to see here",
-  "b": {
-    "to": "world",
-    "msg": "helloworld"
-  }
-}
-```
-You can reroot an expression in a different part of the document using `../${}` syntax
+to understand because the JSONata expressions assign their value directly to the field where they reside. You can 
+reroot an expression in a different part of the document using `../${}` syntax
 ```bash
 > .init -f "example/ex04.json"
 {
