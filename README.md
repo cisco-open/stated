@@ -210,16 +210,7 @@ reroot an expression in a different part of the document using `../${}` syntax
 
 JEEP provides a set of CLI commands to interact with the system:
 
-Standard Node REPL Commands:
-- **.break**: Sometimes you get stuck, this gets you out.
-- **.clear**: Break, and also clear the local context.
-- **.exit**: Exit the REPL.
-- **.help**: Display available commands and their descriptions.
-- **.save**: Save all evaluated commands in this REPL session to a file.
-- **.load**: Load JS from a file into the REPL session.
-- **.editor**: Enter editor mode.
-
-JEEP-Specific Commands:
+JEEP Commands:
 - **.init**: Initialize the template.
 - **.set**: Set data to a JSON pointer path.
 - **.in**: Show the input template.
