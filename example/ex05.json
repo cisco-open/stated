@@ -1,5 +1,5 @@
 {
-  "hello": "${ (function($to){'hello ' & $to})}",
+  "hello": "${ (function($to){'hello ' & $to & '. The current time is ' & $now()})}",
   "to": "dave",
   "greeting": "${ hello(to)}"
 }

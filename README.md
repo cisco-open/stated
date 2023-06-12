@@ -127,7 +127,7 @@ JEEP let's you define and call functions
 ```bash
 > .init -f "example/ex05.json"
 {
-  "hello": "${ (function($to){'hello ' & $to})}",
+  "hello": "${ (function($to){'hello ' & $to & '. The current time is ' & $now()})}",
   "to": "dave",
   "greeting": "${ hello(to)}"
 }
@@ -135,8 +135,9 @@ JEEP let's you define and call functions
 {
   "hello": "{function:}",
   "to": "dave",
-  "greeting": "hello dave"
+  "greeting": "hello dave. The current time is 2023-06-12T07:23:00.243Z"
 }
+
 ```
 
 
@@ -146,12 +147,14 @@ The JEEP CLI also allows you to manually set values in your templates, further a
 
 ```bash
 > .set /to "Dr. David Bowman"
-setData Execution Time: 0.423ms
+setData Execution Time: 1.732ms
 {
   "hello": "{function:}",
   "to": "Dr. David Bowman",
-  "greeting": "hello Dr. David Bowman"
+  "greeting": "hello Dr. David Bowman. The current time is 2023-06-12T07:23:00.243Z"
 }
+> 
+
 ````
 
 ## Why Do We Need Jeep?
