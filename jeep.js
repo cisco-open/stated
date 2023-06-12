@@ -10,6 +10,16 @@ let templateProcessor;
 const r = repl.start({
     prompt: '> ',
 });
+const printFunc = function(key, value) {
+    // if value is a function, ignore it
+    if (value?._jsonata_lambda) {
+        return "{function:}";
+    }
+    if (key === 'compiledExpr__') {
+        return "--compiled expression--";
+    }
+    return value;
+}
 
 r.defineCommand('init', {
     help: 'Initialize the template',
@@ -40,7 +50,7 @@ r.defineCommand('init', {
 
         templateProcessor = new TemplateProcessor(template);
         await templateProcessor.initialize();
-        console.log(JSON.stringify(templateProcessor.input, null, 2));
+        console.log(JSON.stringify(templateProcessor.input, printFunc, 2));
         this.displayPrompt();
     },
 });
@@ -79,7 +89,7 @@ r.defineCommand('set', {
                 await templateProcessor.setData(path, data);
                 console.timeEnd('setData Execution Time');
 
-                console.log(JSON.stringify(templateProcessor.output, null, 2));
+                console.log(JSON.stringify(templateProcessor.output, printFunc, 2));
             } catch (err) {
                 console.error('Error setting data:', err);
             }
@@ -95,7 +105,7 @@ r.defineCommand('in', {
     help: 'Show the input template',
     action() {
         if (templateProcessor) {
-            console.log(JSON.stringify(templateProcessor.input, null, 2));
+            console.log(JSON.stringify(templateProcessor.input, printFunc, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }
@@ -107,13 +117,7 @@ r.defineCommand('out', {
     help: 'Show the current state of the template',
     action() {
         if (templateProcessor) {
-            console.log(JSON.stringify(templateProcessor.output, function(key, value) {
-                // if value is a function, ignore it
-                if (value?._jsonata_lambda) {
-                    return "{function:}";
-                }
-                return value;
-            }, 2));
+            console.log(JSON.stringify(templateProcessor.output, printFunc, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }
@@ -125,13 +129,7 @@ r.defineCommand('state', {
     help: 'Show the current state of the templateMeta',
     action() {
         if (templateProcessor) {
-            const omitCompiledExpressionsFromPrint = (key, value) => {
-                if (key === 'compiledExpr__') {
-                    return undefined;
-                }
-                return value;
-            }
-            console.log(JSON.stringify(templateProcessor.templateMeta, omitCompiledExpressionsFromPrint, 2));
+            console.log(JSON.stringify(templateProcessor.templateMeta, printFunc, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }
@@ -145,7 +143,7 @@ r.defineCommand('from', {
         if (templateProcessor) {
             const [jsonPtr, option] = args.split(' ');
             const dependents = option === '--shallow' ? templateProcessor.getDependents(jsonPtr): templateProcessor.getDependentsTransitiveExecutionPlan(jsonPtr) ;
-            console.log(JSON.stringify(dependents, null, 2));
+            console.log(JSON.stringify(dependents, printFunc, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }
@@ -159,7 +157,7 @@ r.defineCommand('to', {
         if (templateProcessor) {
             const [jsonPtr, option] = args.split(' ');
             const dependencies = option === '--shallow' ? templateProcessor.getDependencies(jsonPtr):templateProcessor.getDependenciesTransitiveExecutionPlan(jsonPtr);
-            console.log(JSON.stringify(Array.from(dependencies), null, 2));
+            console.log(JSON.stringify(Array.from(dependencies), printFunc, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }

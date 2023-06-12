@@ -109,6 +109,14 @@ JEEP let's you define and call functions
   "to": "dave",
   "greeting": "hello dave"
 }
+> .set /to "Dr. David Bowman"
+setData Execution Time: 0.423ms
+{
+  "hello": "{function:}",
+  "to": "Dr. David Bowman",
+  "greeting": "hello Dr. David Bowman"
+}
+
 
 
 ```
