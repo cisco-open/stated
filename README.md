@@ -95,7 +95,20 @@ JEEP brings the data manipulation powers of JSONata:
   ]
 }
 ```
+JEEP let's you define and call functions
+```bash
+> .init -f "example/ex05.json"
+{
+  "hello": "${ (function($to){'hello ' & $to})}",
+  "greeting": "${ hello('dave')}"
+}
+> .out
+{
+  "hello": "{function:}",
+  "greeting": "hello dave"
+}
 
+```
 ## Getting Started
 
 1. **Installation**: Clone the repo, then install JEEP by running the following command:

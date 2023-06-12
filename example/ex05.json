@@ -1,0 +1,4 @@
+{
+  "hello": "${ (function($to){'hello ' & $to})}",
+  "greeting": "${ hello('dave')}"
+}

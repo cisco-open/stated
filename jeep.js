@@ -107,7 +107,13 @@ r.defineCommand('out', {
     help: 'Show the current state of the template',
     action() {
         if (templateProcessor) {
-            console.log(JSON.stringify(templateProcessor.output, null, 2));
+            console.log(JSON.stringify(templateProcessor.output, function(key, value) {
+                // if value is a function, ignore it
+                if (value?._jsonata_lambda) {
+                    return "{function:}";
+                }
+                return value;
+            }, 2));
         } else {
             console.error('Error: Initialize the template first.');
         }
