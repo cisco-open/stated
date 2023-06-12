@@ -147,9 +147,13 @@ setData Execution Time: 0.881ms
 
 ## Why Do We Need Jeep?
 
-JSONata assumes a single input document and provides a powerful complete language for manipulating that input and producing an output. However, JSON templating requires expressions that ride along inside the document itself. Each expression is a JSONata program. In JEEP, JSONata programs are embedded using `${ ...JSONata Expression...}`.
+JSONata assumes a single input document and provides a powerful complete language for manipulating that input and 
+producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. JEEP 
+provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
+is supported.
 
-The embedded JSONata expressions take their enclosing object or array as their JSONata input. JEEP temlates are easy to understand because the JSONata expressions assign their value directly to the field where they reside.
+The embedded JSONata expressions take their enclosing object or array as their JSONata input. JEEP temlates are easy 
+to understand because the JSONata expressions assign their value directly to the field where they reside.
 
 ```bash
 > .init -f "example/ex02.json"
