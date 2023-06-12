@@ -186,27 +186,36 @@ You can reroot an expression in a different part of the document using `../${}` 
 ```bash
 > .init -f "example/ex04.json"
 {
-  "greeting": "hello",
-  "other": {
-    "msg": "../${greeting & ' there!'}",
-    "other": {
-      "msg1": "../../${greeting & ' from msg1'}",
-      "msg2": "${msg1 & '(from msg2)'}"
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "../../${greeting & ', ' &  player1}",
+      "../../${greeting & ', ' &  player2}"
+    ],
+    "partII": {
+      "msg3": "../../${player1 & ', would you like to play a game?'}",
+      "msg4": "../../${'Certainly, '& player2 & '. How about a nice game of chess?'}"
     }
   }
 }
 > .out
 {
-  "greeting": "hello",
-  "other": {
-    "msg": "hello there!",
-    "other": {
-      "msg1": "hello from msg1",
-      "msg2": "hello from msg1(from msg2)"
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "Hello, Joshua",
+      "Hello, Professor Falken"
+    ],
+    "partII": {
+      "msg3": "Joshua, would you like to play a game?",
+      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
     }
   }
 }
-> 
 
 ```
 
