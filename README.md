@@ -1,4 +1,6 @@
 # JEEP: JSONata Embedded Expression Processor
+<img src="https://cdn.pixabay.com/photo/2019/03/11/18/27/jeep-4049181_1280.png" alt="Jeep" width="300">
+
 
 JEEP, or Jsonata Embedded Expression Processor, is a library and CLI for running JSON files with embedded
 [JSONata](http://docs.jsonata.org/) programs.
