@@ -301,3 +301,9 @@ producing an output. However, JSONata programs are a superset of JSON so they ar
 provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
 is supported. 
 
+For small examples it may not seem obvious why JEEP goes to the trouble of computing a DAG and optimizing expression
+evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data 
+(such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
+with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
+was one of the motivating use cases for JEEP: performance critical data rendering applications.
+
