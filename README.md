@@ -278,7 +278,7 @@ setData Execution Time: 1.732ms
 > 
 ````
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
-using the expression ``/${fibonacci}``. The first element of the array contains `${$[2]($[1])}`. Can you see that 
+using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
 it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which 
 will pull in the `fibonacci` function and `$[1]` is the middle element of the array, holding the static value `6`.
 ```bash
