@@ -1,4 +1,4 @@
-const DependencyFinder=require('./DependencyFinder');
+const DependencyFinder = require('./DependencyFinder');
 
 test('$$.aaa', () => {
     const df = new DependencyFinder('$$.aaa');
@@ -26,14 +26,14 @@ test('reduce 2', () => {
 test("transform - pattern should be ignored", () => {
     const program = `k.z~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"],["$","aaaa"]    ]);
+    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
 });
 test("transform 1", () => {
     const program = `(                        
                         $gorp:=k.z[zz].[poop]~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|;                        
                         )`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"],["$","aaaa"]    ]);
+    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
 });
 
 
@@ -81,7 +81,7 @@ test("complex program 1", () => {
                        )});  
                         )`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"], ["$","aaaa"],["doink"], ["", "a"],["", 'a', 'b'], ["x", "y", "z"]]);
+    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"], ["doink"], ["", "a"], ["", 'a', 'b'], ["x", "y", "z"]]);
 });
 
 test("subtract", () => {
@@ -89,4 +89,68 @@ test("subtract", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([["c"], ["a"], ["b"]]);
 });
+
+test("filter numeric predicate (array)", () => {
+    const program = "a[0]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["a", 0]]);
+});
+test("filter numeric predicate (array 2d)", () => {
+    const program = "a[0][1]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["a", 0, 1]]);
+});
+
+test("filter field predicate (array)", () => {
+    const program = "a[z]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["a"]]); //we don't currently go to the level of fidelity to analyze filter expressions. We just say "this depends on 'a'"
+});
+
+
+test("$ filter numeric predicate", () => {
+    const program = "$[0]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["", 0]]);
+});
+test("$$ filter numeric predicate", () => {
+    const program = "$$[0]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["$", 0]]);
+});
+test("$$ filter numeric predicate 2d", () => {
+    const program = "$$[0][1]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["$", 0, 1]]);
+});
+
+test("$[0][1] + $[2][3]", () => {
+    const program = "$[0][1] + $[2][3]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["", 0, 1], ["", 2, 3]]);
+});
+
+test("$[0][1][a]", () => {
+    const program = "$[0][1][a]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["", 0, 1]]);
+});
+
+test("$[0][1].a", () => {
+    const program = "$[0][1].a";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["", 0, 1, "a"]]);
+});
+
+test("$[0]($[1])", () => {
+    const program = "$[0]($[1])";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["", 1], ["",0]]);
+});
+
+
+
+
+
+
 

@@ -196,4 +196,16 @@ r.defineCommand('help', {
     },
 });
 
+r.defineCommand('plan', {
+    help: 'Show the evaluation plan',
+    action() {
+        if (templateProcessor) {
+            console.log(JSON.stringify(templateProcessor.getEvaluationPlan(), printFunc, 2));
+        } else {
+            console.error('Error: Initialize the template first.');
+        }
+        this.displayPrompt();
+    },
+});
+
 

@@ -90,8 +90,8 @@ class TemplateProcessor {
     }
 
     async evaluateDependencies(metaInfos) {
-        const nodePtrList = this.topologicalSort(metaInfos);
-        await this.evaluateJsonPointersInOrder(nodePtrList);
+        this.evaluationPlan = this.topologicalSort(metaInfos);
+        await this.evaluateJsonPointersInOrder(this.evaluationPlan);
     }
 
     makeDepsAbsolute(parentJsonPtr, localJsonPtrs){
@@ -284,6 +284,10 @@ class TemplateProcessor {
             const node = jp.get(this.templateMeta, jsonPtr);
             node.callback__ = cbFn;
         }
+    }
+    //returns the evaluation plan for evaluating the entire template
+    getEvaluationPlan(){
+       return this.evaluationPlan;
     }
 
 }

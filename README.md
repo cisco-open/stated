@@ -91,7 +91,8 @@ fields in your JSON change, that the changes flow through the DAG in an optimal 
 calculation.
 
 JEEP helps you track and debug transitive dependencies in your templates. You can use the
-``from`` and ``to`` commands to track the flow of data
+``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
+you the order in which changes propagate.
 
 ```bash
 > .init -f "example/ex01.json"
@@ -124,7 +125,36 @@ JEEP helps you track and debug transitive dependencies in your templates. You ca
 "/c"
 ]
 ```
+The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
+when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is 
+evaluated twice.
+```bash
+> .init -f "example/ex08.json"
+{
+  "a": "${c}",
+  "b": "${d+1+e}",
+  "c": "${b+1}",
+  "d": "${e+1}",
+  "e": 1
+}
+> .plan
+[
+  "/e",
+  "/d",
+  "/b",
+  "/c",
+  "/a"
+]
+> .out
+{
+  "a": 5,
+  "b": 4,
+  "c": 5,
+  "d": 2,
+  "e": 1
+}
 
+```
 
 JEEP let's you define and call functions
 ```bash
@@ -140,9 +170,7 @@ JEEP let's you define and call functions
   "to": "dave",
   "greeting": "hello dave. The current time is 2023-06-12T07:23:00.243Z"
 }
-
 ```
-
 
 ### Setting Values in the JEEP CLI
 
@@ -157,8 +185,32 @@ setData Execution Time: 1.732ms
   "greeting": "hello Dr. David Bowman. The current time is 2023-06-12T07:23:00.243Z"
 }
 > 
-
 ````
+Here is an elaborate example of functions. The field 'x' is an array. The element with `x[2]`, the last element of `x` is an expression rooted in the 
+document, and referencing the `fibonacci` top level document field, which happens to be a function. The first element of 
+array has an jsonata expression ``$[2]($[1])`` which means "get element 2 of the current array, then invoke it as a function
+passing element 1 of this array to it. Element 1 is 6. Therefore we get the 6th Fibonacci sequence which is 8."
+```bash
+> .init -f "example/ex06.json"
+{
+  "x": [
+    "${$[2]($[1])}",
+    6,
+    "/${fibonacci}"
+  ],
+  "fibonacci": "${ function($n){$n=1?1:$n=0?0:fibonacci($n-1)+fibonacci($n-2)}}"
+}
+> .out
+{
+  "x": [
+    8,
+    6,
+    "{function:}"
+  ],
+  "fibonacci": "{function:}"
+}
+
+```
 
 ## Why Do We Need Jeep?
 
