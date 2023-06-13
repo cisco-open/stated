@@ -169,7 +169,8 @@ is supported.
 
 The embedded JSONata expressions take their enclosing object or array as their JSONata input. JEEP temlates are easy 
 to understand because the JSONata expressions assign their value directly to the field where they reside. You can 
-reroot an expression in a different part of the document using `../${}` syntax
+reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an 
+at the absolute doc root with `/${<expr>}`
 ```bash
 > .init -f "example/ex04.json"
 {
@@ -180,10 +181,10 @@ reroot an expression in a different part of the document using `../${}` syntax
     "partI": [
       "../../${greeting & ', ' &  player1}",
       "../../${greeting & ', ' &  player2}"
-    ],
+     ],
     "partII": {
-      "msg3": "../../${player1 & ', would you like to play a game?'}",
-      "msg4": "../../${'Certainly, '& player2 & '. How about a nice game of chess?'}"
+      "msg3": "/${player1 & ', would you like to play a game?'}",
+      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
     }
   }
 }

@@ -8,8 +8,8 @@
       "../../${greeting & ', ' &  player2}"
      ],
     "partII": {
-      "msg3": "../../${player1 & ', would you like to play a game?'}",
-      "msg4": "../../${'Certainly, '& player2 & '. How about a nice game of chess?'}"
+      "msg3": "/${player1 & ', would you like to play a game?'}",
+      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
     }
   }
 }
