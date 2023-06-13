@@ -42,9 +42,57 @@ If your environment is set up correctly with the path for Node.js, you can simpl
 ```bash
 ./jeep.js
 ````
-## Using JEEP
-JEEP brings the data manipulation powers of JSONata to JSON templating. The JEEP repl let's you experiment with 
-templates.
+## CLI Commands
+
+JEEP provides a set of CLI commands to interact with the system:
+
+JEEP Commands:
+- **.init**: Initialize the template.
+- **.set**: Set data to a JSON pointer path.
+- **.in**: Show the input template.
+- **.out**: Show the current state of the template.
+- **.state**: Show the current state of the templateMeta.
+- **.from**: Show the dependents of a given JSON pointer.
+- **.to**: Show the dependencies of a given JSON pointer.
+
+
+## Expressions
+JEEP allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
+```bash
+{
+  "a": [
+    0,
+    1,
+    "${ $[0] + $[1] }"
+  ]
+}
+```
+
+The content between `${}` can be any valid JSONata program. The JEEP repl lets you experiment with templates.
+```bash
+> .init -f "example/ex09.json"
+{
+  "a": [
+    0,
+    1,
+    "${ $[0] + $[1] }"
+  ]
+}
+> .out
+{
+  "a": [
+    0,
+    1,
+    1
+  ]
+}
+
+```
+### Expression Scope
+What is the input to the JSONata program? The input, by default, is the object or array that the expression resides in. 
+In the example above, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
+refer to the first element of the array. The example below uses JSONata `$zip` function to manipulate data. The `${}` resides 
+in the root object, therefore expressions like `data` refer to the `data` field of the root object.
 ```bash
 > .init -f "example/ex03.json"
 {
@@ -84,7 +132,47 @@ templates.
   ]
 }
 ```
+### Rerooting Expressions
+You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
+at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can 
+explicitly set their input using the rooting syntax.
 
+```bash
+> .init -f "example/ex04.json"
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "../../${greeting & ', ' &  player1}",
+      "../../${greeting & ', ' &  player2}"
+     ],
+    "partII": {
+      "msg3": "/${player1 & ', would you like to play a game?'}",
+      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
+    }
+  }
+}
+> .out
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "Hello, Joshua",
+      "Hello, Professor Falken"
+    ],
+    "partII": {
+      "msg3": "Joshua, would you like to play a game?",
+      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
+    }
+  }
+}
+
+```
+### DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated 
 expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when 
 fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression 
@@ -155,7 +243,7 @@ evaluated twice.
 }
 
 ```
-
+## Functions
 JEEP let's you define and call functions
 ```bash
 > .init -f "example/ex05.json"
@@ -217,58 +305,5 @@ will pull in the `fibonacci` function and `$[1]` is the middle element of the ar
 JSONata assumes a single input document and provides a powerful complete language for manipulating that input and 
 producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. JEEP 
 provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
-is supported.
+is supported. 
 
-The embedded JSONata expressions take their enclosing object or array as their JSONata input. JEEP temlates are easy 
-to understand because the JSONata expressions assign their value directly to the field where they reside. You can 
-reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an 
-at the absolute doc root with `/${<expr>}`
-```bash
-> .init -f "example/ex04.json"
-{
-  "greeting": "Hello",
-  "player1": "Joshua",
-  "player2": "Professor Falken",
-  "dialog": {
-    "partI": [
-      "../../${greeting & ', ' &  player1}",
-      "../../${greeting & ', ' &  player2}"
-     ],
-    "partII": {
-      "msg3": "/${player1 & ', would you like to play a game?'}",
-      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
-    }
-  }
-}
-> .out
-{
-  "greeting": "Hello",
-  "player1": "Joshua",
-  "player2": "Professor Falken",
-  "dialog": {
-    "partI": [
-      "Hello, Joshua",
-      "Hello, Professor Falken"
-    ],
-    "partII": {
-      "msg3": "Joshua, would you like to play a game?",
-      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
-    }
-  }
-}
-
-```
-
-## CLI Commands
-
-JEEP provides a set of CLI commands to interact with the system:
-
-JEEP Commands:
-- **.init**: Initialize the template.
-- **.set**: Set data to a JSON pointer path.
-- **.in**: Show the input template.
-- **.out**: Show the current state of the template.
-- **.state**: Show the current state of the templateMeta.
-- **.from**: Show the dependents of a given JSON pointer.
-- **.to**: Show the dependencies of a given JSON pointer.
-```
