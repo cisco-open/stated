@@ -247,7 +247,8 @@ evaluated twice.
 
 ```
 ## Functions
-JEEP let's you define and call functions
+JEEP let's you define and call functions.
+### Simple Function Example
 ```bash
 > .init -f "example/ex05.json"
 {
@@ -262,6 +263,7 @@ JEEP let's you define and call functions
   "greeting": "hello dave. The current time is 2023-06-12T07:23:00.243Z"
 }
 ```
+### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
 it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which 
