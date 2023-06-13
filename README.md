@@ -258,7 +258,7 @@ Here is an elaborate example of functions. The `fibonnaci` function itself is pu
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
 it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which 
 will pull in the `fibonacci` function and `$[1]` is the middle element of the array, holding the static value `6`. 
-So `$[2]($[1])` expands to `fibonacci(6)`.
+So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, which is what `fibonacci(6)` returns. 
 ```bash
 > .init -f "example/ex06.json"
 {
