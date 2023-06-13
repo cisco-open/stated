@@ -186,10 +186,10 @@ setData Execution Time: 1.732ms
 }
 > 
 ````
-Here is an elaborate example of functions. The field 'x' is an array. The element with `x[2]`, the last element of `x` is an expression rooted in the 
-document, and referencing the `fibonacci` top level document field, which happens to be a function. The first element of 
-array has an jsonata expression ``$[2]($[1])`` which means "get element 2 of the current array, then invoke it as a function
-passing element 1 of this array to it. Element 1 is 6. Therefore we get the 6th Fibonacci sequence which is 8."
+Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
+using the expression ``/${fibonacci}``. The first element of the array contains `${$[2]($[1])}`. Can you see that 
+it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which 
+will pull in the `fibonacci` function and `$[1]` is element 1 of the array, holding the static value `6`.
 ```bash
 > .init -f "example/ex06.json"
 {
