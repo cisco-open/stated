@@ -59,16 +59,6 @@ JEEP Commands:
 
 ## Expressions
 JEEP allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
-```bash
-{
-  "a": [
-    0,
-    1,
-    "${ $[0] + $[1] }"
-  ]
-}
-```
-
 The content between `${}` can be any valid JSONata program. The JEEP repl lets you experiment with templates.
 ```bash
 > .init -f "example/ex09.json"
