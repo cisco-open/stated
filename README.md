@@ -91,8 +91,10 @@ The content between `${}` can be any valid JSONata program. The JEEP repl lets y
 ```
 ### Expression Scope
 What is the input to the JSONata program? The input, by default, is the object or array that the expression resides in. 
-In the example above, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
-refer to the first element of the array. The example below uses JSONata `$zip` function to manipulate data. The `${}` resides 
+In the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
+refer to the first element of the array. 
+
+The example below uses JSONata `$zip` function to manipulate data. The `${}` resides 
 in the root object, therefore expressions like `data` refer to the `data` field of the root object.
 ```bash
 > .init -f "example/ex03.json"
