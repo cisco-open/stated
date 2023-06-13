@@ -29,7 +29,13 @@ class TemplateProcessor {
             const cdUpPath = metaInfo.exprRootPath__;
             if(cdUpPath) {
                 const cdUpParts = cdUpPath.match(/\.\.\//g);
-                metaInfo.parentJsonPointer__ = metaInfo.parentJsonPointer__.slice(0, -cdUpParts.length);
+                if(cdUpParts) {
+                    metaInfo.parentJsonPointer__ = metaInfo.parentJsonPointer__.slice(0, -cdUpParts.length);
+                }else if(cdUpPath.match(/^\/$/g)){
+                    metaInfo.parentJsonPointer__ = [];
+                }else{
+                    throw new Error(`unexpected 'path' expression: ${cdUpPath}`);
+                }
             }
             if (metaInfo.expr__ !== undefined) {
                 const depFinder = new DependencyFinder(metaInfo.expr__, metaInfo);

@@ -342,4 +342,20 @@ test("test 10", async () => {
     });
 });
 
+test("test 11 - test for slash 'rooting'", async () => {
+    const o = {
+        "a": {
+            "b": '/${b}',
+            "c": [7, ["/${b}"]]
+        },
+        "b":42
+    };
+    const tp = new TemplateProcessor(o);
+    await tp.initialize();
+    expect(o).toEqual({
+        "a": {"b": 42, "c": [7, [42]]},
+        "b":42
+    });
+});
+
 

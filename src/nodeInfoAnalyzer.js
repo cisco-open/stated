@@ -34,9 +34,13 @@ module.exports = `
                     )
     
                     :(
-                        $match := /\\s*((\\.\\.\\/)*)\\$\\{(.+)\\}\\s*$/($o); 
+                        $match := /\\s*((\/)|((\\.\\.\\/)*))\\$\\{(.+)\\}\\s*$/($o); 
+                        $leadingSlash := $match[0].groups[1];
+                        $leadingCdUp := $match[0].groups[2];
+                        $slashOrCdUp := $leadingSlash ? $leadingSlash : $leadingCdUp;
+                        $expr := $match[0].groups[4]; 
                         $match
-                                ? $setInfo($acc, { "exprRootPath__":$match[0].groups[0], "expr__": $match[0].groups[2], "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
+                                ? $setInfo($acc, { "exprRootPath__":$slashOrCdUp, "expr__": $expr, "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
                                 : $setInfo($acc, { "jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
                     )
       ) }; 
