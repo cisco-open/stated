@@ -37,7 +37,8 @@ yarn install
 node jeep.js
 ````
 
-If your environment is set up correctly with the path for Node.js, you can simply run:
+If your environment is set up correctly with the path for Node.js, you can simply run this command to
+start the jeep REPL:
 
 ```bash
 ./jeep.js
