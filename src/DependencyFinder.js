@@ -1,4 +1,6 @@
 const jsonata = require("jsonata");
+const _ = require('lodash');
+
 
 class DependencyFinder {
     constructor(program) { //second argument is needed when $path() function is in the program
@@ -11,6 +13,9 @@ class DependencyFinder {
     }
 
     findDependencies(node = this.ast) {
+        if(this.currentSteps.length === 0){
+            this.currentSteps.push([]); //initialize a container for steps
+        }
         if (node === undefined) {
             return;
         }
@@ -27,7 +32,8 @@ class DependencyFinder {
                 update,
                 pattern,
                 predicate,
-                stages
+                stages,
+                procedure
             } = node;
             this.capturePathExpressions(node);
             this.captureArrayIndexes(node);
@@ -35,27 +41,11 @@ class DependencyFinder {
             let children;
             switch (type) {
                 case "bind":  // :=
-                    this.currentSteps = [];
-                    break;
-                case "transform":
-                    children = [{"type": "pattern", pattern}, {"type": "update", update}];
-                    break;
                 case "path": //a.b.c
                     //paths can happen inside paths. a.b[something].[zz] contains paths within paths
                     //so each time the path is broken we push the current paths and reset it.
-                    this.emitPaths();
-                    break;
-                case "unary":
-                case "filter":
-                    //this.pathInterrupts++;
-                    break;
-                case "predicate":
-                    children = [{"type": "predicate", predicate}];
-                    //this.pathInterrupts++;
-                    break;
-                case "stages":
-                    children = [{"type": "stages", stages}];
-                    //this.pathInterrupts++;
+                    //this.emitPaths();
+                    this.currentSteps.push([]);
                     break;
             }
             //the children above require the special processing above. But then there are all the other
@@ -69,18 +59,12 @@ class DependencyFinder {
             //now we are coming out of the recursion, so the switch below is over the just-finished subtree
             switch (type) {
                 case "variable":
-                    if(!this.hasAncestors(["path"])){
+                    if(!this.hasAncestor(["path"])){
                         this.emitPaths(); //every independent variable should be separately emitted. But if it is under a path then don't emit it since it should be glommed onto the path
                     }
                     break;
                 case "path":
                     this.emitPaths(); //every independent path should be separately emitted
-                    break;
-                case "unary":
-                case "filter":
-                case "predicate":
-                case "stages":
-                    //this.pathInterrupts--;
                     break;
             }
             this.exprStack.pop();
@@ -107,7 +91,7 @@ class DependencyFinder {
     captureArrayIndexes(node){
         const {type, expr} = node;
         if (type==="filter" && expr?.type==="number") {
-            this.currentSteps.push({type, "value":expr.value, "emit": expr?.type === "number"});
+            _.last(this.currentSteps).push({type, "value":expr.value, "emit": expr?.type === "number"});
         }
     }
 
@@ -117,35 +101,33 @@ class DependencyFinder {
             return;
         }
         if (this.isRootedIn$$(value)) { //if the root of the expression is $$ then we will always accept the navigation downwards
-            this.currentSteps.push({type, value, "emit": true});
+            _.last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         if (this.isInsideAScopeWhere$IsLocal()) { //path expressions inside a transform are ignored modulo the $$ case just checked for above
-            this.currentSteps.push({type, value, "emit": false});
+            _.last(this.currentSteps).push({type, value, "emit": false});
             return;
         }
         if (this.isSingle$Var(type, value)) {  //accept the "" variable which comes from single-dollar like $.a.b when we are not inside a transform. We won't accept $foo.a.b
-            this.currentSteps.push({type, value, "emit": true});
+            _.last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         if (type === "variable") {
             //if we are here then the variable must be an ordinary locally named variable since it is neither $$ or $.
             //variables local to a closure cannot cause/imply a dependency for this expression
-            this.currentSteps.push({type, value, "emit": false});
+            if(!this.hasParent("function") ) { //the function name is actually a variable, we want to skip such variables
+                _.last(this.currentSteps).push({type, value, "emit": false});
+            }
+            return;
+
         }
         //if we are here then we are dealing with names, which are identifiers like 'a' which can occur in a.b.c or $.a or $$.a or $foo.a, etc
         //The decision to emit a name is made based on its ancestor, or lack thereof
-        this.currentSteps.push({type, value, "emit": !this.isNested(["path", "filter"])});
-        /*
-        const ancestor = _.last(this.currentSteps);
-        if (ancestor) {
-            //this.currentSteps.push({type, value, "emit": ancestor.emit && this.pathInterrupts === 0});
-            this.currentSteps.push({type, value, "emit": ancestor.emit});
-        } else {
-            this.currentSteps.push({type, value, "emit": true});
+        //this.currentSteps.push({type, value, "emit": !this.isNested(["path", "filter"])});
+        if(!this.isUnderTreeShape(["path", "function"])) {
+            _.last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
         }
 
-         */
     }
 
     isNested(ancestors){
@@ -154,10 +136,23 @@ class DependencyFinder {
         }, 0) > 1;
     }
 
-    hasAncestors(ancestors){
+    hasParent(parent){
+        return _.last(this.exprStack) === parent;
+    }
+
+    hasAncestor(ancestors){
         return this.exprStack.reduce((count, curr) =>{
             return ancestors.includes(curr)?count+1:count;
         }, 0) >= 1;
+    }
+
+    isUnderTreeShape(path){
+        return this.exprStack.reduce((_path, curr) =>{
+            if(_path[0] === curr){
+                _path.shift(); //if the curr path item is the first element of the _path we remove it from _path
+            }
+            return _path;
+        }, [...path]).length===0; //if 0 then the desired shape existed
     }
 
     isSingle$Var(type, value) {
@@ -165,8 +160,9 @@ class DependencyFinder {
     }
 
     isRootedIn$$(value) {
-        return this.currentSteps.length === 0 && value === "$"
-            || this.currentSteps.length > 0 && this.currentSteps[0].value === "$";
+        const last = _.last(this.currentSteps);
+        return last && (last.length === 0 && value === "$"
+            || last.length > 0 && last[0].value === "$");
     }
 
 
@@ -177,25 +173,16 @@ class DependencyFinder {
 
     emitPaths() {
         const emitted = [];
-        for (let i = 0; i < this.currentSteps.length; i++) {
-            const cur = this.currentSteps[i];
-            if (!cur.emit) {
-                break; // stops the loop once i reaches 5
-            }
-            emitted.push(cur.value);
+        const steps = this.currentSteps.flat();
+        const last = _.last(this.currentSteps);
+        if(last.length > 0 && last.every(s=>s.emit)){
+            steps.forEach(s=>emitted.push(s.value));
         }
-        /*
-        let filteredSteps = this.currentSteps.filter(s => s.emit).map(s => s.value);
-        if (filteredSteps.length > 0) {
-            this.paths.push(filteredSteps);
-        }
+        this.currentSteps.pop();
 
-         */
         if(emitted.length > 0){
             this.paths.push(emitted);
         }
-        this.currentSteps = [];
-
     }
 
 }

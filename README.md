@@ -84,8 +84,8 @@ What is the input to the JSONata program? The input, by default, is the object o
 In the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
 refer to the first element of the array. 
 
-The example below uses JSONata `$zip` function to manipulate data. The `${}` resides 
-in the root object, therefore expressions like `data` refer to the `data` field of the root object.
+## Complex Data Processing
+The example below uses JSONata `$zip` function to combine related data.
 ```bash
 > .init -f "example/ex03.json"
 {
@@ -124,6 +124,52 @@ in the root object, therefore expressions like `data` refer to the `data` field 
     ]
   ]
 }
+```
+The example below uses the `$sum` function to compute a total cost of 
+```bash
+> .init -f "example/calculate_total.json"
+{
+  "products": [
+    {
+      "name": "Apple",
+      "quantity": 5,
+      "price": 0.5
+    },
+    {
+      "name": "Orange",
+      "quantity": 10,
+      "price": 0.75
+    },
+    {
+      "name": "Banana",
+      "quantity": 8,
+      "price": 0.25
+    }
+  ],
+  "totalCost": "${products.$sum(quantity * price)}"
+}
+> .out
+{
+  "products": [
+    {
+      "name": "Apple",
+      "quantity": 5,
+      "price": 0.5
+    },
+    {
+      "name": "Orange",
+      "quantity": 10,
+      "price": 0.75
+    },
+    {
+      "name": "Banana",
+      "quantity": 8,
+      "price": 0.25
+    }
+  ],
+  "totalCost": 12.5
+}
+
 ```
 ### Rerooting Expressions
 You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an

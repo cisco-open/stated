@@ -1,0 +1,11 @@
+{
+  "totalCost": "${products.$sum(quantity * price)}",
+  "products": [
+    {
+      "name": "Apple",
+      "quantity": 5,
+      "price": 0.5,
+      "totalCost": "/${totalCost[0]}"
+    }
+  ]
+}

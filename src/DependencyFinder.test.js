@@ -28,12 +28,37 @@ test("transform - pattern should be ignored", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
 });
+test("z[zz]", () => {
+    const program = `z[zz]`
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["z", "zz"], ["z"]]);
+});
+
 test("transform 1", () => {
     const program = `(                        
                         $gorp:=k.z[zz].[poop]~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|;                        
                         )`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
+    expect(df.findDependencies()).toEqual([
+        [
+            "k",
+            "z",
+            "zz"
+        ],
+        [
+            "k",
+            "z",
+            "poop"
+        ],
+        [
+            "k",
+            "z"
+        ],
+        [
+            "$",
+            "aaaa"
+        ]
+    ]);
 });
 
 
@@ -81,7 +106,43 @@ test("complex program 1", () => {
                        )});  
                         )`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"], ["doink"], ["", "a"], ["", 'a', 'b'], ["x", "y", "z"]]);
+    expect(df.findDependencies()).toEqual([
+        [
+            "k",
+            "z",
+            "zz"
+        ],
+        [
+            "k",
+            "z",
+            "poop"
+        ],
+        [
+            "k",
+            "z"
+        ],
+        [
+            "$",
+            "aaaa"
+        ],
+        [
+            "doink"
+        ],
+        [
+            "",
+            "a"
+        ],
+        [
+            "",
+            "a",
+            "b"
+        ],
+        [
+            "x",
+            "y",
+            "z"
+        ]
+    ]);
 });
 
 test("subtract", () => {
@@ -104,7 +165,15 @@ test("filter numeric predicate (array 2d)", () => {
 test("filter field predicate (array)", () => {
     const program = "a[z]"
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["a"]]); //we don't currently go to the level of fidelity to analyze filter expressions. We just say "this depends on 'a'"
+    expect(df.findDependencies()).toEqual([
+        [
+            "a",
+            "z"
+        ],
+        [
+            "a"
+        ]
+    ]);
 });
 
 
@@ -133,7 +202,43 @@ test("$[0][1] + $[2][3]", () => {
 test("$[0][1][a]", () => {
     const program = "$[0][1][a]";
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["", 0, 1]]);
+    expect(df.findDependencies()).toEqual([
+        [
+            "",
+            0,
+            1,
+            "a"
+        ],
+        [
+            "",
+            0,
+            1
+        ]
+    ]);
+});
+
+test("$[0][1][a=b]", () => {
+    const program = "$[0][1][a=b]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "",
+            0,
+            1,
+            "a"
+        ],
+        [
+            "",
+            0,
+            1,
+            "b"
+        ],
+        [
+            "",
+            0,
+            1
+        ]
+    ]);
 });
 
 test("$[0][1].a", () => {
@@ -147,6 +252,33 @@ test("$[0]($[1])", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([["", 1], ["",0]]);
 });
+
+//we cannot note products.quantity and products.price cannot be inferred as dependencies. This is because we
+//do not know from this expression if products is an object, or an array of objects
+test("products.$sum(quantity * price)", () => {
+    const program = "products.$sum(quantity * price)";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "products"
+        ]
+    ]);
+});
+
+test("$sum(quantity * price)", () => {
+    const program = "$sum(quantity * price)";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "quantity"
+        ],
+        [
+            "price"
+        ]
+    ]);
+});
+
+
 
 
 

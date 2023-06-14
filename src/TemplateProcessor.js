@@ -126,8 +126,9 @@ class TemplateProcessor {
                     listDependencies(jp.get(templateMeta, dependency));
                 }
             }
-
-            orderedJsonPointers.push(node.jsonPointer__);
+            //if(node.expr__) {
+                orderedJsonPointers.push(node.jsonPointer__);
+            //}
         }
 
         if(!(nodes instanceof Set || Array.isArray(nodes))){
