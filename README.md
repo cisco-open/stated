@@ -83,6 +83,117 @@ The content between `${}` can be any valid JSONata program. The JEEP repl lets y
 What is the input to the JSONata program? The input, by default, is the object or array that the expression resides in. 
 In the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
 refer to the first element of the array. 
+#### Rerooting Expressions
+You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
+at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can
+explicitly set their input using the rooting syntax.
+
+```bash
+> .init -f "example/ex04.json"
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "../../${greeting & ', ' &  player1}",
+      "../../${greeting & ', ' &  player2}"
+     ],
+    "partII": {
+      "msg3": "/${player1 & ', would you like to play a game?'}",
+      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
+    }
+  }
+}
+> .out
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "Hello, Joshua",
+      "Hello, Professor Falken"
+    ],
+    "partII": {
+      "msg3": "Joshua, would you like to play a game?",
+      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
+    }
+  }
+}
+
+```
+### DAG
+Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
+expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
+fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression
+calculation.
+
+JEEP helps you track and debug transitive dependencies in your templates. You can use the
+``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
+you the order in which changes propagate.
+
+```bash
+> .init -f "example/ex01.json"
+{
+"a": 42,
+"b": "${a}",
+"c": "${'the answer is: '& b}"
+}
+> .out
+{
+"a": 42,
+"b": 42,
+"c": "the answer is: 42"
+}
+> .from /a
+[
+"/a",
+"/b",
+"/c"
+]
+> .to /b
+[
+"/a",
+"/b"
+]
+> .to /c
+[
+"/a",
+"/b",
+"/c"
+]
+```
+The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
+when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is
+evaluated twice.
+```bash
+> .init -f "example/ex08.json"
+{
+  "a": "${c}",
+  "b": "${d+1+e}",
+  "c": "${b+1}",
+  "d": "${e+1}",
+  "e": 1
+}
+> .plan
+[
+  "/e",
+  "/d",
+  "/b",
+  "/c",
+  "/a"
+]
+> .out
+{
+  "a": 5,
+  "b": 4,
+  "c": 5,
+  "d": 2,
+  "e": 1
+}
+
+```
 
 ## Complex Data Processing
 The example below uses JSONata `$zip` function to combine related data.
@@ -125,7 +236,10 @@ The example below uses JSONata `$zip` function to combine related data.
   ]
 }
 ```
-The example below uses the `$sum` function to compute a total cost of 
+The example below uses the `$sum` function to compute a `costs` of each product, and then
+again uses `$sum` to sum over the individual product costs to get the `totalCost`. In a round-about fashion each
+individual product pulls in its cost from the costs array.
+
 ```bash
 > .init -f "example/ex10.json"
 {
@@ -136,29 +250,29 @@ The example below uses the `$sum` function to compute a total cost of
       "name": "Apple",
       "quantity": 5,
       "price": 0.5,
-      "cost": "/${totalCost[0]}"
+      "cost": "/${costs[0]}"
     },
     {
       "name": "Orange",
       "quantity": 10,
       "price": 0.75,
-      "cost": "/${totalCost[1]}"
+      "cost": "/${costs[1]}"
     },
     {
       "name": "Banana",
       "quantity": 8,
       "price": 0.25,
-      "cost": "/${totalCost[2]}"
+      "cost": "/${costs[2]}"
     }
   ]
 }
 > .plan
 [
   "/costs",
-  "/totalCost",
   "/products/0/cost",
   "/products/1/cost",
-  "/products/2/cost"
+  "/products/2/cost",
+  "/totalCost"
 ]
 > .out
 {
@@ -173,24 +287,26 @@ The example below uses the `$sum` function to compute a total cost of
       "name": "Apple",
       "quantity": 5,
       "price": 0.5,
-      "cost": 12
+      "cost": 2.5
     },
     {
       "name": "Orange",
       "quantity": 10,
-      "price": 0.75
+      "price": 0.75,
+      "cost": 7.5
     },
     {
       "name": "Banana",
       "quantity": 8,
-      "price": 0.25
+      "price": 0.25,
+      "cost": 2
     }
   ]
 }
 
 ```
 Here is a different approach in which cost of each product is computed locally
-then rolled up to the totalCost. Note the difference in the execution `plan`
+then rolled up to the totalCost. Note the difference in the execution `plan` between the example above and this example.
 ```bash
 > .init -f "example/ex11.json"
 {
@@ -249,117 +365,8 @@ then rolled up to the totalCost. Note the difference in the execution `plan`
 }
 
 ```
-### Rerooting Expressions
-You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
-at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can 
-explicitly set their input using the rooting syntax.
 
-```bash
-> .init -f "example/ex04.json"
-{
-  "greeting": "Hello",
-  "player1": "Joshua",
-  "player2": "Professor Falken",
-  "dialog": {
-    "partI": [
-      "../../${greeting & ', ' &  player1}",
-      "../../${greeting & ', ' &  player2}"
-     ],
-    "partII": {
-      "msg3": "/${player1 & ', would you like to play a game?'}",
-      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
-    }
-  }
-}
-> .out
-{
-  "greeting": "Hello",
-  "player1": "Joshua",
-  "player2": "Professor Falken",
-  "dialog": {
-    "partI": [
-      "Hello, Joshua",
-      "Hello, Professor Falken"
-    ],
-    "partII": {
-      "msg3": "Joshua, would you like to play a game?",
-      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
-    }
-  }
-}
 
-```
-### DAG
-Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated 
-expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when 
-fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression 
-calculation.
-
-JEEP helps you track and debug transitive dependencies in your templates. You can use the
-``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
-you the order in which changes propagate.
-
-```bash
-> .init -f "example/ex01.json"
-{
-"a": 42,
-"b": "${a}",
-"c": "${'the answer is: '& b}"
-}
-> .out
-{
-"a": 42,
-"b": 42,
-"c": "the answer is: 42"
-}
-> .from /a
-[
-"/a",
-"/b",
-"/c"
-]
-> .to /b
-[
-"/a",
-"/b"
-]
-> .to /c
-[
-"/a",
-"/b",
-"/c"
-]
-```
-The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
-when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is 
-evaluated twice.
-```bash
-> .init -f "example/ex08.json"
-{
-  "a": "${c}",
-  "b": "${d+1+e}",
-  "c": "${b+1}",
-  "d": "${e+1}",
-  "e": 1
-}
-> .plan
-[
-  "/e",
-  "/d",
-  "/b",
-  "/c",
-  "/a"
-]
-> .out
-{
-  "a": 5,
-  "b": 4,
-  "c": 5,
-  "d": 2,
-  "e": 1
-}
-
-```
 ## Functions
 JEEP let's you define and call functions.
 ### Simple Function Example

@@ -6,19 +6,19 @@
       "name": "Apple",
       "quantity": 5,
       "price": 0.5,
-      "cost": "/${totalCost[0]}"
+      "cost": "/${costs[0]}"
     },
     {
       "name": "Orange",
       "quantity": 10,
       "price": 0.75,
-      "cost": "/${totalCost[1]}"
+      "cost": "/${costs[1]}"
     },
     {
       "name": "Banana",
       "quantity": 8,
       "price": 0.25,
-      "cost": "/${totalCost[2]}"
+      "cost": "/${costs[2]}"
     }
   ]
 }
