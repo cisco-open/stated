@@ -1,0 +1,15 @@
+{
+  "name": "mysql",
+  "count": "${[1..30]}",
+  "pn": 3306,
+  "providerName": "aws",
+  "tmp": {
+    "host": "/${count.{'database_instance.host':'mysql-instance-' & $ & '.cluster-473653744458.us-west-2.rds.amazonaws.com'}}",
+    "port": "/${count.{'database_instance.port:':$$.pn}}",
+    "provider": "/${count.{'cloud.provider': $$.providerName}}",
+    "instanceId": "/${count.{'cloud.database_instance.id':'db-mysql-instance-' & $formatBase($,16)}}",
+    "instanceName": "/${count.{'database_instance.name':'MySQL instance' & $}}",
+    "clusterName": "/${count.{'database_instance.cluster_name':'MySQL cluster' & $}}"
+  },
+  "instances": "${$zip(tmp.host, tmp.port, tmp.provider, tmp.instanceId, tmp.instanceName, tmp.clusterName)~>$map($merge)}"
+}

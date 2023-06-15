@@ -84,7 +84,7 @@ class TemplateProcessor {
                 if (!jp.has(this.templateMeta, ptr)) {
                     jp.set(this.templateMeta, ptr, { "materialized__":false, "jsonPointer__": ptr, "dependees__": [], "dependencies__": [], "absoluteDependencies__": [] });
                 }
-                jp.get(this.templateMeta, ptr).dependees__.push(i.jsonPointer__);
+                jp.get(this.templateMeta, ptr).dependees__?.push(i.jsonPointer__);
             });
         });
     }
@@ -121,7 +121,7 @@ class TemplateProcessor {
         const listDependencies = (node) => {
             visited.add(node.jsonPointer__);
 
-            for (const dependency of node.absoluteDependencies__) {
+            for (const dependency of node?.absoluteDependencies__) {
                 if (!visited.has(dependency)) {
                     const dependencyNode = jp.get(templateMeta, dependency);
                     if(dependencyNode.materialized__ === false){ //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
