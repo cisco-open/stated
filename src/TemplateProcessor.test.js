@@ -1,5 +1,5 @@
 const TemplateProcessor = require('./TemplateProcessor');
-const DependencyFinder = require("./DependencyFinder");
+const _ = require('lodash');
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -357,5 +357,73 @@ test("test 11 - test for slash 'rooting'", async () => {
         "b":42
     });
 });
+
+
+const mysql = {
+    "name": "mysql",
+    "count": "${[1..30]}",
+    "pn": 3306,
+    "providerName": "aws",
+    "tmp": {
+        "host": "/${count.{'database_instance.host':'mysql-instance-' & $ & '.cluster-473653744458.us-west-2.rds.amazonaws.com'}}",
+        "port": "/${count.{'database_instance.port:':$$.pn}}",
+        "provider": "/${count.{'cloud.provider': $$.providerName}}",
+        "instanceId": "/${count.{'cloud.database_instance.id':'db-mysql-instance-' & $formatBase($,16)}}",
+        "instanceName": "/${count.{'database_instance.name':'MySQL instance' & $}}",
+        "clusterName": "/${count.{'database_instance.cluster._name':'MySQL cluster' & $}}"
+    },
+    "instances": "${$zip(tmp.host, tmp.port, tmp.provider, tmp.instanceId, tmp.instanceName, tmp.clusterName)~>$map($merge)}"
+};
+
+test("mysql output", async () => {
+    const o= _.cloneDeep(mysql);
+    const tp = new TemplateProcessor(o);
+    await tp.initialize();
+    expect(o.instances[0]).toEqual( {
+            "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com",
+            "database_instance.port:": 3306,
+            "cloud.provider": "aws",
+            "cloud.database_instance.id": "db-mysql-instance-1",
+            "database_instance.name": "MySQL instance1",
+            "database_instance.cluster._name": "MySQL cluster1"
+        }
+    );
+});
+
+test("mysql plan", async () => {
+    const o= _.cloneDeep(mysql);
+    const tp = new TemplateProcessor(o);
+    await tp.initialize();
+    expect(tp.getEvaluationPlan()).toEqual(
+        [
+            "/count",
+            "/tmp/host",
+            "/tmp/port",
+            "/tmp/provider",
+            "/tmp/instanceId",
+            "/tmp/instanceName",
+            "/tmp/clusterName",
+            "/instances"
+        ]
+    );
+
+});
+
+
+test("mysql to /tmp/provider", async () => {
+    const o= _.cloneDeep(mysql);
+    const tp = new TemplateProcessor(o);
+    await tp.initialize();
+    expect(tp.getDependenciesTransitiveExecutionPlan("/tmp/provider")).toEqual(
+        [
+            "/providerName",
+            "/count",
+            "/tmp/provider"
+        ]
+    );
+
+});
+
+
 
 

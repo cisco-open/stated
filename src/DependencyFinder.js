@@ -176,7 +176,12 @@ class DependencyFinder {
         const steps = this.currentSteps.flat();
         const last = _.last(this.currentSteps);
         if(last.length > 0 && last.every(s=>s.emit)){
-            steps.forEach(s=>emitted.push(s.value));
+            if(last[0].value==="$"){ //corresponding to '$$' variable
+                //in this case the chain of steps must be broken as '$$' is an absolute reference to root document
+                last.forEach(s => emitted.push(s.value));
+            }else {
+                steps.forEach(s => emitted.push(s.value));
+            }
         }
         this.currentSteps.pop();
 

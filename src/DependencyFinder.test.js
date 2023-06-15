@@ -278,6 +278,22 @@ test("$sum(quantity * price)", () => {
     ]);
 });
 
+test("count.{'cloud.provider': $$.providerName}", () => {
+    const program = "count.{'cloud.provider': $$.providerName}";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "providerName"
+        ],
+        [
+            "count"
+        ]
+    ]);
+});
+
+
+
 
 
 

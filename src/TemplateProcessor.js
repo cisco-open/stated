@@ -90,7 +90,7 @@ class TemplateProcessor {
     }
 
     async evaluateDependencies(metaInfos) {
-        this.evaluationPlan = this.topologicalSort(metaInfos);
+        this.evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         await this.evaluateJsonPointersInOrder(this.evaluationPlan);
     }
 
@@ -113,7 +113,7 @@ class TemplateProcessor {
         return dependencies__;
     }
 
-    topologicalSort(nodes) {
+    topologicalSort(nodes, exprsOnly=true) {
         const visited = new Set();
         const orderedJsonPointers = [];
         const templateMeta = this.templateMeta;
@@ -127,15 +127,22 @@ class TemplateProcessor {
                     if(dependencyNode.materialized__ === false){ //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
                         const ancestor = this.searchUpForExpression(dependencyNode);
                         if(ancestor && !visited.has(ancestor.jsonPointer__)){
-                            listDependencies(ancestor);
+                            listDependencies(ancestor, exprsOnly);
                         }
                     }else{
-                        listDependencies(dependencyNode);
+                        listDependencies(dependencyNode, exprsOnly);
                     }
 
                 }
             }
-            if(node.expr__) {
+            //when we are forming the topological order for the 'plan' command, we don't need to include
+            //nodes in the execution plan that don't have expressions. On the other hand, when we are forming
+            //the topological order to see all the nodes that are dependencies of a particular target node, which
+            //is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
+            //literals that don't have expressions
+            if(exprsOnly) {
+                node.expr__ && orderedJsonPointers.push(node.jsonPointer__);
+            }else{
                 orderedJsonPointers.push(node.jsonPointer__);
             }
         }
@@ -146,7 +153,7 @@ class TemplateProcessor {
         // Perform topological sort
         nodes.forEach(node => {
             if (!visited.has(node.jsonPointer__)) {
-                listDependencies(node);
+                listDependencies(node, exprsOnly);
             }
         });
 
@@ -292,10 +299,10 @@ class TemplateProcessor {
 
     }
 
-    getDependenciesTransitiveExecutionPlan(jsonPtr, data) {
+    getDependenciesTransitiveExecutionPlan(jsonPtr) {
         if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr);
-            return this.topologicalSort(node);
+            return this.topologicalSort(node, false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
         }
         return [];
     }
