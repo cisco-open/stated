@@ -1,24 +1,23 @@
 {
-  "totalCost": "${$sum(costs)}",
-  "costs": "${products.$sum(quantity * price)}",
+  "totalCost": "${ $sum(products.cost) }",
   "products": [
     {
       "name": "Apple",
       "quantity": 5,
       "price": 0.5,
-      "cost": "/${totalCost[0]}"
+      "cost": "${ quantity*price }"
     },
     {
       "name": "Orange",
       "quantity": 10,
       "price": 0.75,
-      "cost": "/${totalCost[1]}"
+      "cost": "${ quantity*price }"
     },
     {
       "name": "Banana",
       "quantity": 8,
       "price": 0.25,
-      "cost": "/${totalCost[2]}"
+      "cost": "${ quantity*price }"
     }
   ]
 }

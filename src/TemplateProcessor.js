@@ -82,7 +82,7 @@ class TemplateProcessor {
         metaInfos.forEach(i => {
             i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
-                    jp.set(this.templateMeta, ptr, { "jsonPointer__": ptr, "dependees__": [], "dependencies__": [], "absoluteDependencies__": [] });
+                    jp.set(this.templateMeta, ptr, { "materialized__":false, "jsonPointer__": ptr, "dependees__": [], "dependencies__": [], "absoluteDependencies__": [] });
                 }
                 jp.get(this.templateMeta, ptr).dependees__.push(i.jsonPointer__);
             });
@@ -118,17 +118,26 @@ class TemplateProcessor {
         const orderedJsonPointers = [];
         const templateMeta = this.templateMeta;
 
-        function listDependencies(node) {
+        const listDependencies = (node) => {
             visited.add(node.jsonPointer__);
 
             for (const dependency of node.absoluteDependencies__) {
                 if (!visited.has(dependency)) {
-                    listDependencies(jp.get(templateMeta, dependency));
+                    const dependencyNode = jp.get(templateMeta, dependency);
+                    if(dependencyNode.materialized__ === false){ //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
+                        const ancestor = this.searchUpForExpression(dependencyNode);
+                        if(ancestor && !visited.has(ancestor.jsonPointer__)){
+                            listDependencies(ancestor);
+                        }
+                    }else{
+                        listDependencies(dependencyNode);
+                    }
+
                 }
             }
-            //if(node.expr__) {
+            if(node.expr__) {
                 orderedJsonPointers.push(node.jsonPointer__);
-            //}
+            }
         }
 
         if(!(nodes instanceof Set || Array.isArray(nodes))){
@@ -143,6 +152,8 @@ class TemplateProcessor {
 
         return orderedJsonPointers;
     }
+
+
     async setData(jsonPtr, data) {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr);
@@ -150,20 +161,24 @@ class TemplateProcessor {
     }
 
     async evaluateJsonPointersInOrder(jsonPtrList, data) {
-        const jsonPtr = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
-        if(!jp.has(this.output, jsonPtr)){ //node doesn't exist yet, so just create it and return
-            await this.evaluateNode(jsonPtr, data);
-        }
-        // Check if the node contains an expression. If so, print a warning and return.
-        const metaInf = jp.get(this.templateMeta, jsonPtr);
-        if (metaInf.expr__ !== undefined) {
-            console.warn(`Attempted to replace expressions with data under ${jsonPtr}. This operation is ignored.`);
-            return;
-        }
-        const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
-        if(!isChanged) {
-            console.log(`data did not change for ${jsonPtr}, short circuiting dependents.`);
-            return false;
+        if(data) {
+            const jsonPtr = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
+            if (!jp.has(this.output, jsonPtr)) { //node doesn't exist yet, so just create it
+                await this.evaluateNode(jsonPtr, data);
+
+            }else {
+                // Check if the node contains an expression. If so, print a warning and return.
+                const metaInf = jp.get(this.templateMeta, jsonPtr);
+                if (metaInf.expr__ !== undefined) {
+                    console.warn(`Attempted to replace expressions with data under ${jsonPtr}. This operation is ignored.`);
+                    return;
+                }
+                const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
+                if (!isChanged) {
+                    console.log(`data did not change for ${jsonPtr}, short circuiting dependents.`);
+                    return false;
+                }
+            }
         }
         for (const jsonPtr of jsonPtrList) {
             try {
@@ -176,10 +191,10 @@ class TemplateProcessor {
 
     async evaluateNode(jsonPtr, data) {
         const templateMeta = this.templateMeta;
-        const template = this.output;
+        const output = this.output;
 
         if (!jp.has(templateMeta, jsonPtr)) {
-            jp.set(template, jsonPtr, data); //this is just the weird case of setting something into the template that has no affect on any expressions
+            jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
             return false;
         }
         const { expr__, compiledExpr__, treeHasExpressions__, callback__ , parentJsonPointer__} = jp.get(templateMeta, jsonPtr);
@@ -187,16 +202,16 @@ class TemplateProcessor {
 
             if (typeof expr__ !== 'undefined') {
                 try {
-                    const target = jp.get(template, parentJsonPointer__); //an expression is always relative to a target
+                    const target = jp.get(output, parentJsonPointer__); //an expression is always relative to a target
                     data = await compiledExpr__.evaluate(target);
-                    this._setData(template, jsonPtr, data, callback__);
+                    this._setData(output, jsonPtr, data, callback__);
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);
                     data = undefined;
                 }
             } else {
                 try {
-                    data = jp.get(template, jsonPtr);
+                    data = jp.get(output, jsonPtr);
                 } catch (error) {
                     console.log(`The reference with json pointer ${jsonPtr} does not exist`);
                     data = undefined;
@@ -207,9 +222,9 @@ class TemplateProcessor {
                 console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
                 return false;
             }
-            const existingData = jp.get(template, jsonPtr);
+            const existingData = jp.get(output, jsonPtr);
             if(!_.isEqual(existingData, data)){
-                this._setData(template, jsonPtr, data, callback__);
+                this._setData(output, jsonPtr, data, callback__);
             }else{
                 console.log(`data to be set at ${jsonPtr} did not change, ignored. `);
                 return false;
@@ -218,6 +233,7 @@ class TemplateProcessor {
         }
 
         jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
+        jp.set(templateMeta, jsonPtr + "/materialized__", true);
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
@@ -242,6 +258,10 @@ class TemplateProcessor {
     }
 
     getDependentsRecursive(jsonPtr, dependees = new Set()) {
+        if(!jp.has(this.templateMeta, jsonPtr)){
+            console.log(`${jsonPtr} does not exist.`);
+            return dependees;
+        }
         const metaInf = jp.get(this.templateMeta, jsonPtr);
         if (metaInf.dependees__) {
             metaInf.dependees__.forEach(dependee => {
@@ -289,6 +309,21 @@ class TemplateProcessor {
     //returns the evaluation plan for evaluating the entire template
     getEvaluationPlan(){
        return this.evaluationPlan;
+    }
+
+    searchUpForExpression(childNode){
+        let pathParts = jp.parse(childNode.jsonPointer__);
+        while(pathParts.length > 1){
+            pathParts = pathParts.slice(0,-1); //get the parent expression
+            const jsonPtr = jp.compile(pathParts);
+            const ancestorNode = jp.get(this.templateMeta, jsonPtr);
+            if(ancestorNode.materialized__ === true){
+                return ancestorNode;
+            }
+        }
+        console.warn(`No parent or ancestor of '${childNode.jsonPointer__}'`);
+        return undefined;
+
     }
 
 }

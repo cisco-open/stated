@@ -127,34 +127,53 @@ The example below uses JSONata `$zip` function to combine related data.
 ```
 The example below uses the `$sum` function to compute a total cost of 
 ```bash
-> .init -f "example/calculate_total.json"
+> .init -f "example/ex10.json"
 {
+  "totalCost": "${$sum(costs)}",
+  "costs": "${products.$sum(quantity * price)}",
   "products": [
     {
       "name": "Apple",
       "quantity": 5,
-      "price": 0.5
+      "price": 0.5,
+      "cost": "/${totalCost[0]}"
     },
     {
       "name": "Orange",
       "quantity": 10,
-      "price": 0.75
+      "price": 0.75,
+      "cost": "/${totalCost[1]}"
     },
     {
       "name": "Banana",
       "quantity": 8,
-      "price": 0.25
+      "price": 0.25,
+      "cost": "/${totalCost[2]}"
     }
-  ],
-  "totalCost": "${products.$sum(quantity * price)}"
+  ]
 }
+> .plan
+[
+  "/costs",
+  "/totalCost",
+  "/products/0/cost",
+  "/products/1/cost",
+  "/products/2/cost"
+]
 > .out
 {
+  "totalCost": 12,
+  "costs": [
+    2.5,
+    7.5,
+    2
+  ],
   "products": [
     {
       "name": "Apple",
       "quantity": 5,
-      "price": 0.5
+      "price": 0.5,
+      "cost": 12
     },
     {
       "name": "Orange",
@@ -166,8 +185,67 @@ The example below uses the `$sum` function to compute a total cost of
       "quantity": 8,
       "price": 0.25
     }
-  ],
-  "totalCost": 12.5
+  ]
+}
+
+```
+Here is a different approach in which cost of each product is computed locally
+then rolled up to the totalCost. Note the difference in the execution `plan`
+```bash
+> .init -f "example/ex11.json"
+{
+  "totalCost": "${ $sum(products.cost) }",
+  "products": [
+    {
+      "name": "Apple",
+      "quantity": 5,
+      "price": 0.5,
+      "cost": "${ quantity*price }"
+    },
+    {
+      "name": "Orange",
+      "quantity": 10,
+      "price": 0.75,
+      "cost": "${ quantity*price }"
+    },
+    {
+      "name": "Banana",
+      "quantity": 8,
+      "price": 0.25,
+      "cost": "${ quantity*price }"
+    }
+  ]
+}
+> .plan
+[
+  "/products/0/cost",
+  "/products/1/cost",
+  "/products/2/cost",
+  "/totalCost"
+]
+> .out
+{
+  "totalCost": 12,
+  "products": [
+    {
+      "name": "Apple",
+      "quantity": 5,
+      "price": 0.5,
+      "cost": 2.5
+    },
+    {
+      "name": "Orange",
+      "quantity": 10,
+      "price": 0.75,
+      "cost": 7.5
+    },
+    {
+      "name": "Banana",
+      "quantity": 8,
+      "price": 0.25,
+      "cost": 2
+    }
+  ]
 }
 
 ```

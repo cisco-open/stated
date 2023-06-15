@@ -16,7 +16,7 @@ module.exports = `
                         $getPaths($v, $acc, $append($path, $idx))
                     }, $acc);
                     $flags:=$flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|;
-                    $setInfo($acc, { "jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
+                    $setInfo($acc, { "materialized__": true, "jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
                 )
                 :$type($o)="object"
                     ?(  $flags := $acc.flags; 
@@ -30,7 +30,7 @@ module.exports = `
                             )
                         }, $acc);
                         $flags:=$flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|;
-                        $setInfo($acc, { "jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
+                        $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
                     )
     
                     :(
@@ -40,8 +40,8 @@ module.exports = `
                         $slashOrCdUp := $leadingSlash ? $leadingSlash : $leadingCdUp;
                         $expr := $match[0].groups[4]; 
                         $match
-                                ? $setInfo($acc, { "exprRootPath__":$slashOrCdUp, "expr__": $expr, "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
-                                : $setInfo($acc, { "jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
+                                ? $setInfo($acc, { "materialized__": true,"exprRootPath__":$slashOrCdUp, "expr__": $expr, "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
+                                : $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
                     )
       ) }; 
     $getPaths($, {"metaInfos":[],"flags":{"treeHasExpressions__":false}}, []).metaInfos; 
