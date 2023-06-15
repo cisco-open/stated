@@ -1,8 +1,8 @@
-# JEEP: JSONata Embedded Expression Processor
-<img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="Jeep" width="300">
+# jeep: JSONata Embedded Expression Processor
+<img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="300">
 
 
-JEEP, or JSONata Embedded Expression Processor, is a library and CLI for running JSON files with embedded
+jeep, or JSONata Embedded Expression Processor, is a library and CLI for running JSON files with embedded
 [JSONata](http://docs.jsonata.org/) programs.
 ```bash
 ghendrey$ jeep.js
@@ -25,13 +25,13 @@ ghendrey$ jeep.js
 git clone ssh://git@bitbucket.corp.appdynamics.com:7999/arch/templates.git;
 cd templates
 ```
-3. then install JEEP by running the following command:
+3. then install jeep by running the following command:
 
 ```bash
 yarn install
 ````
 
-2. **Start JEEP**: Once installed, you can start using JEEP by running the following command:
+2. **Start jeep**: Once installed, you can start using jeep by running the following command:
 
 ```bash
 node jeep.js
@@ -45,9 +45,9 @@ start the jeep REPL:
 ````
 ## CLI Commands
 
-JEEP provides a set of CLI commands to interact with the system:
+jeep provides a set of CLI commands to interact with the system:
 
-JEEP Commands:
+jeep Commands:
 - **.init**: Initialize the template.
 - **.set**: Set data to a JSON pointer path.
 - **.in**: Show the input template.
@@ -58,8 +58,8 @@ JEEP Commands:
 
 
 ## Expressions
-JEEP allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
-The content between `${}` can be any valid JSONata program. The JEEP repl lets you experiment with templates.
+jeep allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
+The content between `${}` can be any valid JSONata program. The jeep repl lets you experiment with templates.
 ```bash
 > .init -f "example/ex09.json"
 {
@@ -125,11 +125,11 @@ explicitly set their input using the rooting syntax.
 ```
 ### DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
-expressions. JEEP is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
+expressions. jeep is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
 fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression
 calculation.
 
-JEEP helps you track and debug transitive dependencies in your templates. You can use the
+jeep helps you track and debug transitive dependencies in your templates. You can use the
 ``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
 you the order in which changes propagate.
 
@@ -368,7 +368,7 @@ then rolled up to the totalCost. Note the difference in the execution `plan` bet
 
 
 ## Functions
-JEEP let's you define and call functions.
+jeep let's you define and call functions.
 ### Simple Function Example
 ```bash
 > .init -f "example/ex05.json"
@@ -411,9 +411,9 @@ So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, 
 }
 
 ```
-### Setting Values in the JEEP CLI
+### Setting Values in the jeep CLI
 
-The JEEP CLI also allows you to manually set values in your templates, further aiding in debugging and development:
+The jeep CLI also allows you to manually set values in your templates, further aiding in debugging and development:
 
 ```bash
 > .set /to "Dr. David Bowman"
@@ -426,16 +426,16 @@ setData Execution Time: 1.732ms
 > 
 ````
 
-## Why Do We Need Jeep?
+## Why Do We Need jeep?
 
 JSONata assumes a single input document and provides a powerful complete language for manipulating that input and 
-producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. JEEP 
+producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. jeep 
 provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
 is supported. 
 
-For small examples it may not seem obvious why JEEP goes to the trouble of computing a DAG and optimizing expression
+For small examples it may not seem obvious why jeep goes to the trouble of computing a DAG and optimizing expression
 evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data 
 (such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
 with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
-was one of the motivating use cases for JEEP: performance critical data rendering applications.
+was one of the motivating use cases for jeep: performance critical data rendering applications.
 
