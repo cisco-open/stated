@@ -121,18 +121,20 @@ class TemplateProcessor {
         const listDependencies = (node) => {
             visited.add(node.jsonPointer__);
 
-            for (const dependency of node?.absoluteDependencies__) {
-                if (!visited.has(dependency)) {
-                    const dependencyNode = jp.get(templateMeta, dependency);
-                    if(dependencyNode.materialized__ === false){ //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
-                        const ancestor = this.searchUpForExpression(dependencyNode);
-                        if(ancestor && !visited.has(ancestor.jsonPointer__)){
-                            listDependencies(ancestor, exprsOnly);
+            if (node.absoluteDependencies__){
+                for (const dependency of node.absoluteDependencies__) {
+                    if (!visited.has(dependency)) {
+                        const dependencyNode = jp.get(templateMeta, dependency);
+                        if (dependencyNode.materialized__ === false) { //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
+                            const ancestor = this.searchUpForExpression(dependencyNode);
+                            if (ancestor && !visited.has(ancestor.jsonPointer__)) {
+                                listDependencies(ancestor, exprsOnly);
+                            }
+                        } else {
+                            listDependencies(dependencyNode, exprsOnly);
                         }
-                    }else{
-                        listDependencies(dependencyNode, exprsOnly);
-                    }
 
+                    }
                 }
             }
             //when we are forming the topological order for the 'plan' command, we don't need to include
@@ -264,31 +266,45 @@ class TemplateProcessor {
         }
     }
 
-    getDependentsRecursive(jsonPtr, dependees = new Set()) {
-        if(!jp.has(this.templateMeta, jsonPtr)){
+    getDependentsRecursive(jsonPtr) {
+        if (!jp.has(this.templateMeta, jsonPtr)) {
             console.log(`${jsonPtr} does not exist.`);
-            return dependees;
-        }
-        const metaInf = jp.get(this.templateMeta, jsonPtr);
-        if (metaInf.dependees__) {
-            metaInf.dependees__.forEach(dependee => {
-                dependees.add(jp.get(this.templateMeta, dependee));
-                this.getDependentsRecursive(dependee, dependees);
-            });
+            return [];
         }
 
-        // Get parent node. Ancestors are considered implicit dependents
-        let parentPtrParts = jp.parse(jsonPtr);
-        parentPtrParts.pop();
+        const dependents = [];
+        const queue = [jsonPtr];
+        const visited = new Set();
 
-        // Only proceed if there are more ancestor nodes to process
-        if (parentPtrParts.length > 0) {
-            let parentPtr = jp.compile(parentPtrParts);
-            // recursively process the parent node
-            this.getDependentsRecursive(parentPtr, dependees);
+        while (queue.length > 0) {
+            const currentPtr = queue.shift();
+            visited.add(currentPtr);
+
+            const metaInf = jp.get(this.templateMeta, currentPtr);
+
+            if (metaInf.dependees__) {
+                metaInf.dependees__.forEach(dependee => {
+                    if (!visited.has(dependee)) {
+                        dependents.push(jp.get(this.templateMeta, dependee));
+                        queue.push(dependee);
+                        visited.add(dependee);
+                    }
+                });
+            }
+
+            // Get parent node. Ancestors are considered implicit dependents
+            const parentPtrParts = jp.parse(currentPtr);
+            parentPtrParts.pop();
+            const parentPtr = jp.compile(parentPtrParts);
+
+            if (!visited.has(parentPtr) && parentPtr.length > 0) {
+                dependents.push(jp.get(this.templateMeta, parentPtr));
+                queue.push(parentPtr);
+                visited.add(parentPtr);
+            }
         }
 
-        return dependees;
+        return dependents;
     }
 
     getDependencies(jsonPtr){
@@ -299,6 +315,7 @@ class TemplateProcessor {
 
     }
 
+    //this is the .to repl
     getDependenciesTransitiveExecutionPlan(jsonPtr) {
         if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr);

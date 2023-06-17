@@ -8,12 +8,11 @@ class DependencyFinder {
         this.ast = this.compiledExpression.ast();
         this.currentSteps = [];
         this.paths = [];
-        this.exprStack = [];
-        //this.pathInterrupts = 0;
+        this.nodeStack = [];
     }
 
     findDependencies(node = this.ast) {
-        if(this.currentSteps.length === 0){
+        if (this.currentSteps.length === 0) {
             this.currentSteps.push([]); //initialize a container for steps
         }
         if (node === undefined) {
@@ -29,16 +28,10 @@ class DependencyFinder {
         if (typeof node === 'object' && node !== null) {
             const {
                 type,
-                update,
-                pattern,
-                predicate,
-                stages,
-                procedure
             } = node;
             this.capturePathExpressions(node);
             this.captureArrayIndexes(node);
-            this.exprStack.push(type);
-            let children;
+            this.nodeStack.push(node);
             switch (type) {
                 case "bind":  // :=
                 case "path": //a.b.c
@@ -50,7 +43,7 @@ class DependencyFinder {
             }
             //the children above require the special processing above. But then there are all the other
             //children which we deal with, and we don't need to write any special code for them.
-            children = this.collectChildren(children, node);
+            const children = this.collectChildren(node);
 
             children.forEach(c => {
                 this.findDependencies(c);
@@ -59,7 +52,7 @@ class DependencyFinder {
             //now we are coming out of the recursion, so the switch below is over the just-finished subtree
             switch (type) {
                 case "variable":
-                    if(!this.hasAncestor(["path"])){
+                    if (!this.hasAncestor(n => n.type === "path")) {
                         this.emitPaths(); //every independent variable should be separately emitted. But if it is under a path then don't emit it since it should be glommed onto the path
                     }
                     break;
@@ -67,44 +60,42 @@ class DependencyFinder {
                     this.emitPaths(); //every independent path should be separately emitted
                     break;
             }
-            this.exprStack.pop();
+            this.nodeStack.pop();
         }
         return this.paths;
     }
 
 
-    collectChildren(children, node) {
+    collectChildren(node) {
         //any property of node that is not type, value, or position is a child of the node
-        if (children === undefined) {
-            children = Object.keys(node).filter(k => !["type", "value", "position"]
-                .includes(k)).reduce((acc, k) => {
-                const v = node[k];
-                if (v) {
-                    acc.push(v);
-                }
-                return acc;
-            }, []);
-        }
-        return children;
+        return Object.keys(node).filter(k => !["type", "value", "position", "pseudoType"]
+            .includes(k)).reduce((acc, k) => {
+            const v = node[k];
+            if (v) {
+                acc.push({...v, "pseudoType": k});
+            }
+
+            return acc;
+        }, []);
     }
 
-    captureArrayIndexes(node){
+    captureArrayIndexes(node) {
         const {type, expr} = node;
-        if (type==="filter" && expr?.type==="number") {
-            _.last(this.currentSteps).push({type, "value":expr.value, "emit": expr?.type === "number"});
+        if (type === "filter" && expr?.type === "number") {
+            _.last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
         }
     }
 
     capturePathExpressions(node) {
         const {type, value} = node;
-        if (type !== "name" && type !== "variable" ) {
+        if (type !== "name" && type !== "variable") {
             return;
         }
         if (this.isRootedIn$$(value)) { //if the root of the expression is $$ then we will always accept the navigation downwards
             _.last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
-        if (this.isInsideAScopeWhere$IsLocal()) { //path expressions inside a transform are ignored modulo the $$ case just checked for above
+        if (this.isInsideAScopeWhere$IsLocal(node)) { //path expressions inside a transform are ignored modulo the $$ case just checked for above
             _.last(this.currentSteps).push({type, value, "emit": false});
             return;
         }
@@ -115,7 +106,7 @@ class DependencyFinder {
         if (type === "variable") {
             //if we are here then the variable must be an ordinary locally named variable since it is neither $$ or $.
             //variables local to a closure cannot cause/imply a dependency for this expression
-            if(!this.hasParent("function") ) { //the function name is actually a variable, we want to skip such variables
+            if (!this.hasParent("function")) { //the function name is actually a variable, we want to skip such variables
                 _.last(this.currentSteps).push({type, value, "emit": false});
             }
             return;
@@ -124,35 +115,32 @@ class DependencyFinder {
         //if we are here then we are dealing with names, which are identifiers like 'a' which can occur in a.b.c or $.a or $$.a or $foo.a, etc
         //The decision to emit a name is made based on its ancestor, or lack thereof
         //this.currentSteps.push({type, value, "emit": !this.isNested(["path", "filter"])});
-        if(!this.isUnderTreeShape(["path", "function"])) {
+        if (!this.isUnderTreeShape(["path", "function"])) {
             _.last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
         }
 
     }
 
-    isNested(ancestors){
-        return this.exprStack.reduce((count, curr) =>{
-            return ancestors.includes(curr)?count+1:count;
-        }, 0) > 1;
+
+    hasParent(parentType) {
+        return _.last(this.nodeStack).type === parentType;
     }
 
-    hasParent(parent){
-        return _.last(this.exprStack) === parent;
+    hasAncestor(matcher) {
+        return this.nodeStack.some(matcher);
     }
 
-    hasAncestor(ancestors){
-        return this.exprStack.reduce((count, curr) =>{
-            return ancestors.includes(curr)?count+1:count;
-        }, 0) >= 1;
+    ancestors(matcher) {
+        return this.nodeStack.filter(matcher);
     }
 
-    isUnderTreeShape(path){
-        return this.exprStack.reduce((_path, curr) =>{
-            if(_path[0] === curr){
-                _path.shift(); //if the curr path item is the first element of the _path we remove it from _path
+    isUnderTreeShape(pathTypes) {
+        return this.nodeStack.reduce((_pathTypes, curr) => {
+            if (_pathTypes[0] === curr.type) {
+                _pathTypes.shift(); //if the curr path item is the first element of the _pathTypes we remove it from _path
             }
-            return _path;
-        }, [...path]).length===0; //if 0 then the desired shape existed
+            return _pathTypes;
+        }, [...pathTypes]).length === 0; //if 0 then the desired shape existed
     }
 
     isSingle$Var(type, value) {
@@ -166,26 +154,56 @@ class DependencyFinder {
     }
 
 
+    isInsideAScopeWhere$IsLocal(node) {
+        let matches = this.ancestors(n => {
+            const {type:t, pseudoType:p, value:v} = n;
+            return (t === "unary" && ["(", "{", "[", "^"].includes(v)) //(map, {reduce, [filter, ^sort
+                || t === "filter"
+                || p === "predicate";
+        });
+        //the local scope is equal to the input scope to the expression the first time we enter one of these blocks
+        //However the second time the scope is the output from a prior expression, not the input. Therefore the scope
+        //is local to the expression when there is more than one match in the ancestors
+        if (matches.length > 1){
+            return true;
+        }
 
-    isInsideAScopeWhere$IsLocal() {
-        return this.exprStack.some(type => type === "transform")
+        //if we are following a consarray like [1..count].{"foo"+$}} then $ is a local scope. So we have to make
+        //sure we are not IN a consarray as count is in and then if we are not in a consarray, are we following
+        //a consarray (immediately or later)
+        matches = !this.hasAncestor(n=>n.consarray !== undefined) && this.ancestors(n => {
+            const {type:t,  position, steps} = n;
+            //iterate the steps array and determine if there is a consarray that comes before this node's position in the steps
+            return t==="path" && steps.find(nn=>nn.consarray && nn.position < node.position);
+        });
+        if (matches.length > 0){
+            return true;
+        }
+
+
+        //If we are in a transfor, scope is local
+        matches = this.ancestors(n => {
+            const {type:t} = n;
+            return t === "transform";
+        });
+        return matches.length > 0;
     }
 
     emitPaths() {
         const emitted = [];
         const steps = this.currentSteps.flat();
         const last = _.last(this.currentSteps);
-        if(last.length > 0 && last.every(s=>s.emit)){
-            if(last[0].value==="$"){ //corresponding to '$$' variable
+        if (last.length > 0 && last.every(s => s.emit)) {
+            if (last[0].value === "$") { //corresponding to '$$' variable
                 //in this case the chain of steps must be broken as '$$' is an absolute reference to root document
                 last.forEach(s => emitted.push(s.value));
-            }else {
+            } else {
                 steps.forEach(s => emitted.push(s.value));
             }
         }
         this.currentSteps.pop();
 
-        if(emitted.length > 0){
+        if (emitted.length > 0) {
             this.paths.push(emitted);
         }
     }

@@ -425,6 +425,176 @@ setData Execution Time: 1.732ms
 }
 > 
 ````
+Let's take a more complex example where we generate MySQL instances:
+```bash 
+> .init -f "example/mysql.json"
+{
+  "name": "mysql",
+  "count": 1,
+  "pn": 3306,
+  "providerName": "aws",
+  "tmp": {
+    "host": "/${ [1..count].{'database_instance.host':'mysql-instance-' & $ & '.cluster-473653744458.us-west-2.rds.amazonaws.com'}}",
+    "port": "/${ [1..count].{'database_instance.port:':$$.pn}}",
+    "provider": "/${[1..count].{'cloud.provider': $$.providerName}}",
+    "instanceId": "/${[1..count].{'cloud.database_instance.id':'db-mysql-instance-' & $formatBase($,16)}}",
+    "instanceName": "/${[1..count].{'database_instance.name':'MySQL instance' & $}}",
+    "clusterName": "/${[1..count].{'database_instance.cluster._name':'MySQL cluster' & $}}"
+  },
+  "instances": "${$zip(tmp.host, tmp.port, tmp.provider, tmp.instanceId, tmp.instanceName, tmp.clusterName)~>$map($merge)}"
+}
+> .out
+{
+  "name": "mysql",
+  "count": 1,
+  "pn": 3306,
+  "providerName": "aws",
+  "tmp": {
+    "host": {
+      "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com"
+    },
+    "port": {
+      "database_instance.port:": 3306
+    },
+    "provider": {
+      "cloud.provider": "aws"
+    },
+    "instanceId": {
+      "cloud.database_instance.id": "db-mysql-instance-1"
+    },
+    "instanceName": {
+      "database_instance.name": "MySQL instance1"
+    },
+    "clusterName": {
+      "database_instance.cluster._name": "MySQL cluster1"
+    }
+  },
+  "instances": {
+    "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com",
+    "database_instance.port:": 3306,
+    "cloud.provider": "aws",
+    "cloud.database_instance.id": "db-mysql-instance-1",
+    "database_instance.name": "MySQL instance1",
+    "database_instance.cluster._name": "MySQL cluster1"
+  }
+}
+> .from /count 
+[
+  "/count",
+  "/tmp/clusterName",
+  "/tmp/host",
+  "/tmp/instanceId",
+  "/tmp/instanceName",
+  "/tmp/port",
+  "/tmp/provider",
+  "/instances",
+  "/tmp"
+]
+> .set /count 3
+setData Execution Time: 6.576ms
+{
+  "name": "mysql",
+  "count": 3,
+  "pn": 3306,
+  "providerName": "aws",
+  "tmp": {
+    "host": [
+      {
+        "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com"
+      },
+      {
+        "database_instance.host": "mysql-instance-2.cluster-473653744458.us-west-2.rds.amazonaws.com"
+      },
+      {
+        "database_instance.host": "mysql-instance-3.cluster-473653744458.us-west-2.rds.amazonaws.com"
+      }
+    ],
+    "port": [
+      {
+        "database_instance.port:": 3306
+      },
+      {
+        "database_instance.port:": 3306
+      },
+      {
+        "database_instance.port:": 3306
+      }
+    ],
+    "provider": [
+      {
+        "cloud.provider": "aws"
+      },
+      {
+        "cloud.provider": "aws"
+      },
+      {
+        "cloud.provider": "aws"
+      }
+    ],
+    "instanceId": [
+      {
+        "cloud.database_instance.id": "db-mysql-instance-1"
+      },
+      {
+        "cloud.database_instance.id": "db-mysql-instance-2"
+      },
+      {
+        "cloud.database_instance.id": "db-mysql-instance-3"
+      }
+    ],
+    "instanceName": [
+      {
+        "database_instance.name": "MySQL instance1"
+      },
+      {
+        "database_instance.name": "MySQL instance2"
+      },
+      {
+        "database_instance.name": "MySQL instance3"
+      }
+    ],
+    "clusterName": [
+      {
+        "database_instance.cluster._name": "MySQL cluster1"
+      },
+      {
+        "database_instance.cluster._name": "MySQL cluster2"
+      },
+      {
+        "database_instance.cluster._name": "MySQL cluster3"
+      }
+    ]
+  },
+  "instances": [
+    {
+      "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com",
+      "database_instance.port:": 3306,
+      "cloud.provider": "aws",
+      "cloud.database_instance.id": "db-mysql-instance-1",
+      "database_instance.name": "MySQL instance1",
+      "database_instance.cluster._name": "MySQL cluster1"
+    },
+    {
+      "database_instance.host": "mysql-instance-2.cluster-473653744458.us-west-2.rds.amazonaws.com",
+      "database_instance.port:": 3306,
+      "cloud.provider": "aws",
+      "cloud.database_instance.id": "db-mysql-instance-2",
+      "database_instance.name": "MySQL instance2",
+      "database_instance.cluster._name": "MySQL cluster2"
+    },
+    {
+      "database_instance.host": "mysql-instance-3.cluster-473653744458.us-west-2.rds.amazonaws.com",
+      "database_instance.port:": 3306,
+      "cloud.provider": "aws",
+      "cloud.database_instance.id": "db-mysql-instance-3",
+      "database_instance.name": "MySQL instance3",
+      "database_instance.cluster._name": "MySQL cluster3"
+    }
+  ]
+}
+
+```
+
 
 ## Why Do We Need jeep?
 

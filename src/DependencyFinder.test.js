@@ -5,12 +5,12 @@ test('$$.aaa', () => {
     expect(df.findDependencies()).toEqual([["$", 'aaa']]);
 });
 
-test('merge', () => {
+test('$merge($.a.b, $i)', () => {
     const df = new DependencyFinder('$merge($.a.b, $i)');
     expect(df.findDependencies()).toEqual([["", 'a', 'b']]);
 });
 
-test('reduce 1', () => {
+test(`'$reduce(function($acc, $i){(x.y.z)})`, () => {
     const df = new DependencyFinder('$reduce(function($acc, $i){(\n' +
         '                            x.y.z\n' +
         '                       )})');
@@ -26,12 +26,78 @@ test('reduce 2', () => {
 test("transform - pattern should be ignored", () => {
     const program = `k.z~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
+    expect(df.findDependencies()).
+    toEqual([["k", "z"], ["$", "aaaa"]]);
 });
 test("z[zz]", () => {
     const program = `z[zz]`
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([["z", "zz"], ["z"]]);
+});
+test("k.z[zz].[poop]", () => {
+    const program = `k.z[zz].[poop]`
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "k",
+            "z",
+            "zz"
+        ],
+        [
+            "k",
+            "z",
+            "poop"
+        ],
+        [
+            "k",
+            "z"
+        ]
+    ]);
+});
+test("k.z[zz='foo' and yy=a][xx+b = $$.c]", () => {
+    const program = `k.z[zz='foo' and yy=a][xx+b = $$.c]`
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "k",
+            "z",
+            "zz"
+        ],
+        [
+            "k",
+            "z",
+            "yy"
+        ],
+        [
+            "k",
+            "z",
+            "a"
+        ],
+        [
+            "k",
+            "z",
+            "xx"
+        ],
+        [
+            "k",
+            "z",
+            "b"
+        ],
+        [
+            "$",
+            "c"
+        ],
+        [
+            "k",
+            "z"
+        ]
+    ]);
+});
+
+test("[1..count][$=count]", () => {
+    const program = "[1..count][$=count]"
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["count"]]);
 });
 
 test("transform 1", () => {
@@ -206,13 +272,33 @@ test("$[0][1][a]", () => {
         [
             "",
             0,
-            1,
-            "a"
-        ],
+            1
+        ]
+    ]);
+});
+
+test("$[0][1].a", () => {
+    const program = "$[0][1].a";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
         [
             "",
             0,
-            1
+            1,
+            "a"
+        ]
+    ]);
+});
+
+test("$[0][1].(a)", () => {
+    const program = "$[0][1].a";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "",
+            0,
+            1,
+            "a"
         ]
     ]);
 });
@@ -221,18 +307,6 @@ test("$[0][1][a=b]", () => {
     const program = "$[0][1][a=b]";
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([
-        [
-            "",
-            0,
-            1,
-            "a"
-        ],
-        [
-            "",
-            0,
-            1,
-            "b"
-        ],
         [
             "",
             0,
@@ -291,6 +365,42 @@ test("count.{'cloud.provider': $$.providerName}", () => {
         ]
     ]);
 });
+
+test("[1..count].{'cloud.provider': $$.providerName}", () => {
+    const program = "[1..count].{'cloud.provider': $$.providerName}";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "count"
+        ],
+        [
+            "$",
+            "providerName"
+        ]
+    ]);
+});
+
+test("[1..count].{'database_instance.name':'MySQL instance' & $}", () => {
+    const program = "[1..count].{'database_instance.name':'MySQL instance' & $}";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "count"
+        ]
+    ]);
+});
+test("[1..count][$=1]", () => {
+    const program = "[1..count]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "count"
+        ]
+    ]);
+});
+
+
+
 
 
 
