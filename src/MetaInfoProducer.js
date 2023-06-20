@@ -21,20 +21,20 @@ module.exports = `
                 :$type($o)="object"
                     ?(  $flags := $acc.flags; 
                         $acc := $acc~>|flags|{"treeHasExpressions__":false}|; /*init to false upon descending)*/
-                        $acc := $spread($o)~>$reduce(function($acc, $kv){
+                        $acc := $spread($o)?$spread($o)~>$reduce(function($acc, $kv){
                             (
                                 $k := $keys($kv)[0];
                                 $v := $lookup($kv, $k);
                                 $nextPath := $append($path, $k);
                                 $getPaths($v, $acc, $nextPath)
                             )
-                        }, $acc);
+                        }, $acc):$acc;
                         $flags:=$flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|;
                         $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
                     )
     
                     :(
-                        $match := /\\s*((\/)|((\\.\\.\\/)*))\\$\\{(.+)\\}\\s*$/($o); 
+                        $match := /\\s*((/)|((\\.\\.\\/)*))\\$\\{(.+)\\}\\s*$/($o); 
                         $leadingSlash := $match[0].groups[1];
                         $leadingCdUp := $match[0].groups[2];
                         $slashOrCdUp := $leadingSlash ? $leadingSlash : $leadingCdUp;

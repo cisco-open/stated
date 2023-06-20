@@ -185,40 +185,40 @@ test("test 9.1 - $ refers to the array the expression is in", async () => {
     const o = [7, " ${ $[0]  }"];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([7,7]);
+    expect(o).toEqual([7, 7]);
 });
 
 test("test 9.1 - allow ../ to back up past root", async () => {
     const o = [7, " ../../../../../../${ $[0]  }"];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([7,7]);
+    expect(o).toEqual([7, 7]);
 });
 
 test("test 9.1.1", async () => {
     const o = [7, [" ../${ $[0]  }"]];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([7,[7]]);
+    expect(o).toEqual([7, [7]]);
 });
 
 test("test 9.1.2", async () => {
     const o = [1, [" ../${ $[0] +  1 }", "${ $[0]+1 }"]];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([1,[2, 3]]);
+    expect(o).toEqual([1, [2, 3]]);
 });
 test("test 9.1.3", async () => {
-    const o = [1, "${ $[2]  }" , [" ../${ $[0]+1  }", "${ $[0] + 1}"]];
+    const o = [1, "${ $[2]  }", [" ../${ $[0]+1  }", "${ $[0] + 1}"]];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([1,[2, 3], [2, 3]]);
+    expect(o).toEqual([1, [2, 3], [2, 3]]);
 });
 test("test 9.1.4", async () => {
-    const o = [1, "${ $[2][2]  }" , ["../${ $[0]+1  }", "${ $[0] + 1}", {"a":{"b":42}}]];
+    const o = [1, "${ $[2][2]  }", ["../${ $[0]+1  }", "${ $[0] + 1}", {"a": {"b": 42}}]];
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o).toEqual([1,{"a":{"b":42}}, [2, 3, {"a":{"b":42}}]]);
+    expect(o).toEqual([1, {"a": {"b": 42}}, [2, 3, {"a": {"b": 42}}]]);
 });
 
 test("test 9.1.5", async () => {
@@ -348,13 +348,13 @@ test("test 11 - test for slash 'rooting'", async () => {
             "b": '/${b}',
             "c": [7, ["/${b}"]]
         },
-        "b":42
+        "b": 42
     };
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     expect(o).toEqual({
         "a": {"b": 42, "c": [7, [42]]},
-        "b":42
+        "b": 42
     });
 });
 
@@ -376,10 +376,10 @@ const mysql = {
 };
 
 test("mysql output", async () => {
-    const o= _.cloneDeep(mysql);
+    const o = _.cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(o.instances[0]).toEqual( {
+    expect(o.instances[0]).toEqual({
             "database_instance.host": "mysql-instance-1.cluster-473653744458.us-west-2.rds.amazonaws.com",
             "database_instance.port:": 3306,
             "cloud.provider": "aws",
@@ -391,7 +391,7 @@ test("mysql output", async () => {
 });
 
 test("mysql plan", async () => {
-    const o= _.cloneDeep(mysql);
+    const o = _.cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     expect(tp.getEvaluationPlan()).toEqual(
@@ -411,7 +411,7 @@ test("mysql plan", async () => {
 
 
 test("mysql to /tmp/provider", async () => {
-    const o= _.cloneDeep(mysql);
+    const o = _.cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     expect(tp.getDependenciesTransitiveExecutionPlan("/tmp/provider")).toEqual(
@@ -423,6 +423,58 @@ test("mysql to /tmp/provider", async () => {
     );
 
 });
+
+
+test("nested arrays", async () => {
+        const o = {
+            "spec": {
+                "count": 0,
+                "increment": "function($state) { { \"count\": $state.count+1 } }",
+                "decrement": "function($state) { { \"count\": $state.count-1 } }",
+                "return": [
+                    [
+                        "div",
+                        {
+                            ".": "App"
+                        },
+                        [
+                            "h2",
+                            {},
+                            "/${ spec.count }"
+                        ]
+                    ]
+                ]
+            }
+        };
+        const tp = new TemplateProcessor(o);
+        await tp.initialize();
+        expect(tp.output).toEqual(
+            {
+                "spec": {
+                    "count": 0,
+                    "decrement": "function($state) { { \"count\": $state.count-1 } }",
+                    "increment": "function($state) { { \"count\": $state.count+1 } }",
+                    "return": [
+                        [
+                            "div",
+                            {
+                                ".": "App"
+                            },
+                            [
+                                "h2",
+                                {},
+                                0
+                            ]
+                        ]
+                    ]
+                }
+            }
+        );
+    }
+);
+
+
+
 
 
 
