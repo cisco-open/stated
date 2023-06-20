@@ -1,4 +1,4 @@
-const TemplateProcessor = require('./TemplateProcessor');
+const TemplateProcessor = require('../TemplateProcessor');
 const _ = require('lodash');
 
 test("test 1", async () => {

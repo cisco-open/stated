@@ -1,7 +1,7 @@
 const jsonata = require('jsonata');
 const jp = require('json-pointer');
 const _ = require('lodash');
-const metaInfoProducer = require('./nodeInfoAnalyzer');
+const metaInfoProducer = require('./MetaInfoProducer');
 const DependencyFinder=require('./DependencyFinder');
 
 class TemplateProcessor {

@@ -1,11 +1,10 @@
 # jeep: JSONata Embedded Expression Processor
 <img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="300">
 
-
-jeep, or JSONata Embedded Expression Processor, is a library and CLI for running JSON files with embedded
+A library and CLI for running JSON files with embedded
 [JSONata](http://docs.jsonata.org/) programs.
 ```bash
-ghendrey$ jeep.js
+ghendrey$ jeep.old.js
 > .init -f "example/hello.json"
 {
 "to": "world",
@@ -16,7 +15,7 @@ ghendrey$ jeep.js
 "to": "world",
 "msg": "hello world"
 }
-````
+```
 
 ## Getting Started
 
@@ -29,20 +28,20 @@ cd templates
 
 ```bash
 yarn install
-````
+```
 
 2. **Start jeep**: Once installed, you can start using jeep by running the following command:
 
 ```bash
-node jeep.js
-````
+node jeep.old.js
+```
 
 If your environment is set up correctly with the path for Node.js, you can simply run this command to
 start the jeep REPL:
 
 ```bash
-./jeep.js
-````
+./jeep.old.js
+```
 ## CLI Commands
 
 jeep provides a set of CLI commands to interact with the system:
@@ -77,16 +76,42 @@ The content between `${}` can be any valid JSONata program. The jeep repl lets y
     1
   ]
 }
+```
+### Setting Values in the jeep CLI
 
+The jeep CLI also allows you to dynamically set values in your templates, further aiding in debugging and development.
+In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+
+```bash
+> .init -f "example/ex09.json"
+{
+  "a": [
+    0,
+    1,
+    "${ $[0] + $[1] }"
+  ]
+}
+> .set /a/0 100
+{
+  "a": [
+    100,
+    1,
+    101
+  ]
+}
 ```
 ### Expression Scope
-What is the input to the JSONata program? The input, by default, is the object or array that the expression resides in. 
-In the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
+Individual JSONata programs are embedded in JSON files between `${..}`. What is the input to the JSONata program? 
+The input, by default, is the object or array that the expression resides in. For instance in the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
 refer to the first element of the array. 
 #### Rerooting Expressions
+In the example below, we want `player1` to refer to `/player1` (the field named 'player1' at the root of the document). 
+But our expression `greeting & ', ' &  player1` is located deep in the document at `/dialog/part1`. So how can we cause 
+the root of the document to be the input to the JSONata expression `greeting & ', ' &  player1`? 
 You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
 at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can
-explicitly set their input using the rooting syntax.
+explicitly set their input using the rooting syntax. Both absolute rooting, `/${...}` and relative rooting `../${...}`
+are shown.
 
 ```bash
 > .init -f "example/ex04.json"
@@ -178,7 +203,6 @@ evaluated twice.
 }
 > .plan
 [
-  "/e",
   "/d",
   "/b",
   "/c",
@@ -373,15 +397,17 @@ jeep let's you define and call functions.
 ```bash
 > .init -f "example/ex05.json"
 {
-  "hello": "${ (function($to){'hello ' & $to & '. The current time is ' & $now()})}",
-  "to": "dave",
+  "hello": "${ (function($to){'hello ' & $to & '. How about a nice game of ' & $$.game})}",
+  "to": "David",
+  "game": "chess",
   "greeting": "${ hello(to)}"
 }
 > .out
 {
   "hello": "{function:}",
-  "to": "dave",
-  "greeting": "hello dave. The current time is 2023-06-12T07:23:00.243Z"
+  "to": "David",
+  "game": "chess",
+  "greeting": "hello David. How about a nice game of chess"
 }
 ```
 ### More Complex Function Example
@@ -411,20 +437,6 @@ So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, 
 }
 
 ```
-### Setting Values in the jeep CLI
-
-The jeep CLI also allows you to manually set values in your templates, further aiding in debugging and development:
-
-```bash
-> .set /to "Dr. David Bowman"
-setData Execution Time: 1.732ms
-{
-  "hello": "{function:}",
-  "to": "Dr. David Bowman",
-  "greeting": "hello Dr. David Bowman. The current time is 2023-06-12T07:23:00.243Z"
-}
-> 
-````
 Let's take a more complex example where we generate MySQL instances:
 ```bash 
 > .init -f "example/mysql.json"
@@ -478,7 +490,7 @@ Let's take a more complex example where we generate MySQL instances:
     "database_instance.cluster._name": "MySQL cluster1"
   }
 }
-> .from /count 
+> .from /count
 [
   "/count",
   "/tmp/clusterName",
@@ -491,7 +503,6 @@ Let's take a more complex example where we generate MySQL instances:
   "/tmp"
 ]
 > .set /count 3
-setData Execution Time: 6.576ms
 {
   "name": "mysql",
   "count": 3,
@@ -592,7 +603,6 @@ setData Execution Time: 6.576ms
     }
   ]
 }
-
 ```
 
 

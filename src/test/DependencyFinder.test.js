@@ -1,4 +1,4 @@
-const DependencyFinder = require('./DependencyFinder');
+const DependencyFinder = require('../DependencyFinder');
 
 test('$$.aaa', () => {
     const df = new DependencyFinder('$$.aaa');
