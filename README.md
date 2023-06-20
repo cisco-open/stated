@@ -4,7 +4,7 @@
 A library and CLI for running JSON files with embedded
 [JSONata](http://docs.jsonata.org/) programs.
 ```bash
-ghendrey$ jeep.old.js
+ghendrey$ jeep.js
 > .init -f "example/hello.json"
 {
 "to": "world",
@@ -33,14 +33,14 @@ yarn install
 2. **Start jeep**: Once installed, you can start using jeep by running the following command:
 
 ```bash
-node jeep.old.js
+node jeep.js
 ```
 
 If your environment is set up correctly with the path for Node.js, you can simply run this command to
 start the jeep REPL:
 
 ```bash
-./jeep.old.js
+./jeep.js
 ```
 ## CLI Commands
 
