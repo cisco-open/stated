@@ -473,6 +473,31 @@ test("nested arrays", async () => {
     }
 );
 
+test("fetch", async () => {
+    const tp = await TemplateProcessor.load({
+        "url": 'https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json',
+        "data": "${ $fetch(url).json()~> |props|{'yo':'there', 'zoink':'zing'}|}"
+    });
+    expect(tp.output).toEqual(
+        {
+            "data": {
+                "baz": "zap",
+                "foo": "bar",
+                "props": {
+                    "koink": {
+                        "dingus": "doink",
+                        "nozzle": "bingus"
+                    },
+                    "yo": "there",
+                    "zoink": "zing"
+                }
+            },
+            "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json"
+        }
+    );
+
+});
+
 
 
 

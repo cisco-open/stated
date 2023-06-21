@@ -45,6 +45,7 @@ class DependencyFinder {
             //children which we deal with, and we don't need to write any special code for them.
             const children = this.collectChildren(node);
 
+
             children.forEach(c => {
                 this.findDependencies(c);
             });
@@ -71,8 +72,12 @@ class DependencyFinder {
         return Object.keys(node).filter(k => !["type", "value", "position", "pseudoType"]
             .includes(k)).reduce((acc, k) => {
             const v = node[k];
-            if (v) {
-                acc.push({...v, "pseudoType": k});
+            if(v) {
+                if (Array.isArray(v)) {
+                    acc.push(v);
+                } else if (typeof v === 'object' && v !== null) {
+                    acc.push({...v, "pseudoType": k});
+                }
             }
 
             return acc;

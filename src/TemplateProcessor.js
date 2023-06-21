@@ -19,6 +19,12 @@ class TemplateProcessor {
         await this.evaluateDependencies(metaInfos);
     }
 
+    static async load(template){
+        const t = new TemplateProcessor(template);
+        await t.initialize();
+        return t;
+    }
+
     async createMetaInfos() {
         const metaInfProcessor = jsonata(metaInfoProducer);
         let metaInfos = await metaInfProcessor.evaluate(this.input);
@@ -212,7 +218,11 @@ class TemplateProcessor {
             if (typeof expr__ !== 'undefined') {
                 try {
                     const target = jp.get(output, parentJsonPointer__); //an expression is always relative to a target
-                    data = await compiledExpr__.evaluate(target);
+                    data = await compiledExpr__.evaluate(target,
+                        {
+                            "fetch":fetch
+                        }
+                    );
                     this._setData(output, jsonPtr, data, callback__);
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);
