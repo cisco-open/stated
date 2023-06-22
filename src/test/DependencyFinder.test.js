@@ -272,6 +272,12 @@ test("$[0][1][a]", () => {
         [
             "",
             0,
+            1,
+            "a"
+        ],
+        [
+            "",
+            0,
             1
         ]
     ]);
@@ -307,6 +313,18 @@ test("$[0][1][a=b]", () => {
     const program = "$[0][1][a=b]";
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([
+        [
+            "",
+            0,
+            1,
+            "a"
+        ],
+        [
+            "",
+            0,
+            1,
+            "b"
+        ],
         [
             "",
             0,
@@ -398,6 +416,30 @@ test("[1..count][$=1]", () => {
         ]
     ]);
 });
+test("count.{'database_instance.host':'mysql-instance-' & $ & '.cluster-473653744458.us-west-2.rds.amazonaws.com'}", () => {
+    const program = "count.{'database_instance.host':'mysql-instance-' & $ & '.cluster-473653744458.us-west-2.rds.amazonaws.com'}\n";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "count"
+        ]
+    ]);
+});
+test("count.{'cloud.provider': $$.providerName}", () => {
+    const program = "count.{'cloud.provider': $$.providerName}";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "providerName"
+        ],
+        [
+            "count"
+        ]
+    ]);
+});
+
+
 
 
 

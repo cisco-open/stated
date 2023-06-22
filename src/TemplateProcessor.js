@@ -46,7 +46,7 @@ class TemplateProcessor {
             if (metaInfo.expr__ !== undefined) {
                 const depFinder = new DependencyFinder(metaInfo.expr__, metaInfo);
                 metaInfo.compiledExpr__  = depFinder.compiledExpression;
-                metaInfo.dependencies__ = depFinder.findDependencies();
+                metaInfo.dependencies__ = TemplateProcessor.getAncestors(depFinder.findDependencies());
             }
             return metaInfo;
         }));
@@ -54,17 +54,19 @@ class TemplateProcessor {
         return metaInfos;
     }
 
+    //for deps [[a,b,c], [d,e,f]] we convert to [[a,b,c], [a,b], [a],[d,e,f], [d,e], [d]] thus producing all ancestors of a.b.c as well as a.b.c
+    static getAncestors(deps){  //
+      return deps.map(d=> d.map((_, index, self) => self.slice(0, index + 1))).flat(1).filter(d=> d.length>1 || !["", "$"].includes(d[0])); //the final filter is to remove dependencies on "" or $ (root)
+    }
+
+
     sortMetaInfos(metaInfos) {
         metaInfos.sort((a, b) => a.jsonPointer__ < b.jsonPointer__ ? -1 : (a.jsonPointer__ > b.jsonPointer__ ? 1 : 0));
     }
 
     populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
-            //these initialDependenciesPathParts may have "../" meta instructions like ["../", "../", "a", "b", "c"]
             const initialDependenciesPathParts = this.removeLeadingDollarsFromDependencies(meta);
-            //we need the cdUp operation to remove the "../" meta instructions and process them by shortening
-            // the parentPathParts. The cdUp method mutates both the initalDependenciesPathParts and the parentJsonPointer
-            //TemplateProcessor.cdUp(meta.parentJsonPointer__, initialDependenciesPathParts);
             meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.parentJsonPointer__, initialDependenciesPathParts);
             meta.dependencies__ = initialDependenciesPathParts;
             //so if we will never allow replacement of the entire root document. But modulo that if-statement we can setup the templateMeta
@@ -241,7 +243,10 @@ class TemplateProcessor {
                 console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
                 return false;
             }
-            const existingData = jp.get(output, jsonPtr);
+            let existingData;
+            if(jp.has(output, jsonPtr)){
+                existingData = jp.get(output, jsonPtr);
+            }
             if(!_.isEqual(existingData, data)){
                 this._setData(output, jsonPtr, data, callback__);
             }else{

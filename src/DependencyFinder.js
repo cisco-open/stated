@@ -207,7 +207,12 @@ class DependencyFinder {
             }
         }
         this.currentSteps.pop();
-
+        if(emitted[emitted.length-1]===""){
+            emitted.pop(); //foo.{$} would result in [foo, ""] as dependency. Trailing "" must be removed.
+        }
+        if(emitted.length === 1 && emitted[0]==="$"){
+            return; // a solo dependency of "$" gets scrapped. We don't track dependencies on the root of the template itself
+        }
         if (emitted.length > 0) {
             this.paths.push(emitted);
         }

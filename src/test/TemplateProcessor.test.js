@@ -414,7 +414,8 @@ test("mysql to /tmp/provider", async () => {
     const o = _.cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(tp.getDependenciesTransitiveExecutionPlan("/tmp/provider")).toEqual(
+    const deps = tp.getDependenciesTransitiveExecutionPlan("/tmp/provider");
+    expect(deps).toEqual(
         [
             "/providerName",
             "/count",
@@ -476,10 +477,15 @@ test("nested arrays", async () => {
 test("fetch", async () => {
     const tp = await TemplateProcessor.load({
         "url": 'https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json',
-        "data": "${ $fetch(url).json()~> |props|{'yo':'there', 'zoink':'zing'}|}"
+        "bar": "${data.foo}",
+        "respHandler": "${ function($res){$res.ok? $res.json()~> |props|{'yo':'there', 'zoink':'zing'}|:{'error': $res.status}} }",
+        "data": "${ $fetch(url) ~> respHandler}",
+        "expectedError": "${$fetch(url&'breakme') ~> respHandler }"
     });
+    delete tp.output["respHandler"];
     expect(tp.output).toEqual(
         {
+            "bar": "bar",
             "data": {
                 "baz": "zap",
                 "foo": "bar",
@@ -492,7 +498,39 @@ test("fetch", async () => {
                     "zoink": "zing"
                 }
             },
+            "expectedError": {
+                "error": 404
+            },
             "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json"
+        }
+    );
+
+});
+
+test("big data block", async () => {
+    const tp = new TemplateProcessor({
+        "foo": "${data.a.b.c}",
+    });
+    await tp.initialize();
+    await tp.setData("/data", {"a": {"b": {"c": {"bing": 1, "bang": 2, "boom": 3}}}});
+
+    expect(tp.output).toEqual({
+            "data": {
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": 2,
+                            "bing": 1,
+                            "boom": 3
+                        }
+                    }
+                }
+            },
+            "foo": {
+                "bang": 2,
+                "bing": 1,
+                "boom": 3
+            }
         }
     );
 
