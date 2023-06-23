@@ -1,8 +1,10 @@
 # jeep: JSONata Embedded Expression Processor
-![jeep](https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png){: align="center" width="150"}
+<p align="center">
+  <img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="400">
+</p>
 
-A library and CLI for running JSON files with embedded
-[JSONata](http://docs.jsonata.org/) programs.
+A library and CLI for running JSON files with embedded [JSONata](http://docs.jsonata.org/) programs.
+
 ```bash
 ghendrey$ jeep.js
 > .init -f "example/hello.json"
