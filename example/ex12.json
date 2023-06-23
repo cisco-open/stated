@@ -1,0 +1,6 @@
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game.selected}",
+  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
+}

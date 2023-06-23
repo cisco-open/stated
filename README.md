@@ -77,7 +77,7 @@ The content between `${}` can be any valid JSONata program. The jeep repl lets y
   ]
 }
 ```
-### Setting Values in the jeep CLI
+## Setting Values in the jeep CLI
 
 The jeep CLI also allows you to dynamically set values in your templates, further aiding in debugging and development.
 In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
@@ -100,11 +100,11 @@ In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [
   ]
 }
 ```
-### Expression Scope
+## Expression Scope
 Individual JSONata programs are embedded in JSON files between `${..}`. What is the input to the JSONata program? 
 The input, by default, is the object or array that the expression resides in. For instance in the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
 refer to the first element of the array. 
-#### Rerooting Expressions
+## Rerooting Expressions
 In the example below, we want `player1` to refer to `/player1` (the field named 'player1' at the root of the document). 
 But our expression `greeting & ', ' &  player1` is located deep in the document at `/dialog/part1`. So how can we cause 
 the root of the document to be the input to the JSONata expression `greeting & ', ' &  player1`? 
@@ -148,7 +148,7 @@ are shown.
 }
 
 ```
-### DAG
+## DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
 expressions. jeep is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
 fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression
@@ -410,6 +410,35 @@ jeep let's you define and call functions.
   "greeting": "hello David. How about a nice game of chess"
 }
 ```
+### Fetch
+You can use the JS fetch function to get data over the network and gracefully handle the response.
+```bash
+> .init -f "example/ex12.json"
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game.selected}",
+  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
+}
+> .out
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "Global Thermonuclear War",
+  "respHandler": "{function:}",
+  "game": {
+    "titles": [
+      "chess",
+      "checkers",
+      "backgammon",
+      "poker",
+      "Theaterwide Biotoxic and Chemical Warfare",
+      "Global Thermonuclear War"
+    ],
+    "selected": "Global Thermonuclear War",
+    "player": "dlightman"
+  }
+}
+```
 ### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
@@ -604,7 +633,33 @@ Let's take a more complex example where we generate MySQL instances:
   ]
 }
 ```
+## The set function
+The set function is used to push data into other parts of the template. The function is `set(jsonPointer, value)`. The 
+set command returns an array of JSON Pointers that represent the transitive updates that result in callint set.
+```bash
+> .init -f "example/ex13.json"
+{
+  "systems": [
+    "WOPR"
+  ],
+  "onBoot": "${ $set('/systems/1', 'JOSHUA')}",
+  "newSystem": "${systems[1]}"
+}
+> .out
+{
+  "systems": [
+    "WOPR",
+    "JOSHUA"
+  ],
+  "onBoot": [
+    "/systems/1",
+    "/newSystem",
+    "/systems"
+  ],
+  "newSystem": "JOSHUA"
+}
 
+```
 
 ## Why Do We Need jeep?
 
