@@ -635,7 +635,7 @@ Let's take a more complex example where we generate MySQL instances:
 ```
 ## The set function
 The set function is used to push data into other parts of the template. The function is `set(jsonPointer, value)`. The 
-set command returns an array of JSON Pointers that represent the transitive updates that result in callint set.
+set command returns an array of JSON Pointers that represent the transitive updates that resulted from calling `set`.
 ```bash
 > .init -f "example/ex13.json"
 {
