@@ -479,7 +479,7 @@ test("fetch", async () => {
         "url": 'https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json',
         "bar": "${data.foo}",
         "respHandler": "${ function($res){$res.ok? $res.json()~> |props|{'yo':'there', 'zoink':'zing'}|:{'error': $res.status}} }",
-        "data": "${ $fetch(url) ~> respHandler}",
+        "data": "${ $fetch(url) ~> respHandler }",
         "expectedError": "${$fetch(url&'breakme') ~> respHandler }"
     });
     delete tp.output["respHandler"];
@@ -534,6 +534,64 @@ test("big data block", async () => {
         }
     );
 
+});
+
+test("set 0", async () => {
+    const tp = await TemplateProcessor.load(
+        {
+            "data": {
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": "${bing+1}",
+                            "bing": 1,
+                            "boom": "${bang+1}"
+                        }
+                    }
+                }
+            },
+            "foo": {
+                "bang": "${ $set('/data/a/b/c/bing', 42) }",
+                "bing": 1,
+                "boom": 3
+            },
+            "bar":"${data.a}"
+        });
+    expect(tp.output).toEqual(
+        {
+            "bar": {
+                "b": {
+                    "c": {
+                        "bang": 43,
+                        "bing": 42,
+                        "boom": 44
+                    }
+                }
+            },
+            "data": {
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": 43,
+                            "bing": 42,
+                            "boom": 44
+                        }
+                    }
+                }
+            },
+            "foo": {
+                "bang": [
+                    "/data/a/b/c/bing",
+                    "/data/a/b/c/bang",
+                    "/data/a/b/c/boom",
+                    "/data/a",
+                    "/bar",
+                    "/data"
+                ],
+                "bing": 1,
+                "boom": 3
+            }
+        });
 });
 
 

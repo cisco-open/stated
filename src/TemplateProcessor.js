@@ -12,6 +12,7 @@ class TemplateProcessor {
     }
 
     async initialize() {
+        this.setData = this.setData.bind(this); // Bind 'this' to setData method
         let metaInfos = await this.createMetaInfos();
         this.sortMetaInfos(metaInfos);
         this.populateTemplateMeta(metaInfos);
@@ -99,7 +100,7 @@ class TemplateProcessor {
 
     async evaluateDependencies(metaInfos) {
         this.evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        await this.evaluateJsonPointersInOrder(this.evaluationPlan);
+        return await this.evaluateJsonPointersInOrder(this.evaluationPlan);
     }
 
     makeDepsAbsolute(parentJsonPtr, localJsonPtrs){
@@ -174,36 +175,44 @@ class TemplateProcessor {
     async setData(jsonPtr, data) {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr);
-        await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
+        return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
     }
 
     async evaluateJsonPointersInOrder(jsonPtrList, data) {
+        const resp = [];
+        let first;
         if(data) {
-            const jsonPtr = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
-            if (!jp.has(this.output, jsonPtr)) { //node doesn't exist yet, so just create it
-                await this.evaluateNode(jsonPtr, data);
-
+            first = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
+            if (!jp.has(this.output, first)) { //node doesn't exist yet, so just create it
+                const didUpdate= await this.evaluateNode(first, data);
+                jp.get(this.templateMeta, first).didUpdate = didUpdate;
             }else {
                 // Check if the node contains an expression. If so, print a warning and return.
-                const metaInf = jp.get(this.templateMeta, jsonPtr);
-                if (metaInf.expr__ !== undefined) {
-                    console.warn(`Attempted to replace expressions with data under ${jsonPtr}. This operation is ignored.`);
-                    return;
+                const firstMeta = jp.get(this.templateMeta, first);
+                if (firstMeta.expr__ !== undefined) {
+                    console.warn(`Attempted to replace expressions with data under ${first}. This operation is ignored.`);
+                    return false;
                 }
-                const isChanged = await this.evaluateNode(jsonPtr, data); // Evaluate the node provided with the data provided
-                if (!isChanged) {
-                    console.log(`data did not change for ${jsonPtr}, short circuiting dependents.`);
+                firstMeta.didUpdate  = await this.evaluateNode(first, data); // Evaluate the node provided with the data provided
+                if (!firstMeta.didUpdate) {
+                    console.log(`data did not change for ${first}, short circuiting dependents.`);
                     return false;
                 }
             }
         }
         for (const jsonPtr of jsonPtrList) {
             try {
-                await this.evaluateNode(jsonPtr);
+                const didUpdate = await this.evaluateNode(jsonPtr);
+                jp.get(this.templateMeta, jsonPtr).didUpdate = didUpdate;
             } catch (e) {
                 console.log(`An error occurred while evaluating dependencies for ${jsonPtr}`);
             }
         }
+        first && jsonPtrList.unshift(first);
+        return jsonPtrList.filter(jptr=>{
+            const meta = jp.get(this.templateMeta, jptr);
+            return meta.didUpdate
+        });
     }
 
     async evaluateNode(jsonPtr, data) {
@@ -212,7 +221,8 @@ class TemplateProcessor {
 
         if (!jp.has(templateMeta, jsonPtr)) {
             jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
-            return false;
+            jp.set(this.templateMeta, jsonPtr, { "materialized__":true, "jsonPointer__": ptr, "dependees__": [], "dependencies__": [], "absoluteDependencies__": [] });
+            return true;
         }
         const { expr__, compiledExpr__, treeHasExpressions__, callback__ , parentJsonPointer__} = jp.get(templateMeta, jsonPtr);
         if (data === undefined) {
@@ -222,10 +232,12 @@ class TemplateProcessor {
                     const target = jp.get(output, parentJsonPointer__); //an expression is always relative to a target
                     data = await compiledExpr__.evaluate(target,
                         {
-                            "fetch":fetch
+                            "fetch":fetch,
+                            "set": this.setData
                         }
                     );
                     this._setData(output, jsonPtr, data, callback__);
+                    return true;
                 } catch (error) {
                     console.error(`Error evaluating expression at ${jsonPtr}:`, error);
                     data = undefined;
@@ -268,7 +280,6 @@ class TemplateProcessor {
 
     getDependentsTransitiveExecutionPlan(jsonPtr) {
         const effectedNodesSet = this.getDependentsRecursive(jsonPtr);
-        //const sortedJsonPtrs = this.topologicalSort(effectedNodesSet);
         return [jsonPtr, ...[...effectedNodesSet].map(n=>n.jsonPointer__)];
 
     }
@@ -281,46 +292,49 @@ class TemplateProcessor {
         }
     }
 
-    getDependentsRecursive(jsonPtr) {
-        if (!jp.has(this.templateMeta, jsonPtr)) {
-            console.log(`${jsonPtr} does not exist.`);
-            return [];
-        }
+        getDependentsRecursive(jsonPtr) {
+            if (!jp.has(this.templateMeta, jsonPtr)) {
+                console.log(`${jsonPtr} does not exist.`);
+                return [];
+            }
 
-        const dependents = [];
-        const queue = [jsonPtr];
-        const visited = new Set();
+            const dependents = [];
+            const queue = [jsonPtr];
+            const visited = new Set();
 
-        while (queue.length > 0) {
-            const currentPtr = queue.shift();
-            visited.add(currentPtr);
+            while (queue.length > 0) {
+                const currentPtr = queue.shift();
+                visited.add(currentPtr);
 
-            const metaInf = jp.get(this.templateMeta, currentPtr);
+                const metaInf = jp.get(this.templateMeta, currentPtr);
 
-            if (metaInf.dependees__) {
-                metaInf.dependees__.forEach(dependee => {
-                    if (!visited.has(dependee)) {
-                        dependents.push(jp.get(this.templateMeta, dependee));
-                        queue.push(dependee);
-                        visited.add(dependee);
+                if (metaInf.dependees__) {
+                    metaInf.dependees__.forEach(dependee => {
+                        if (!visited.has(dependee)) {
+                            dependents.push(jp.get(this.templateMeta, dependee));
+                            queue.push(dependee);
+                            visited.add(dependee);
+                        }
+                    });
+                }
+
+                // Get parent node. Ancestors are considered implicit dependents
+                const parentPtrParts = jp.parse(currentPtr);
+                parentPtrParts.pop();
+                const parentPtr = jp.compile(parentPtrParts);
+
+                if (!visited.has(parentPtr) && parentPtr.length > 0) {
+                    const parentMeta = jp.get(this.templateMeta, parentPtr);
+                    visited.add(parentPtr);
+                    if(parentMeta && parentMeta.dependees__ && parentMeta.dependees__.length > 0) {
+                        dependents.push(parentMeta);
                     }
-                });
+                    queue.push(parentPtr);
+                }
             }
 
-            // Get parent node. Ancestors are considered implicit dependents
-            const parentPtrParts = jp.parse(currentPtr);
-            parentPtrParts.pop();
-            const parentPtr = jp.compile(parentPtrParts);
-
-            if (!visited.has(parentPtr) && parentPtr.length > 0) {
-                dependents.push(jp.get(this.templateMeta, parentPtr));
-                queue.push(parentPtr);
-                visited.add(parentPtr);
-            }
+            return dependents;
         }
-
-        return dependents;
-    }
 
     getDependencies(jsonPtr){
         if(jp.has(this.templateMeta, jsonPtr)){
