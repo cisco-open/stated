@@ -1,6 +1,5 @@
-`[TOC]`
 # jeep: JSONata Embedded Expression Processor
-<img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="300">
+![jeep](https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png){: align="center" width="150"}
 
 A library and CLI for running JSON files with embedded
 [JSONata](http://docs.jsonata.org/) programs.
