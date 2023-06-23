@@ -1,3 +1,6 @@
+/*
+  Copyright 2023, Cisco Systems, Inc
+ */
 const jsonata = require("jsonata");
 const _ = require('lodash');
 

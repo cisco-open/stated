@@ -1,3 +1,6 @@
+/*
+  Copyright 2023, Cisco Systems, Inc
+ */
 const fs = require('fs');
 const TemplateProcessor = require('./TemplateProcessor');
 

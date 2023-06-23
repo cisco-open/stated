@@ -1,4 +1,7 @@
 #!/usr/bin/env node
+/*
+  Copyright 2023, Cisco Systems, Inc
+ */
 const repl = require('repl');
 const JeepCliCore = require('./src/JeepCliCore');
 

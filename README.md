@@ -3,7 +3,7 @@
   <img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="400">
 </p>
 
-A library and CLI for running JSON files with embedded [JSONata](http://docs.jsonata.org/) programs.
+A library and REPL for running JSON files with embedded [JSONata](http://docs.jsonata.org/) programs.
 
 ```bash
 ghendrey$ jeep.js
@@ -44,9 +44,9 @@ start the jeep REPL:
 ```bash
 ./jeep.js
 ```
-## CLI Commands
+## REPL Commands
 
-jeep provides a set of CLI commands to interact with the system:
+jeep provides a set of REPL commands to interact with the system:
 
 jeep Commands:
 - **.init**: Initialize the template.
@@ -79,9 +79,9 @@ The content between `${}` can be any valid JSONata program. The jeep repl lets y
   ]
 }
 ```
-## Setting Values in the jeep CLI
+## Setting Values in the jeep REPL
 
-The jeep CLI also allows you to dynamically set values in your templates, further aiding in debugging and development.
+The jeep REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
 In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
 
 ```bash
