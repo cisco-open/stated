@@ -1,4 +1,4 @@
-[TOC]
+`[TOC]`
 # jeep: JSONata Embedded Expression Processor
 <img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="300">
 
