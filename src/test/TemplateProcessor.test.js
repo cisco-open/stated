@@ -595,6 +595,19 @@ test("set 0", async () => {
 });
 
 
+test("circular", async () => {
+    const tp = new TemplateProcessor({
+        "a":"${b}",
+        "b":"${c}",
+        "c":"${a}"
+    });
+    await tp.initialize();
+    expect(tp.errors).toEqual(
+        ["🔃 Circular dependency  /a → /b → /c → /a"]
+    );
+
+});
+
 
 
 

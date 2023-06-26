@@ -15,6 +15,9 @@ class DependencyFinder {
     }
 
     findDependencies(node = this.ast) {
+        if(this.isRootLevelFunctionDecalaration(node)){
+            return []; //if the expression is entirely a function declaration, it has no dependencies because nothing is ever allowed to trigger function recomplation
+        }
         if (this.currentSteps.length === 0) {
             this.currentSteps.push([]); //initialize a container for steps
         }
@@ -67,6 +70,10 @@ class DependencyFinder {
             this.nodeStack.pop();
         }
         return this.paths;
+    }
+
+    findTargetsOfSet(node = this.ast){
+        console.log(node);
     }
 
 
@@ -219,6 +226,10 @@ class DependencyFinder {
         if (emitted.length > 0) {
             this.paths.push(emitted);
         }
+    }
+
+    isRootLevelFunctionDecalaration(node){
+        return this.nodeStack.length===0 && node.type === "lambda"
     }
 
 }

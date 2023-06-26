@@ -64,12 +64,20 @@ class Jeep {
     }
 
     static printFunc(key, value) {
+        if(value === undefined){
+            return null;
+        }
         if (value?._jsonata_lambda) {
             return "{function:}";
         }
         if (key === 'compiledExpr__') {
             return "--compiled expression--";
         }
+        const {_idleTimeout, _onTimeout} = value;
+        if(_idleTimeout !== undefined && _onTimeout !== undefined){
+            return "--interval/timeout--";
+        }
+
         return value;
     }
 

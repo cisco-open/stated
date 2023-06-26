@@ -8,10 +8,12 @@ const metaInfoProducer = require('./MetaInfoProducer');
 const DependencyFinder=require('./DependencyFinder');
 
 class TemplateProcessor {
-    constructor(template) {
+    constructor(template, templateRootPath=[]) {
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
+        this.errors = [];
+        this.templateRootPath = templateRootPath;
     }
 
     async initialize() {
@@ -23,8 +25,8 @@ class TemplateProcessor {
         await this.evaluateDependencies(metaInfos);
     }
 
-    static async load(template){
-        const t = new TemplateProcessor(template);
+    static async load(template, templateRootPath=[]){
+        const t = new TemplateProcessor(template, templateRootPath);
         await t.initialize();
         return t;
     }
@@ -35,6 +37,7 @@ class TemplateProcessor {
 
         //const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
+            metaInfo.jsonPointer__ = [...this.templateRootPath, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates
             metaInfo.parentJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
             const cdUpPath = metaInfo.exprRootPath__;
             if(cdUpPath) {
@@ -127,17 +130,23 @@ class TemplateProcessor {
 
     topologicalSort(nodes, exprsOnly=true) {
         const visited = new Set();
+        const recursionStack = new Set(); //for circular dependency detection
         const orderedJsonPointers = [];
         const templateMeta = this.templateMeta;
 
         const listDependencies = (node) => {
             visited.add(node.jsonPointer__);
+            recursionStack.add(node.jsonPointer__);
 
             if (node.absoluteDependencies__){
                 for (const dependency of node.absoluteDependencies__) {
-                    if (!visited.has(dependency)) {
+                    if (recursionStack.has(dependency)) {
+                        const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ')+ " → "+ dependency;
+                        this.errors.push(e);
+                        console.warn('\x1b[31m%s\x1b[0m', e); // New check for circular dependencies
+                    } else if (!visited.has(dependency)) {
                         const dependencyNode = jp.get(templateMeta, dependency);
-                        if (dependencyNode.materialized__ === false) { //a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
+                        if (dependencyNode.materialized__ === false) { // a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
                             const ancestor = this.searchUpForExpression(dependencyNode);
                             if (ancestor && !visited.has(ancestor.jsonPointer__)) {
                                 listDependencies(ancestor, exprsOnly);
@@ -145,20 +154,22 @@ class TemplateProcessor {
                         } else {
                             listDependencies(dependencyNode, exprsOnly);
                         }
-
                     }
                 }
             }
-            //when we are forming the topological order for the 'plan' command, we don't need to include
-            //nodes in the execution plan that don't have expressions. On the other hand, when we are forming
-            //the topological order to see all the nodes that are dependencies of a particular target node, which
-            //is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
-            //literals that don't have expressions
+
+            // when we are forming the topological order for the 'plan' command, we don't need to include
+            // nodes in the execution plan that don't have expressions. On the other hand, when we are forming
+            // the topological order to see all the nodes that are dependencies of a particular target node, which
+            // is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
+            // literals that don't have expressions
             if(exprsOnly) {
                 node.expr__ && orderedJsonPointers.push(node.jsonPointer__);
-            }else{
+            } else {
                 orderedJsonPointers.push(node.jsonPointer__);
             }
+
+            recursionStack.delete(node.jsonPointer__); // Clean up after finishing with this node
         }
 
         if(!(nodes instanceof Set || Array.isArray(nodes))){
@@ -173,6 +184,7 @@ class TemplateProcessor {
 
         return orderedJsonPointers;
     }
+
 
 
     async setData(jsonPtr, data) {
@@ -236,7 +248,10 @@ class TemplateProcessor {
                     data = await compiledExpr__.evaluate(target,
                         {
                             "fetch":fetch,
-                            "set": this.setData
+                            "set": this.setData,
+                            "setInterval":setInterval,
+                            "clearInterval":clearInterval,
+                            "setTimeout":setTimeout,
                         }
                     );
                     this._setData(output, jsonPtr, data, callback__);
