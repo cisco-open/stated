@@ -92,11 +92,11 @@ class JeepCliCore {
         return option === '--shallow' ? this.templateProcessor.getDependencies(jsonPtr) : this.templateProcessor.getDependenciesTransitiveExecutionPlan(jsonPtr);
     }
 
-    plan() {
+    async plan() {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        return this.templateProcessor.getEvaluationPlan();
+        return await this.templateProcessor.getEvaluationPlan();
     }
 }
 

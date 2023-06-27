@@ -394,7 +394,8 @@ test("mysql plan", async () => {
     const o = _.cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    expect(tp.getEvaluationPlan()).toEqual(
+    const plan = await tp.getEvaluationPlan();
+    expect(plan).toEqual(
         [
             "/count",
             "/tmp/host",
@@ -555,7 +556,7 @@ test("set 0", async () => {
                 "bing": 1,
                 "boom": 3
             },
-            "bar":"${data.a}"
+            "bar": "${data.a}"
         });
     expect(tp.output).toEqual(
         {
@@ -597,15 +598,97 @@ test("set 0", async () => {
 
 test("circular", async () => {
     const tp = new TemplateProcessor({
-        "a":"${b}",
-        "b":"${c}",
-        "c":"${a}"
+        "a": "${b}",
+        "b": "${c}",
+        "c": "${a}"
     });
     await tp.initialize();
     expect(tp.errors).toEqual(
         ["🔃 Circular dependency  /a → /b → /c → /a"]
     );
 
+});
+
+test("import 0", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}"
+    });
+    await tp.initialize();
+    await tp.import("${ 'hello B' }", "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": "hello B"
+        }
+    );
+});
+test("import 1", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}"
+    });
+    await tp.initialize();
+    await tp.import({
+        "b1": "${ 'hello B' }",
+        "b2": 42
+    }, "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": {
+                "b1": "hello B",
+                "b2": 42
+            }
+        }
+    );
+});
+test("import 2", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}",
+        "b": "${ c }"
+    });
+    await tp.initialize();
+    await tp.import("${ 'hello from C' }", "/c")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": "hello from C",
+            "c": "hello from C"
+        }
+    );
+});
+
+test("import 3", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}",
+        "b": "${ c.c2 }",
+        "x": "${ c.c3[1]}",
+        "y": "${ c.c3 }"
+    });
+    await tp.initialize();
+    await tp.import({
+            "c2": "${ 'hello from c2' }",
+            "c3": ["bing", "bang", "boom"],
+        }, "/c")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": "hello from c2",
+            "c": {
+                "c2": "hello from c2",
+                "c3": [
+                    "bing",
+                    "bang",
+                    "boom"
+                ]
+            },
+            "x": "bang",
+            "y": [
+                "bing",
+                "bang",
+                "boom"
+            ]
+        }
+    );
 });
 
 
