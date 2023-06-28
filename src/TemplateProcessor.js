@@ -26,10 +26,14 @@ class TemplateProcessor {
         this.sortMetaInfos(metaInfos);
         this.populateTemplateMeta(metaInfos);
         this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+        await this.evaluate(jsonPtr);
+    }
+
+    async evaluate(jsonPtr) {
         const rootMetaInfos = this.metaInfoByJsonPointer["/"];
-        if(jsonPtr==="/"){ //<-- root/parent template
+        if (jsonPtr === "/") { //<-- root/parent template
             await this.evaluateDependencies(rootMetaInfos);
-        }else{  //<-- child/imported template
+        } else {  //<-- child/imported template
             //this is the case of an import. Imports target something other than root
             const importedMetaInfos = this.metaInfoByJsonPointer[jsonPtr];
             await this.evaluateDependencies([
@@ -273,6 +277,7 @@ class TemplateProcessor {
         const output = this.output;
 
         if (!jp.has(templateMeta, jsonPtr)) {
+            throw new Error('Whaaa');
             jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
             jp.set(this.templateMeta, jsonPtr, {
                 "materialized__":true,
@@ -316,7 +321,7 @@ class TemplateProcessor {
         jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
         jp.set(templateMeta, jsonPtr + "/materialized__", true);
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
-        
+
     }
 
     async _evaluateExprNode(jsonPtr){
@@ -372,49 +377,50 @@ class TemplateProcessor {
         }
     }
 
-        getDependentsBFS(jsonPtr) {
-            if (!jp.has(this.templateMeta, jsonPtr)) {
-                console.log(`${jsonPtr} does not exist.`);
-                return [];
-            }
-
-            const dependents = [];
-            const queue = [jsonPtr];
-            const visited = new Set();
-
-            while (queue.length > 0) {
-                const currentPtr = queue.shift();
-                visited.add(currentPtr);
-
-                const metaInf = jp.get(this.templateMeta, currentPtr);
-
-                if (metaInf.dependees__) {
-                    metaInf.dependees__.forEach(dependee => {
-                        if (!visited.has(dependee)) {
-                            dependents.push(jp.get(this.templateMeta, dependee));
-                            queue.push(dependee);
-                            visited.add(dependee);
-                        }
-                    });
-                }
-
-                // Get parent node. Ancestors are considered implicit dependents
-                const parentPtrParts = jp.parse(currentPtr);
-                parentPtrParts.pop();
-                const parentPtr = jp.compile(parentPtrParts);
-
-                if (!visited.has(parentPtr) && parentPtr.length > 0) {
-                    const parentMeta = jp.get(this.templateMeta, parentPtr);
-                    visited.add(parentPtr);
-                    if(parentMeta && parentMeta.dependees__ && parentMeta.dependees__.length > 0) {
-                        dependents.push(parentMeta);
-                    }
-                    queue.push(parentPtr);
-                }
-            }
-
-            return dependents;
+    getDependentsBFS(jsonPtr) {
+        if (!jp.has(this.templateMeta, jsonPtr)) {
+            console.log(`${jsonPtr} does not exist.`);
+            return [];
         }
+
+        const dependents = [];
+        const queue = [jsonPtr];
+        const visited = new Set();
+
+        while (queue.length > 0) {
+            const currentPtr = queue.shift();
+            visited.add(currentPtr);
+
+            const metaInf = jp.get(this.templateMeta, currentPtr);
+
+            if (metaInf.dependees__) {
+                metaInf.dependees__.forEach(dependee => {
+                    if (!visited.has(dependee)) {
+                        dependents.push(jp.get(this.templateMeta, dependee));
+                        queue.push(dependee);
+                        visited.add(dependee);
+                    }
+                });
+            }
+
+            // Recursively traverse into children nodes.
+            for (let key in metaInf) {
+                // Skip fields that end in "__" and non-object children
+                if (key.endsWith('__') || typeof metaInf[key] !== 'object') {
+                    continue;
+                }
+                // Generate json pointer for child
+                let childPtr = `${currentPtr}/${key}`;
+                if (!visited.has(childPtr)) {
+                    queue.push(childPtr);
+                    visited.add(childPtr);
+                }
+            }
+        }
+
+        return dependents;
+    }
+
 
     getDependencies(jsonPtr){
         if(jp.has(this.templateMeta, jsonPtr)){

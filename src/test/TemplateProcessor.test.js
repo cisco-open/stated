@@ -536,6 +536,82 @@ test("big data block", async () => {
     );
 
 });
+test("big data block 2", async () => {
+    const tp = new TemplateProcessor({
+        "foo": "${data.a}",
+    });
+    await tp.initialize();
+    await tp.setData("/data", {
+        "a": {
+            "b": {
+                "c": {
+                    "bang": 2,
+                    "bing": 1,
+                    "boom": 3
+                }
+            }
+        }
+    });
+    expect(tp.output).toEqual({
+            "data": {
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": 2,
+                            "bing": 1,
+                            "boom": 3
+                        }
+                    }
+                }
+            },
+            "foo": {
+                "b": {
+                    "c": {
+                        "bang": 2,
+                        "bing": 1,
+                        "boom": 3
+                    }
+                }
+            }
+        }
+    );
+
+});
+
+test("big data block 3", async () => {
+    const tp = new TemplateProcessor({
+        "foo": "${data}",
+    });
+    await tp.initialize();
+    await tp.setData("/data", {"a": {"b": {"c": {"bing": 1, "bang": 2, "boom": 3}}}});
+
+    expect(tp.output).toEqual({
+            "data": {
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": 2,
+                            "bing": 1,
+                            "boom": 3
+                        }
+                    }
+                }
+            },
+            "foo":{
+                "a": {
+                    "b": {
+                        "c": {
+                            "bang": 2,
+                            "bing": 1,
+                            "boom": 3
+                        }
+                    }
+                }
+            }
+        }
+    );
+
+});
 
 test("set 0", async () => {
     const tp = await TemplateProcessor.load(
