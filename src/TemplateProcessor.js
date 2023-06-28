@@ -273,40 +273,27 @@ class TemplateProcessor {
     }
 
     async evaluateNode(jsonPtr, data) {
-        const templateMeta = this.templateMeta;
-        const output = this.output;
+        const {output, templateMeta} = this;
 
-        if (!jp.has(templateMeta, jsonPtr)) {
-            throw new Error('Whaaa');
-            jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
-            jp.set(this.templateMeta, jsonPtr, {
-                "materialized__":true,
-                "jsonPointer__": jsonPtr,
-                "dependees__": [],
-                "dependencies__": [],
-                "absoluteDependencies__": [],
-                "data__":data,
-                "materialized":true }
-            );
-            return true;
+        //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
+        //set /foo when /foo does not exist yey
+        const isUntracked = !jp.has(templateMeta, jsonPtr);
+        if (isUntracked) {
+            return this.setUntrackedLocation(output, jsonPtr, data);
         }
 
-        if(data !== undefined ){
-            const { treeHasExpressions__, callback__ } = jp.get(templateMeta, jsonPtr);
-            if(treeHasExpressions__){
-                console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
-                return false;
-            }
-            let didSet = this._setData(jsonPtr, data, callback__);
-            if(didSet) {
-                jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
-                jp.set(templateMeta, jsonPtr + "/materialized__", true);
-            }
-            return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
-
-
+        const hasDataToSet = data !== undefined;
+        if(hasDataToSet){
+            return this.setDataIntoTrackedLocation(templateMeta, jsonPtr, data);
         }
 
+        return this._evaluateExpression(jsonPtr);
+
+    }
+
+    async _evaluateExpression(jsonPtr){
+        const {templateMeta, output} = this;
+        let data;
         const { expr__} = jp.get(templateMeta, jsonPtr);
         if (expr__ !== undefined) {
             data = await this._evaluateExprNode(jsonPtr);
@@ -321,7 +308,35 @@ class TemplateProcessor {
         jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
         jp.set(templateMeta, jsonPtr + "/materialized__", true);
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
+    }
 
+    setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
+        const {treeHasExpressions__, callback__} = jp.get(templateMeta, jsonPtr);
+        if (treeHasExpressions__) {
+            console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
+            return false;
+        }
+        let didSet = this._setData(jsonPtr, data, callback__);
+        if (didSet) {
+            jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
+            jp.set(templateMeta, jsonPtr + "/materialized__", true);
+        }
+        return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
+    }
+
+    setUntrackedLocation(output, jsonPtr, data) {
+        jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
+        jp.set(this.templateMeta, jsonPtr, {
+                "materialized__": true,
+                "jsonPointer__": jsonPtr,
+                "dependees__": [],
+                "dependencies__": [],
+                "absoluteDependencies__": [],
+                "data__": data,
+                "materialized": true
+            }
+        );
+        return true;
     }
 
     async _evaluateExprNode(jsonPtr){
@@ -447,7 +462,7 @@ class TemplateProcessor {
     }
     //returns the evaluation plan for evaluating the entire template
     async getEvaluationPlan(){
-        return await this.evaluateDependencies(this.metaInfoByJsonPointer["/"]);
+        return this.topologicalSort(this.metaInfoByJsonPointer["/"], true);
     }
 
     searchUpForExpression(childNode){
