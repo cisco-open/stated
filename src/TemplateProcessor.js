@@ -136,6 +136,7 @@ class TemplateProcessor {
     }
 
     async evaluateDependencies(metaInfos) {
+        //const evaluationPlan = this.sortNodes(metaInfos);
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.evaluateJsonPointersInOrder(evaluationPlan);
     }
@@ -158,11 +159,39 @@ class TemplateProcessor {
         });
         return dependencies__;
     }
+/*
+    topologicalSort(nodes, exprsOnly = true) {
+        if(exprsOnly) {
+            nodes = nodes.filter(n => n.expr__ !== undefined);
+        }
+        const isChildOrDependency = (child, parent) => {
+            return child.startsWith(parent) && child !== parent;
+        };
+
+        const sorted = nodes.sort((a, b) => {
+            const bDependsOnA = b.absoluteDependencies__ && b.absoluteDependencies__.some(dep => isChildOrDependency(dep, a.jsonPointer__));
+            const aDependsOnB = a.absoluteDependencies__ && a.absoluteDependencies__.some(dep => isChildOrDependency(dep, b.jsonPointer__));
+
+            if (bDependsOnA) {
+                return -1;
+            }
+
+            if (aDependsOnB) {
+                return 1;
+            }
+
+            return a.jsonPointer__ < b.jsonPointer__?-1:b.jsonPointer__< a.jsonPointer__?1:0;
+        });
+
+        const sortedJPs = sorted.map(node => node.jsonPointer__);
+        return sortedJPs;
+    }
+*/
 
     topologicalSort(nodes, exprsOnly=true) {
         const visited = new Set();
         const recursionStack = new Set(); //for circular dependency detection
-        const orderedJsonPointers = [];
+        const orderedJsonPointers = new Set();
         const templateMeta = this.templateMeta;
 
         const processNode = (node) => {
@@ -189,7 +218,9 @@ class TemplateProcessor {
                         const dependencyNode = jp.get(templateMeta, dependency);
                         if (dependencyNode.materialized__ === false) { // a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
                             const ancestor = this.searchUpForExpression(dependencyNode);
-                            if (ancestor && !visited.has(ancestor.jsonPointer__)) {
+                            //if (ancestor && !visited.has(ancestor.jsonPointer__)) {
+                            if(ancestor){
+                                //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular depedencies as it would in ex10
                                 listDependencies(ancestor, exprsOnly);
                             }
                         } else {
@@ -204,10 +235,8 @@ class TemplateProcessor {
             // the topological order to see all the nodes that are dependencies of a particular target node, which
             // is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
             // literals that don't have expressions
-            if (exprsOnly && node.expr__) {
-                orderedJsonPointers.push(node.jsonPointer__);
-            } else if(!exprsOnly) {
-                orderedJsonPointers.push(node.jsonPointer__);
+            if (!exprsOnly || (exprsOnly && node.expr__)) {
+                orderedJsonPointers.add(node.jsonPointer__);
             }
             processNode(node);
 
@@ -224,7 +253,7 @@ class TemplateProcessor {
             }
         });
 
-        return orderedJsonPointers;
+        return [...orderedJsonPointers];
     }
 
 
