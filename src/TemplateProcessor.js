@@ -8,9 +8,17 @@ const metaInfoProducer = require('./MetaInfoProducer');
 const DependencyFinder=require('./DependencyFinder');
 
 class TemplateProcessor {
-    constructor(template) {
+    constructor(template, context = {}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this);
+        this.context = _.merge(context, {
+            "set": this.setData,
+            "fetch":fetch,
+            "setInterval":setInterval,
+            "clearInterval":clearInterval,
+            "setTimeout":setTimeout,
+        });
+
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
@@ -52,8 +60,8 @@ class TemplateProcessor {
          */
     }
 
-    static async load(template){
-        const t = new TemplateProcessor(template);
+    static async load(template, context={}){
+        const t = new TemplateProcessor(template, context);
         await t.initialize();
         return t;
     }
@@ -366,16 +374,9 @@ class TemplateProcessor {
         try {
             const { compiledExpr__, callback__ , parentJsonPointer__, jsonPointer__} = jp.get(this.templateMeta, jsonPtr);
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
-            evaluated = await compiledExpr__.evaluate(target,
-                {
-                    "set": this.setData,
-                    "import":this.getImport(jsonPointer__),
-                    "fetch":fetch,
-                    "setInterval":setInterval,
-                    "clearInterval":clearInterval,
-                    "setTimeout":setTimeout,
-                }
-            );
+            evaluated = await compiledExpr__.evaluate(
+                target,
+                _.merge(this.context, {"import":this.getImport(jsonPointer__)}));
             this._setData(jsonPtr, evaluated, callback__);
         } catch (error) {
             console.error(`Error evaluating expression at ${jsonPtr}:`, error);
