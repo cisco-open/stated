@@ -715,6 +715,20 @@ test("import 1", async () => {
     );
 });
 
+test("context", async () => {
+    const nozzle = (something)=>"nozzle got some "+something;
+    const context = {"nozzle":nozzle, "ZOINK":"ZOINK"}
+    const tp = new TemplateProcessor({
+          "a": "${$nozzle($ZOINK)}"
+        }, context);
+    await tp.initialize();
+    expect(tp.output).toEqual(
+        {
+            "a": "nozzle got some ZOINK",
+        }
+    );
+});
+
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {
