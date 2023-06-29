@@ -29,7 +29,14 @@ class TemplateProcessor {
         await this.evaluate(jsonPtr);
     }
 
+
     async evaluate(jsonPtr) {
+        await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
+        //the commented out approach below us necessary if we want to push in imports. It has the unsolved problem
+        //that if the existing template has dependencies on the to-be-imported template, and we are not forcing it
+        //in externally but rather the import is written as part of the template that the things that depend on the
+        //import will be executed twice.
+        /*
         const rootMetaInfos = this.metaInfoByJsonPointer["/"];
         if (jsonPtr === "/") { //<-- root/parent template
             await this.evaluateDependencies(rootMetaInfos);
@@ -41,6 +48,8 @@ class TemplateProcessor {
                 ...importedMetaInfos
             ]);
         }
+
+         */
     }
 
     static async load(template){
@@ -49,24 +58,36 @@ class TemplateProcessor {
         return t;
     }
 
-    //import the template to the location pointed to by jsonPtr
-    async import(template, jsonPtrImportPath){
-        if(!jsonPtrImportPath){
-            throw new Error("can't import template to " + jsonPtrImportPath);
+    import(template, jsonPtrImportPath){
+        return this.getImport(undefined)(template, jsonPtrImportPath);
+    }
+
+    static NOOP =  Symbol('NOOP');
+
+    getImport(defaultPath) {
+        //import the template to the location pointed to by jsonPtr
+        return async (templateOrUrl, jsonPtrImportPath)=>
+        {
+            try {
+                new URL(templateOrUrl);
+                const res  = await fetch(templateOrUrl);
+                templateOrUrl = await (res.ok ? res.json():res.statusText);
+            } catch (_) {
+                //no-op ...it's not a URL...it must be a literal template
+            }
+            if (!jsonPtrImportPath) {
+                jsonPtrImportPath = defaultPath;
+            }
+            jp.set(this.output, jsonPtrImportPath, templateOrUrl);
+            await this.initialize(templateOrUrl, jsonPtrImportPath);
+            return TemplateProcessor.NOOP;
         }
-        jp.set(this.output, jsonPtrImportPath, template);
-        await this.initialize(template, jsonPtrImportPath);
-        //at this point the output actually has the evaluated imported template. However, the import method itself
-        //must not get and return this. If it does not then foo:"${$import(...blah...)}" will actually return null
-        //which will result in can't import foo:null.
-        return jp.get(this.output, jsonPtrImportPath);
     }
 
     async createMetaInfos(template, rootJsonPtr=[]) {
         const metaInfProcessor = jsonata(metaInfoProducer);
         let metaInfos = await metaInfProcessor.evaluate(template);
 
-        //const compiledPathFinder = jsonata("**[type='path'].[steps.value][]");
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates
             metaInfo.parentJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
@@ -159,34 +180,6 @@ class TemplateProcessor {
         });
         return dependencies__;
     }
-/*
-    topologicalSort(nodes, exprsOnly = true) {
-        if(exprsOnly) {
-            nodes = nodes.filter(n => n.expr__ !== undefined);
-        }
-        const isChildOrDependency = (child, parent) => {
-            return child.startsWith(parent) && child !== parent;
-        };
-
-        const sorted = nodes.sort((a, b) => {
-            const bDependsOnA = b.absoluteDependencies__ && b.absoluteDependencies__.some(dep => isChildOrDependency(dep, a.jsonPointer__));
-            const aDependsOnB = a.absoluteDependencies__ && a.absoluteDependencies__.some(dep => isChildOrDependency(dep, b.jsonPointer__));
-
-            if (bDependsOnA) {
-                return -1;
-            }
-
-            if (aDependsOnB) {
-                return 1;
-            }
-
-            return a.jsonPointer__ < b.jsonPointer__?-1:b.jsonPointer__< a.jsonPointer__?1:0;
-        });
-
-        const sortedJPs = sorted.map(node => node.jsonPointer__);
-        return sortedJPs;
-    }
-*/
 
     topologicalSort(nodes, exprsOnly=true) {
         const visited = new Set();
@@ -371,12 +364,12 @@ class TemplateProcessor {
     async _evaluateExprNode(jsonPtr){
         let evaluated;
         try {
-            const { compiledExpr__, callback__ , parentJsonPointer__} = jp.get(this.templateMeta, jsonPtr);
+            const { compiledExpr__, callback__ , parentJsonPointer__, jsonPointer__} = jp.get(this.templateMeta, jsonPtr);
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
             evaluated = await compiledExpr__.evaluate(target,
                 {
                     "set": this.setData,
-                    "import":this.import,
+                    "import":this.getImport(jsonPointer__),
                     "fetch":fetch,
                     "setInterval":setInterval,
                     "clearInterval":clearInterval,
@@ -391,6 +384,9 @@ class TemplateProcessor {
     }
 
     _setData(jsonPtr, data, callback){
+        if(data === TemplateProcessor.NOOP){ //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
+            return false;
+        }
         const {output} = this;
         let existingData;
         if(jp.has(output, jsonPtr)){

@@ -441,6 +441,173 @@ You can use the JS fetch function to get data over the network and gracefully ha
   }
 }
 ```
+### Import
+```bash
+> .note "let's take a simple template..."
+"============================================================="
+> .init -f "example/ex17.json"
+{
+  "commanderDetails": {
+    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+    "systemsUnderCommand": "../${$count(systems)}"
+  },
+  "organization": "NORAD",
+  "location": "Cheyenne Mountain Complex, Colorado",
+  "commander": {
+    "firstName": "Jack",
+    "lastName": "Beringer",
+    "rank": "General"
+  },
+  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+  "systems": [
+    "Ballistic Missile Early Warning System (BMEWS)",
+    "North Warning System (NWS)",
+    "Space-Based Infrared System (SBIRS)",
+    "Cheyenne Mountain Complex"
+  ]
+}
+> .note "now let's see what it produced"
+"============================================================="
+> .out
+{
+  "commanderDetails": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "organization": "NORAD",
+  "location": "Cheyenne Mountain Complex, Colorado",
+  "commander": {
+    "firstName": "Jack",
+    "lastName": "Beringer",
+    "rank": "General"
+  },
+  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+  "systems": [
+    "Ballistic Missile Early Warning System (BMEWS)",
+    "North Warning System (NWS)",
+    "Space-Based Infrared System (SBIRS)",
+    "Cheyenne Mountain Complex"
+  ]
+}
+> .note "what happens if we put it on the web and fetch it?"
+"============================================================="
+> .init -f "example/ex19.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes }",
+  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
+}
+>  .note "If we look at the output, it's just the template."
+"============================================================="
+> .out
+{
+  "noradCommander": {
+    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+    "systemsUnderCommand": "../${$count(systems)}"
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+      "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+      "systemsUnderCommand": "../${$count(systems)}"
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  },
+  "handleRes": "{function:}"
+}
+> .note "Now let's use the import function on the template"
+"============================================================="
+> .init -f "example/ex16.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import('/norad')}",
+  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
+}
+> .out
+{
+  "noradCommander": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  },
+  "handleRes": "{function:}"
+}
+> .note "You can see above that 'import' makes it behave as a template, not raw JSON."
+"============================================================="
+> .note "We don't have to fetch ourselves to use import, it will do it for us."
+"============================================================="
+> .init -f "example/ex18.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json')}"
+}
+> .out
+{
+  "noradCommander": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  }
+}
+```
 ### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
@@ -530,8 +697,7 @@ Let's take a more complex example where we generate MySQL instances:
   "/tmp/instanceName",
   "/tmp/port",
   "/tmp/provider",
-  "/instances",
-  "/tmp"
+  "/instances"
 ]
 > .set /count 3
 {
@@ -649,16 +815,15 @@ set command returns an array of JSON Pointers that represent the transitive upda
 }
 > .out
 {
+  "newSystem": "JOSHUA",
+  "onBoot": [
+    "/systems/1",
+    "/newSystem"
+  ],
   "systems": [
     "WOPR",
     "JOSHUA"
-  ],
-  "onBoot": [
-    "/systems/1",
-    "/newSystem",
-    "/systems"
-  ],
-  "newSystem": "JOSHUA"
+  ]
 }
 
 ```

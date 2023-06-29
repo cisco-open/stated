@@ -26,8 +26,7 @@ test('reduce 2', () => {
 test("transform - pattern should be ignored", () => {
     const program = `k.z~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|`
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).
-    toEqual([["k", "z"], ["$", "aaaa"]]);
+    expect(df.findDependencies()).toEqual([["k", "z"], ["$", "aaaa"]]);
 });
 test("z[zz]", () => {
     const program = `z[zz]`
@@ -342,7 +341,7 @@ test("$[0][1].a", () => {
 test("$[0]($[1])", () => {
     const program = "$[0]($[1])";
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["", 1], ["",0]]);
+    expect(df.findDependencies()).toEqual([["", 1], ["", 0]]);
 });
 
 //we cannot note products.quantity and products.price cannot be inferred as dependencies. This is because we
@@ -444,11 +443,38 @@ test("count.{'cloud.provider': $$.providerName}", () => {
 test("top level function should have no dependencies", () => {
     const program = "function($a){ $a+42 +$$.x+$.y*$foo}";
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([
-    ]);
+    expect(df.findDependencies()).toEqual([]);
 });
 
+test("data.duration.data[0].expression.[{\"name\": \"Duration\", \"data\": expression}]", () => {
+    const program = "data.duration.data[0].expression.[{\"name\": \"Duration\", \"data\": expression}]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual(
+        [
+            [
+                "data",
+                "duration",
+                "data",
+                0,
+                "expression"
+            ]
+        ]);
+});
 
+test("$import('nozzle.com/boink.json')", () => {
+    const program = "$import('nozzle.com/boink.json')";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual(
+        [
+            [
+                "data",
+                "duration",
+                "data",
+                0,
+                "expression"
+            ]
+        ]);
+});
 
 
 

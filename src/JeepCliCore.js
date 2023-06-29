@@ -98,6 +98,10 @@ class JeepCliCore {
         }
         return await this.templateProcessor.getEvaluationPlan();
     }
+
+    note(note){
+        return "=============================================================";
+    }
 }
 
 module.exports = JeepCliCore;
