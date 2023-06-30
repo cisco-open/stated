@@ -12,7 +12,7 @@ a REPL for working with stated json templates, and a JS library for embedding st
 Stated is modular and allows templates to import other templates.
 
 ```bash
-dlightman$ stated.js
+ghendrey$ stated.js
 > .init -f "example/hello.json"
 {
 "to": "world",
