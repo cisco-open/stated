@@ -1,12 +1,13 @@
-# jeep: JSONata Embedded Expression Processor
-<p align="center">
-  <img src="https://cdn.pixabay.com/photo/2021/05/13/08/16/jeep-6250207_1280.png" alt="jeep" width="400">
-</p>
+# stated
+![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-A library and REPL for running JSON files with embedded [JSONata](http://docs.jsonata.org/) programs.
+Stated, pronounced "state d" is a daemon for continuosly computing state. Stated uses JSON to fully "externalize" and make state observable. 
+Stated used embedded [JSONata](http://docs.jsonata.org/) expressions to create a directed acyclic graph of state flow. Stated includes
+a repl for working with stated json files, and a JS library for embedding stated in applications. Applications for stated include
+UI state storage, and config file templating.
 
 ```bash
-ghendrey$ jeep.js
+dlightman$ stated.js
 > .init -f "example/hello.json"
 {
 "to": "world",
@@ -26,29 +27,29 @@ ghendrey$ jeep.js
 git clone ssh://git@bitbucket.corp.appdynamics.com:7999/arch/templates.git;
 cd templates
 ```
-3. then install jeep by running the following command:
+3. then install stated by running the following command:
 
 ```bash
 yarn install
 ```
 
-2. **Start jeep**: Once installed, you can start using jeep by running the following command:
+2. **Start stated**: Once installed, you can start using stated by running the following command:
 
 ```bash
-node jeep.js
+node stated.js
 ```
 
 If your environment is set up correctly with the path for Node.js, you can simply run this command to
-start the jeep REPL:
+start the stated REPL:
 
 ```bash
-./jeep.js
+./stated.js
 ```
 ## REPL Commands
 
-jeep provides a set of REPL commands to interact with the system:
+stated provides a set of REPL commands to interact with the system:
 
-jeep Commands:
+stated Commands:
 - **.init**: Initialize the template.
 - **.set**: Set data to a JSON pointer path.
 - **.in**: Show the input template.
@@ -59,8 +60,8 @@ jeep Commands:
 
 
 ## Expressions
-jeep allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
-The content between `${}` can be any valid JSONata program. The jeep repl lets you experiment with templates.
+stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
+The content between `${}` can be any valid JSONata program. The stated repl lets you experiment with templates.
 ```bash
 > .init -f "example/ex09.json"
 {
@@ -79,9 +80,9 @@ The content between `${}` can be any valid JSONata program. The jeep repl lets y
   ]
 }
 ```
-## Setting Values in the jeep REPL
+## Setting Values in the stated REPL
 
-The jeep REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
+The stated REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
 In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
 
 ```bash
@@ -152,11 +153,11 @@ are shown.
 ```
 ## DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
-expressions. jeep is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
+expressions. stated is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
 fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression
 calculation.
 
-jeep helps you track and debug transitive dependencies in your templates. You can use the
+stated helps you track and debug transitive dependencies in your templates. You can use the
 ``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
 you the order in which changes propagate.
 
@@ -394,7 +395,7 @@ then rolled up to the totalCost. Note the difference in the execution `plan` bet
 
 
 ## Functions
-jeep let's you define and call functions.
+stated let's you define and call functions.
 ### Simple Function Example
 ```bash
 > .init -f "example/ex05.json"
@@ -828,16 +829,16 @@ set command returns an array of JSON Pointers that represent the transitive upda
 
 ```
 
-## Why Do We Need jeep?
+## Why Do We Need stated?
 
 JSONata assumes a single input document and provides a powerful complete language for manipulating that input and 
-producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. jeep 
+producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. stated 
 provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
 is supported. 
 
-For small examples it may not seem obvious why jeep goes to the trouble of computing a DAG and optimizing expression
+For small examples it may not seem obvious why stated goes to the trouble of computing a DAG and optimizing expression
 evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data 
 (such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
 with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
-was one of the motivating use cases for jeep: performance critical data rendering applications.
+was one of the motivating use cases for stated: performance critical data rendering applications.
 

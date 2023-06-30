@@ -1,6 +1,6 @@
 const JeepCliCore = require('./src/JeepCliCore');
 const fs = require('fs');
-const {stringify} = require("./jeep");
+const {stringify} = require("./stated");
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
  * that begin and and with ``` (markdown syntax for code block) and it extracts the jeep cli command and the

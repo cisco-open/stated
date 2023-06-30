@@ -88,7 +88,7 @@ class TemplateProcessor {
             }
             jp.set(this.output, jsonPtrImportPath, templateOrUrl);
             await this.initialize(templateOrUrl, jsonPtrImportPath);
-            return TemplateProcessor.NOOP;
+            return TemplateProcessor.NOOP; //import returns No-Op because import assigns content to jsonPointer as a side effect
         }
     }
 

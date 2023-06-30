@@ -6,7 +6,7 @@ const repl = require('repl');
 const JeepCliCore = require('./src/JeepCliCore');
 
 
-class Jeep {
+class Stated {
     constructor() {
         this.jeepCliCore = new JeepCliCore();
         this.r = repl.start({
@@ -59,7 +59,7 @@ class Jeep {
     async cli(cliCoreMethod, args){
         try{
             const result = await cliCoreMethod(args);
-            console.log(Jeep.stringify(result));
+            console.log(Stated.stringify(result));
         } catch (e) {
             console.error(e);
         }
@@ -85,12 +85,12 @@ class Jeep {
     }
 
     static stringify(o){
-        return JSON.stringify(o, Jeep.printFunc, 2)
+        return JSON.stringify(o, Stated.printFunc, 2)
     }
 
 }
 
-module.exports = Jeep;
-const jeep = new Jeep();
+module.exports = Stated;
+const jeep = new Stated();
 
 
