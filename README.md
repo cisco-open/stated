@@ -1,10 +1,15 @@
 # stated
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-Stated, pronounced "state d" is a daemon for continuosly computing state. Stated uses JSON to fully "externalize" and make state observable. 
+Stated, pronounced "state d", is a library for maintaining directed acyclic graphs (DAGs) and propagating state changes through them.
+Stated uses JSON to fully "externalize" and make state observable. 
 Stated used embedded [JSONata](http://docs.jsonata.org/) expressions to create a directed acyclic graph of state flow. Stated includes
-a repl for working with stated json files, and a JS library for embedding stated in applications. Applications for stated include
-UI state storage, and config file templating.
+a REPL for working with stated json templates, and a JS library for embedding stated in applications. Applications for stated include
+* dynamic/continuous UI state
+* config file templating
+* lambda-like computations
+
+Stated is modular and allows templates to import other templates.
 
 ```bash
 dlightman$ stated.js
