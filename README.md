@@ -45,7 +45,7 @@ node stated.js
 ```
 
 If your environment is set up correctly with the path for Node.js, you can simply run this command to
-start the stated REPL:
+start the stated REPL. The first line of state.js is `#!/usr/bin/env node`:
 
 ```bash
 ./stated.js
