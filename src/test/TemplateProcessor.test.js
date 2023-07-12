@@ -729,6 +729,21 @@ test("context", async () => {
     );
 });
 
+test("pass function as parameter", async () => {
+
+    const tp = new TemplateProcessor({
+        "a": 42,
+        "b": "${a}",
+        "c": "${'the answer is: '& b}",
+        "increment": "${ function($f) { ($set('/a', a+$f()); a) } }",
+    });
+    await tp.initialize();
+    await tp.output.increment.apply(this, [()=>{
+        return 3;
+    }]);
+    expect(tp.output.a).toEqual(45);
+});
+
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {

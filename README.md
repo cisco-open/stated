@@ -1,15 +1,14 @@
 # stated
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-Stated, pronounced "state d", is a library for maintaining directed acyclic graphs (DAGs) and propagating state changes through them.
-Stated uses JSON to fully "externalize" and make state observable. 
-Stated used embedded [JSONata](http://docs.jsonata.org/) expressions to create a directed acyclic graph of state flow. Stated includes
-a REPL for working with stated json templates, and a JS library for embedding stated in applications. Applications for stated include
+Stated uses embedded [JSONata](http://docs.jsonata.org/) expressions embedded in ordinary json to make json programmable. Stated includes
+a REPL for working with stated json templates, and a JS library for embedding stated in applications.
+Stated is modular and allows templates to define functions and to import other templates.
+Applications for stated include
 * dynamic/continuous UI state
 * config file templating
 * lambda-like computations
 
-Stated is modular and allows templates to import other templates.
 
 ```bash
 ghendrey$ stated.js
@@ -158,9 +157,9 @@ are shown.
 ```
 ## DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
-expressions. stated is at its core a data flow engine. It builds a Directed Acyclic Graph (DAG) and ensures that when
-fields in your JSON change, that the changes flow through the DAG in an optimal order that avoids redundant expression
-calculation.
+expressions. stated is at its core a data flow engine. Stated analyzes the abstract syntax tree (AST) of JSONata 
+expressions and builds a Directed Acyclic Graph (DAG). Stated ensures that when fields in your JSON change, that the
+changes flow through the DAG in an optimal order that avoids redundant expression calculation.
 
 stated helps you track and debug transitive dependencies in your templates. You can use the
 ``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
@@ -419,7 +418,11 @@ stated let's you define and call functions.
 }
 ```
 ### Fetch
-You can use the JS fetch function to get data over the network and gracefully handle the response.
+This example fetches JSON over the network and uses the JSONata transform operator to set the 
+`player` field on the fetched JSON.
+[Here is the JSON file](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json) that it downloads and operates on.
+You can see why DAG and evaluation order matter. selectedGame does not exist until the game field has been populated by 
+fetch.
 ```bash
 > .init -f "example/ex12.json"
 {

@@ -1,0 +1,8 @@
+data:
+    fn:
+      - john
+      - jane
+    ln:
+      - do
+      - smith
+names$: $zip(data.fn, data.ln)

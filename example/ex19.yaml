@@ -1,0 +1,3 @@
+noradCommander: "${ norad.commanderDetails }"
+norad: "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes }"
+handleRes: "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"

@@ -6,6 +6,7 @@ const jp = require('json-pointer');
 const _ = require('lodash');
 const metaInfoProducer = require('./MetaInfoProducer');
 const DependencyFinder=require('./DependencyFinder');
+const winston = require('winston');
 
 class TemplateProcessor {
     constructor(template, context = {}) {
@@ -17,13 +18,29 @@ class TemplateProcessor {
             "setInterval":setInterval,
             "clearInterval":clearInterval,
             "setTimeout":setTimeout,
+            "console":console
         });
-
+        this.logger = this.getLogger();
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
         this.errors = [];
         this.metaInfoByJsonPointer = {};
+        this.logger = this.getLogger();
+    }
+
+    getLogger() {
+        return winston.createLogger({
+            format: winston.format.json(),
+            transports: [
+                new winston.transports.Console({
+                    format: winston.format.combine(
+                        winston.format.colorize(),
+                        winston.format.simple()
+                    )
+                })
+            ],
+        });
     }
 
     async initialize(template = this.input, jsonPtr="/") {
@@ -94,7 +111,7 @@ class TemplateProcessor {
 
     async createMetaInfos(template, rootJsonPtr=[]) {
         const metaInfProcessor = jsonata(metaInfoProducer);
-        let metaInfos = await metaInfProcessor.evaluate(template);
+        let metaInfos = await metaInfProcessor.evaluate(template, {"console":console});
 
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates
@@ -165,7 +182,6 @@ class TemplateProcessor {
     }
 
     async evaluateDependencies(metaInfos) {
-        //const evaluationPlan = this.sortNodes(metaInfos);
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.evaluateJsonPointersInOrder(evaluationPlan);
     }
@@ -214,7 +230,7 @@ class TemplateProcessor {
                     if (recursionStack.has(dependency)) {
                         const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ')+ " → "+ dependency;
                         this.errors.push(e);
-                        console.warn('\x1b[31m%s\x1b[0m', e); // use terminal red coloring
+                        this.logger.log('warn', e);
                     } else if (!visited.has(dependency)) {
                         const dependencyNode = jp.get(templateMeta, dependency);
                         if (dependencyNode.materialized__ === false) { // a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
@@ -277,12 +293,12 @@ class TemplateProcessor {
                 // Check if the node contains an expression. If so, print a warning and return.
                 const firstMeta = jp.get(this.templateMeta, first);
                 if (firstMeta.expr__ !== undefined) {
-                    console.warn(`Attempted to replace expressions with data under ${first}. This operation is ignored.`);
+                    this.logger.log('warn',`Attempted to replace expressions with data under ${first}. This operation is ignored.`);
                     return false;
                 }
                 firstMeta.didUpdate__  = await this.evaluateNode(first, data); // Evaluate the node provided with the data provided
                 if (!firstMeta.didUpdate__) {
-                    console.log(`data did not change for ${first}, short circuiting dependents.`);
+                    this.logger.log('info', `data did not change for ${first}, short circuiting dependents.`);
                     return false;
                 }
             }
@@ -292,7 +308,7 @@ class TemplateProcessor {
                 const didUpdate = await this.evaluateNode(jsonPtr);
                 jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
             } catch (e) {
-                console.log(`An error occurred while evaluating dependencies for ${jsonPtr}`);
+                this.logger.log('error', `An error occurred while evaluating dependencies for ${jsonPtr}`);
             }
         }
         first && jsonPtrList.unshift(first);
@@ -331,7 +347,7 @@ class TemplateProcessor {
             try {
                 data = jp.get(output, jsonPtr);
             } catch (error) {
-                console.log(`The reference with json pointer ${jsonPtr} does not exist`);
+                this.logger.log('error', `The reference with json pointer ${jsonPtr} does not exist`);
                 data = undefined;
             }
         }
@@ -343,7 +359,7 @@ class TemplateProcessor {
     setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
         const {treeHasExpressions__, callback__} = jp.get(templateMeta, jsonPtr);
         if (treeHasExpressions__) {
-            console.log(`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
+            this.logger.log('warn',`nodes containing expressions cannot be overwritten: ${jsonPtr}`);
             return false;
         }
         let didSet = this._setData(jsonPtr, data, callback__);
@@ -379,7 +395,7 @@ class TemplateProcessor {
                 _.merge(this.context, {"import":this.getImport(jsonPointer__)}));
             this._setData(jsonPtr, evaluated, callback__);
         } catch (error) {
-            console.error(`Error evaluating expression at ${jsonPtr}:`, error);
+            this.logger.log('error', `Error evaluating expression at ${jsonPtr}`);
         }
         return evaluated; //can be undefined if error evaluating expression
     }
@@ -398,7 +414,7 @@ class TemplateProcessor {
             callback && callback(data, jsonPtr);
             return true;
         }else{
-            console.log(`data to be set at ${jsonPtr} did not change, ignored. `);
+            this.logger.log('info', `data to be set at ${jsonPtr} did not change, ignored. `);
             return false;
         }
 
@@ -420,7 +436,7 @@ class TemplateProcessor {
 
     getDependentsBFS(jsonPtr) {
         if (!jp.has(this.templateMeta, jsonPtr)) {
-            console.log(`${jsonPtr} does not exist.`);
+            this.logger.log('warn', `${jsonPtr} does not exist.`);
             return [];
         }
 
@@ -501,7 +517,7 @@ class TemplateProcessor {
                 return ancestorNode;
             }
         }
-        console.warn(`No parent or ancestor of '${childNode.jsonPointer__}'`);
+        this.logger.log("info", `No parent or ancestor of '${childNode.jsonPointer__}'`);
         return undefined;
 
     }

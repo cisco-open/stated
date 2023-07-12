@@ -2,24 +2,36 @@
   Copyright 2023, Cisco Systems, Inc
  */
 const fs = require('fs');
+const path = require('path');
 const TemplateProcessor = require('./TemplateProcessor');
+const yaml = require('js-yaml');
 
 class JeepCliCore {
     constructor() {
         this.templateProcessor = null;
+        this.logLevel = "info";
     }
-
     async init(args) {
         const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
         const [flag, templateOrFilePath] = options;
         let input;
+
         if (flag === '-f') {
             const fileContent = await fs.promises.readFile(templateOrFilePath.slice(1, -1), 'utf8');
-            input = JSON.parse(fileContent);
+            //get the file extension and kill off any non word chars including quotes that may have surrounded it
+            const fileExtension = path.extname(templateOrFilePath).toLowerCase().replace(/\W/g, '');
+
+            if (fileExtension === 'yaml' || fileExtension === 'yml') {
+                input = yaml.safeLoad(fileContent); // Parse YAML file
+            } else {
+                input = JSON.parse(fileContent); // Parse JSON file
+            }
         } else {
-            input = JSON.parse(templateOrFilePath);
+            input = JSON.parse(templateOrFilePath); // Parse JSON template
         }
+
         this.templateProcessor = new TemplateProcessor(input);
+        this.templateProcessor.logger.level = this.logLevel;
         await this.templateProcessor.initialize();
         return this.templateProcessor.input;
     }
@@ -97,6 +109,14 @@ class JeepCliCore {
             throw new Error('Initialize the template first.');
         }
         return await this.templateProcessor.getEvaluationPlan();
+    }
+
+    log(level) {
+        this.logLevel = level;
+        if(this.templateProcessor){
+            this.templateProcessor.logger.level = level;
+        }
+        return undefined;
     }
 
     note(note){

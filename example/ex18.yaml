@@ -1,0 +1,2 @@
+noradCommander: "${ norad.commanderDetails }"
+norad: "${ $import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json')}"

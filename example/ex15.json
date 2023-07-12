@@ -1,4 +1,4 @@
 {
   "counter": 0,
-  "upCount": "${  counter<10 ? ($setTimeout(function(){$set('/counter', counter+1)}, 1000);'counting'):'done'  }"
+  "upCount$": "counter<10 ? ($setTimeout(function(){$set('/counter', counter+1)}, 1000);'counting'):'done'"
 }

@@ -1,0 +1,16 @@
+commanderDetails:
+  fullName: "../${commander.firstName & ' ' & commander.lastName}"
+  salutation: "../${$join([commander.rank, commanderDetails.fullName], ' ')}"
+  systemsUnderCommand: "../${$count(systems)}"
+organization: "NORAD"
+location: "Cheyenne Mountain Complex, Colorado"
+commander:
+  firstName: "Jack"
+  lastName: "Beringer"
+  rank: "General"
+purpose: "Provide aerospace warning, air sovereignty, and defense for North America"
+systems:
+  - "Ballistic Missile Early Warning System (BMEWS)"
+  - "North Warning System (NWS)"
+  - "Space-Based Infrared System (SBIRS)"
+  - "Cheyenne Mountain Complex"

@@ -1,9 +1,14 @@
 /*
   Copyright 2023, Cisco Systems, Inc
  */
+const EMBEDDED_EXPR_REGEX = //used to test a string and see if it is of form ${<JSONata>}, that is to say a jsonata program inside dollars-moustache
+    '\\s*' +              // Match optional whitespace
+    '((\\/)|((\\.\\.\\/)*))' + // Match a forward slash '/' or '../' to represent relative paths
+    '\\$\\{' +            // Match the literal characters '${'
+    '([\\s\\S]+)' +       // Match one or more of any character. This is the JSONata expression/program (including newline, to accommodate multiline JSONata).\s\S is a little trick for capturing everything inclusing newline
+    '\\}' +               // Match the literal character '}'
+    '\\s*$';              // Match optional whitespace
 module.exports = `
-
-
 (   $setInfo := function($acc, $metaInfo, $flags){(
         $acc~>|$|{
                     "metaInfos":metaInfos~>$append($metaInfo~>|$|{"treeHasExpressions__":$flags.treeHasExpressions__}|),
@@ -37,12 +42,13 @@ module.exports = `
                     )
     
                     :(
-                        $match := /\\s*((/)|((\\.\\.\\/)*))\\$\\{(.+)\\}\\s*$/($o); 
+                        $match := /${EMBEDDED_EXPR_REGEX}/($o); /* */
+                        $keyEndsWithDollars := $type($path[-1])='string'?$path[-1]~>$contains(/\\$/):null; /* let's allow keys that end with '$' to tell us it's an expression in addition to dollars moustache */
                         $leadingSlash := $match[0].groups[1];
                         $leadingCdUp := $match[0].groups[2];
                         $slashOrCdUp := $leadingSlash ? $leadingSlash : $leadingCdUp;
-                        $expr := $match[0].groups[4]; 
-                        $match
+                        $expr := $keyEndsWithDollars?$o:$match[0].groups[4];                         
+                        $match or $keyEndsWithDollars
                                 ? $setInfo($acc, { "materialized__": true,"exprRootPath__":$slashOrCdUp, "expr__": $expr, "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
                                 : $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
                     )

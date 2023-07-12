@@ -1,0 +1,15 @@
+totalCost: "${$sum(costs)}"
+costs: "${products.$sum(quantity * price)}"
+products:
+  - name: Apple
+    quantity: 5
+    price: 0.5
+    cost: "/${costs[0]}"
+  - name: Orange
+    quantity: 10
+    price: 0.75
+    cost: "/${costs[1]}"
+  - name: Banana
+    quantity: 8
+    price: 0.25
+    cost: "/${costs[2]}"

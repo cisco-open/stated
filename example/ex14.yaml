@@ -1,0 +1,15 @@
+incr$: |
+  function(){
+    $set('/counter',counter+1)
+  }
+counter: 0
+upCount$: $setInterval(incr$, 1000)
+status$: |
+  (
+    counter>10
+      ?(
+        $clearInterval(upCount$);
+        'done'
+      )
+      :'counting'
+  )

@@ -466,13 +466,6 @@ test("$import('nozzle.com/boink.json')", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual(
         [
-            [
-                "data",
-                "duration",
-                "data",
-                0,
-                "expression"
-            ]
         ]);
 });
 

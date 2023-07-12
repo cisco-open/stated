@@ -1,0 +1,12 @@
+counter: 0
+upCount$: | 
+  counter<10 
+    ? (
+        $incr := function(){
+            $set('/counter', counter+1)      
+        };
+        $setTimeout($incr, 1000);
+        'counting';
+      )
+    :'done'
+  

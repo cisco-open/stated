@@ -17,7 +17,7 @@ class Stated {
 
     registerCommands() {
         [ //these are CLICore commands
-            ["init", 'Initialize the template'],
+            ["init", '-f <fname> to Initialize the template'],
             ["set", 'Set data to a JSON pointer path and show the executed output'],
             ["in", 'Show the input template'],
             ["out", 'Show the executed output'],
@@ -25,7 +25,8 @@ class Stated {
             ["from", 'Show the dependents of a given JSON pointer'],
             ["to", 'Show the dependencies of a given JSON pointer'],
             ["plan", 'Show the evaluation plan'],
-            ["note", "returns 🌈═══ ... for creating documentation"]
+            ["note", "returns ═══ ... for creating documentation"],
+            ["log", "set the log level [debug, info, warn, error]"]
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
@@ -76,9 +77,11 @@ class Stated {
         if (key === 'compiledExpr__') {
             return "--compiled expression--";
         }
-        const {_idleTimeout, _onTimeout} = value;
-        if(_idleTimeout !== undefined && _onTimeout !== undefined){
-            return "--interval/timeout--";
+        if(null !== value) {
+            const {_idleTimeout, _onTimeout} = value;
+            if (_idleTimeout !== undefined && _onTimeout !== undefined) {
+                return "--interval/timeout--";
+            }
         }
 
         return value;

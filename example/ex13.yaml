@@ -1,0 +1,4 @@
+systems:
+  - "WOPR"
+onBoot$: "$set('/systems/1', 'JOSHUA')"
+newSystem$: systems[1]

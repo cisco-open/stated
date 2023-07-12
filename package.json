@@ -1,10 +1,30 @@
 {
-  "name": "jeep",
-  "version": "1.0.0",
+  "name": "stated",
+  "version": "0.0.1",
+  "description": "JSONata embedded in JSON",
+  "main": "index.js",
+  "scripts": {
+    "test": "jest",
+    "start": "node index.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://bitbucket.corp.appdynamics.com/scm/arch/templates.git"
+  },
+  "keywords": [
+    "jsonata",
+    "json",
+    "config",
+    "state",
+    "dag"
+  ],
+  "author": "Geoff Hendrey <ghendreyl@cisco.com>",
+  "license": "Apache-2.0",
   "dependencies": {
     "json-pointer": "^0.6.2",
     "jsonata": "^2.0.3",
-    "lodash": "^4.17.21"
+    "lodash": "^4.17.21",
+    "winston": "^3.10.0"
   },
   "devDependencies": {
     "jest": "^29.5.0"
