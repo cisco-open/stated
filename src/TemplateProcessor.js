@@ -44,6 +44,7 @@ class TemplateProcessor {
     }
 
     async initialize(template = this.input, jsonPtr="/") {
+        this.executionPlans = {}; //clear execution plans
         let parsedJsonPtr = jp.parse(jsonPtr);
         parsedJsonPtr = _.isEqual(parsedJsonPtr,[""])?[]:parsedJsonPtr; //correct [""] to []
         let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
@@ -421,9 +422,12 @@ class TemplateProcessor {
     }
 
     getDependentsTransitiveExecutionPlan(jsonPtr) {
-        const effectedNodesSet = this.getDependentsBFS(jsonPtr);
-        return [jsonPtr, ...[...effectedNodesSet].map(n=>n.jsonPointer__)];
-
+        //check execution plan cache
+        if(! this.executionPlans[jsonPtr]) {
+            const effectedNodesSet = this.getDependentsBFS(jsonPtr);
+            this.executionPlans[jsonPtr] = [jsonPtr, ...[...effectedNodesSet].map(n => n.jsonPointer__)];
+        }
+        return this.executionPlans[jsonPtr];
     }
 
     getDependents(jsonPtr){

@@ -1,15 +1,17 @@
 # stated
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-Stated uses embedded [JSONata](http://docs.jsonata.org/) expressions embedded in ordinary json to make json programmable. Stated includes
-a REPL for working with stated json templates, and a JS library for embedding stated in applications.
-Stated is modular and allows templates to define functions and to import other templates.
+Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions. Unlike an 
+ordinary program that executes sequentially, Stated builds a directed acyclic graph (DAG) to determine which order to 
+evaluate the expressions, based on the content of the expressions themselves. Setting any value in the json document 
+will cause the value to propagate through the DAG.
+
 Applications for stated include
 * dynamic/continuous UI state
 * config file templating
 * lambda-like computations
 
-
+Stated includes a node REPL, `stated.js` for working with Stated json templates, and a JS library for embedding stated in applications.
 ```bash
 ghendrey$ stated.js
 > .init -f "example/hello.json"
@@ -22,14 +24,19 @@ ghendrey$ stated.js
 "to": "world",
 "msg": "hello world"
 }
+> .set /to "jsonata"
+{
+  "to": "jsonata",
+  "msg": "hello jsonata"
+}
 ```
 
 ## Getting Started
 
 1. **Installation**: Clone the repo
 ```bash
-git clone ssh://git@bitbucket.corp.appdynamics.com:7999/arch/templates.git;
-cd templates
+git clone git@github.com:cisco-open/stated.git;
+cd stated
 ```
 3. then install stated by running the following command:
 
