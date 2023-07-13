@@ -4,7 +4,7 @@
 Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions. Unlike an 
 ordinary program that executes sequentially, Stated builds a directed acyclic graph (DAG) to determine which order to 
 evaluate the expressions, based on the content of the expressions themselves. Setting any value in the json document 
-will cause the value to propagate through the DAG.
+will cause the value to propagate through the DAG. Only the expressions on the propagation path are recomputed.
 
 Applications for stated include
 * dynamic/continuous UI state
