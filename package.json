@@ -1,11 +1,15 @@
 {
-  "name": "stated",
-  "version": "0.0.1",
+  "name": "stated-js",
+  "version": "0.0.3",
   "description": "JSONata embedded in JSON",
   "main": "index.js",
   "scripts": {
     "test": "jest",
-    "start": "node index.js"
+    "start": "node index.js",
+    "stated": "./stated.js"
+  },
+  "bin": {
+    "stated": "./stated.js"
   },
   "repository": {
     "type": "git",
@@ -21,9 +25,12 @@
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "license": "Apache-2.0",
   "dependencies": {
+    "global": "^4.4.0",
+    "js-yaml": "^4.1.0",
     "json-pointer": "^0.6.2",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21",
+    "stated": "^1.3.2",
     "winston": "^3.10.0"
   },
   "devDependencies": {
