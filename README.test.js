@@ -1,9 +1,23 @@
-const JeepCliCore = require('./src/JeepCliCore');
+// Copyright 2022 Cisco Systems, Inc.
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//      http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+const CliCore = require('./src/CliCore');
 const fs = require('fs');
 const {stringify} = require("./stated");
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
- * that begin and and with ``` (markdown syntax for code block) and it extracts the jeep cli command and the
+ * that begin and and with ``` (markdown syntax for code block) and it extracts the cli command and the
  * response. It then runs the cli command and compares the response to what is in the README.md. This ensures
  * that the README is always accurate.
  *
@@ -36,7 +50,7 @@ const {stringify} = require("./stated");
 const markdownContent = fs.readFileSync("README.md", 'utf-8');
 const commandRegex  = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;;
 let match;
-const jeepCliCore = new JeepCliCore();
+const cliCore = new CliCore();
 const testData = [];
 
 while ((match = commandRegex.exec(markdownContent)) !== null) {
@@ -46,7 +60,7 @@ while ((match = commandRegex.exec(markdownContent)) !== null) {
 
     if (args.length > 0) {
         const cmdName = args.shift();
-        const method = jeepCliCore[cmdName];
+        const method = cliCore[cmdName];
 
         if (typeof method === 'function') {
             testData.push([cmdName, args, expectedResponseString]);
@@ -59,7 +73,7 @@ while ((match = commandRegex.exec(markdownContent)) !== null) {
 testData.forEach(([cmdName, args, expectedResponseString], i) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
         const rest = args.join(" ");
-        const resp = await jeepCliCore[cmdName].apply(jeepCliCore, [rest]);
+        const resp = await cliCore[cmdName].apply(cliCore, [rest]);
         const respNormalized = JSON.parse(stringify(resp));
         const _expected = JSON.parse(expectedResponseString);
         expect(respNormalized).toEqual(_expected);
