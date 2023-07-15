@@ -289,14 +289,14 @@ class TemplateProcessor {
 
     async setData(jsonPtr, data) {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
-        const sortedJsonPtrs = this.getDependentsTransitiveExecutionPlan(jsonPtr);
+        const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
         return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
     }
 
-    async evaluateJsonPointersInOrder(jsonPtrList, data) {
+    async evaluateJsonPointersInOrder(jsonPtrList, data=TemplateProcessor.NOOP) {
         const resp = [];
         let first;
-        if(data) {
+        if(data !== TemplateProcessor.NOOP) {
             first = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
             if (!jp.has(this.output, first)) { //node doesn't exist yet, so just create it
                 const didUpdate= await this.evaluateNode(first, data);
@@ -434,7 +434,7 @@ class TemplateProcessor {
 
     getDependentsTransitiveExecutionPlan(jsonPtr) {
         //check execution plan cache
-        if(! this.executionPlans[jsonPtr]) {
+        if(this.executionPlans[jsonPtr]===undefined) {
             const effectedNodesSet = this.getDependentsBFS(jsonPtr);
             this.executionPlans[jsonPtr] = [jsonPtr, ...[...effectedNodesSet].map(n => n.jsonPointer__)];
         }
