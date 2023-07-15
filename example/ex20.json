@@ -1,0 +1,7 @@
+{
+  "defcon$": "($tmp:=$floor(intelLevel * threatLevel);$tmp:= $tmp<=MAX_DEFCON?$tmp:MAX_DEFCON;$tmp>=MIN_DEFCON?$tmp:MIN_DEFCON)",
+  "MAX_DEFCON": 5,
+  "MIN_DEFCON": 1,
+  "intelLevel": 1.45,
+  "threatLevel": 2.2
+}

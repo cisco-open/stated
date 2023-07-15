@@ -3,17 +3,21 @@
 
 Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions. Unlike an 
 ordinary program that executes sequentially, Stated builds a directed acyclic graph (DAG) to determine which order to 
-evaluate the expressions, based on the content of the expressions themselves. Setting any value in the json document 
-will cause the value to propagate through the DAG. Only the expressions on the propagation path are recomputed.
+evaluate the expressions, based on the content of the expressions themselves. The Stated library builds an execution plan
+which it retains in memory even after calculating the output. The library (and the REPL) allow values to be pushed into the 
+object after the initial output is calculated. These values propagate through the DAG efficiently. Setting values does not 
+result in reccomputing all expressions. Only the expressions on the propagation path are recomputed.
 
 Applications for stated include
 * dynamic/continuous UI state
 * config file templating
 * lambda-like computations
 
-Stated includes a node REPL, `stated.js` for working with Stated json templates, and a JS library for embedding stated in applications.
+Stated includes a node REPL, `stated.js`, for testing Stated json templates, and a JS library for embedding stated
+in applications. A typical REPL session consists of loading a template with the `init` command, viewing the computed
+output with the `.out` command and then setting values with the `.set` command and observing the changed output.
 ```bash
-ghendrey$ stated.js
+falken$ stated.js
 > .init -f "example/hello.json"
 {
 "to": "world",
@@ -91,12 +95,9 @@ stated provides a set of REPL commands to interact with the system:
 - **.in**: Show the input template.
 - **.out**: Show the current state of the template.
 - **.state**: Show the current state of the templateMeta.  
-
-
-
-## Expressions
-Stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
-The content between `${}` can be any valid JSONata program. The stated repl lets you experiment with templates.
+The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
+parses the input, builds an execution plan, and executes the result. To see the result you have to use the `.out` 
+- command.
 ```bash
 > .init -f "example/ex09.json"
 {
@@ -114,6 +115,96 @@ The content between `${}` can be any valid JSONata program. The stated repl lets
     1
   ]
 }
+```
+## Expressions and Variables
+What makes a Stated template different from an ordinary JSON file? JSONata Expressions of course! Stated analyzes the 
+Abstract Syntax Tree of every JSONata expression in the file, and learns what _references_ are made by each expression
+to other fields of the document. The _references_ of an expression become the _dependencies_ of the field, which are 
+used to build a DAG. The DAG allows Stated to know what expressions to compute if any fields of the document change. 
+Fields of the document are changed either via the REPL `$set` function, or by calling the equivalent library function.
+Many classes of _reactive_ application need to maintain state, and need to propagate state changes through the _dependees_
+of a particular field (a _dependee_ of foo is a field that _depends_ on foo).
+### Dollars-Moustache
+Stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
+The content between `${}` can be any valid JSONata program. We have already seen simple examples of `${}` expressions
+such as ex01.json where `"msg": "${'hello ' & to}"` is an expression. 
+### Dollars-Variables
+When an expression is used to compute a field (as opposed to an array item), it is possible to use a more concise 
+syntax to identify the field's string as containing a JSONata expression. The field can simply be named with a trailing
+dollars sign. Such as `"foo$": "'hello' & to"`. 
+### References
+In that example above `to` is a *reference* to another field of the object.
+In the example below, a JSONata [_block_](https://docs.jsonata.org/programming) is used to produce `defcon$`. It 
+defines local variables like `$tmp` which are pure JSONata constructs. The JSONata program also references fields 
+of the input like `MAX_DEFCON` and `threataLevel`. All 'ordinary' fields of the object such as these can be mutated
+after the initial output has been computed. As shown below after viewing the output with the `.out` commnand, we 
+mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
+
+```bash
+> .init -f "example/ex20.json"
+{
+  "defcon$": "($tmp:=$floor(intelLevel * threatLevel);$tmp:= $tmp<=MAX_DEFCON?$tmp:MAX_DEFCON;$tmp>=MIN_DEFCON?$tmp:MIN_DEFCON)",
+  "MAX_DEFCON": 5,
+  "MIN_DEFCON": 1,
+  "intelLevel": 1.45,
+  "threatLevel": 2.2
+}
+> .out
+{
+  "defcon$": 3,
+  "MAX_DEFCON": 5,
+  "MIN_DEFCON": 1,
+  "intelLevel": 1.45,
+  "threatLevel": 2.2
+}
+> .set /threatLevel 3.5
+{
+  "defcon$": 5,
+  "MAX_DEFCON": 5,
+  "MIN_DEFCON": 1,
+  "intelLevel": 1.45,
+  "threatLevel": 3.5
+}
+```
+
+## YAML
+Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 
+support text blocks with line returns in a way that is readable. For instance if we compare ex12.json and ex12.yaml, 
+which is more readable?
+```bash
+falken$ cat ex12.json
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game.selected}",
+  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
+}
+```
+In YAML the `respHandler` function can be written as a text block, whereas in JSON it must appear on a single line.
+```bash
+falken$ cat ex12.yaml
+url: "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json"
+selectedGame: "${game$.selected}"
+respHandler$: |
+  function($res){
+    $res.ok? $res.json():{'error': $res.status}
+  }
+game$: "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
+```
+
+However, once a YAML file is parsed with the JavaScript runtime it becomes a JavaScript
+object. Hence, in the example below a YAML is the input file, but the REPL displays the resulting Javascript object 
+using JSON syntax. As we can see below, loading the yaml file still results in the function being deisplayed
+as it's parsed in-memory JS representation.
+```bash
+> .init -f "example/ex12.yaml"
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game$.selected}",
+  "respHandler$": "function($res){\n  $res.ok? $res.json():{'error': $res.status}\n}\n",
+  "game$": "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
+}
+
 ```
 ## Setting Values in the stated REPL
 
@@ -438,15 +529,16 @@ stated let's you define and call functions.
   "hello": "${ (function($to){'hello ' & $to & '. How about a nice game of ' & $$.game})}",
   "to": "David",
   "game": "chess",
-  "greeting": "${ hello(to)}"
+  "greeting$": "hello(to)"
 }
 > .out
 {
   "hello": "{function:}",
   "to": "David",
   "game": "chess",
-  "greeting": "hello David. How about a nice game of chess"
+  "greeting$": "hello David. How about a nice game of chess"
 }
+
 ```
 ### Fetch
 This example fetches JSON over the network and uses the JSONata transform operator to set the 
@@ -842,8 +934,12 @@ Let's take a more complex example where we generate MySQL instances:
 }
 ```
 ## The set function
-The set function is used to push data into other parts of the template. The function is `set(jsonPointer, value)`. The 
+You have already seen how the REPL `.set` command works. The REPL simply calls the internal $set function. 
+The `$set` function can be called from your JSONata blocks or function. The `$set` function is used to push data into 
+other parts of the template. The function signature is `$set(jsonPointer, value)`. The 
 set command returns an array of JSON Pointers that represent the transitive updates that resulted from calling `set`.
+In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "JOSHUA" onto the `systems` array.
+
 ```bash
 > .init -f "example/ex13.json"
 {

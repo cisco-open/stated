@@ -32,7 +32,7 @@ class CliCore {
             const fileExtension = path.extname(templateOrFilePath).toLowerCase().replace(/\W/g, '');
 
             if (fileExtension === 'yaml' || fileExtension === 'yml') {
-                input = yaml.safeLoad(fileContent); // Parse YAML file
+                input = yaml.load(fileContent); // Parse YAML file
             } else {
                 input = JSON.parse(fileContent); // Parse JSON file
             }

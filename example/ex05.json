@@ -2,5 +2,5 @@
   "hello": "${ (function($to){'hello ' & $to & '. How about a nice game of ' & $$.game})}",
   "to": "David",
   "game": "chess",
-  "greeting": "${ hello(to)}"
+  "greeting$": "hello(to)"
 }
