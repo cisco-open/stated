@@ -1,6 +1,7 @@
 {
   "name": "stated-js",
   "version": "0.0.3",
+  "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "index.js",
   "scripts": {
@@ -23,7 +24,6 @@
     "dag"
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
-  "license": "Apache-2.0",
   "dependencies": {
     "global": "^4.4.0",
     "js-yaml": "^4.1.0",

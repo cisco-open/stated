@@ -33,45 +33,69 @@ ghendrey$ stated.js
 
 ## Getting Started
 
-1. **Installation**: Clone the repo
-```bash
-git clone git@github.com:cisco-open/stated.git;
-cd stated
+### Installation
+
+To install the `stated-js` package, you can use yarn or npm. Open your terminal and run one of the following commands:
+
+Using Yarn:
+
+```shell
+yarn global add stated-js
+````
+
+Using Npm:
+
+```shell
+npm install -g stated-js
+````
+
+### Running the REPL
+To use the Stated REPL (Read-Eval-Print Loop) it is recommended to have at least version 12 or higher of node.js. The 
+Stated REPL is built on [Node REPL](https://nodejs.org/api/repl.html#repl). 
+You can start the REPL by running the `stated` command in your terminal:
+```shell
+stated
 ```
-3. then install stated by running the following command:
-
+The REPL will launch, allowing you to interact with the stated-js library. For example you can enter this command in the
+REPL:
 ```bash
-yarn install
+> .init -f "example/ex01.json"
+```
+### Using the lib
+To use the stated-js library in your own projects, you can require it as a dependency.
+Here's an example of how you can import it into your JavaScript file:
+```js
+const stated = require('stated-js');
+
+// Start using the 'stated' library
+// ...
+
 ```
 
-2. **Start stated**: Once installed, you can start using stated by running the following command:
-
-```bash
-node stated.js
-```
-
-If your environment is set up correctly with the path for Node.js, you can simply run this command to
-start the stated REPL. The first line of state.js is `#!/usr/bin/env node`:
-
-```bash
-./stated.js
-```
-## REPL Commands
+### REPL Commands
 
 stated provides a set of REPL commands to interact with the system:
 
-stated Commands:
-- **.init**: Initialize the template.
+- **.init**: Initialize the template, typically from `-f <file.json>`.
+    - Example:
+      `.init -f "example/hello.json"`
+
 - **.set**: Set data to a JSON pointer path.
+    - Example:
+      `.set /to "jsonata"`
+
+- **.from**: Show the dependents of a given JSON pointer.
+    - Example:`.from /a`
+- **.to**: Show the dependencies of a given JSON pointer.
+    - Example:`.to /b`
 - **.in**: Show the input template.
 - **.out**: Show the current state of the template.
-- **.state**: Show the current state of the templateMeta.
-- **.from**: Show the dependents of a given JSON pointer.
-- **.to**: Show the dependencies of a given JSON pointer.
+- **.state**: Show the current state of the templateMeta.  
+
 
 
 ## Expressions
-stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
+Stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
 The content between `${}` can be any valid JSONata program. The stated repl lets you experiment with templates.
 ```bash
 > .init -f "example/ex09.json"
