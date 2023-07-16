@@ -1,9 +1,9 @@
 {
   "name": "stated-js",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
-  "main": "index.js",
+  "main": "stated.js",
   "scripts": {
     "test": "jest",
     "start": "node index.js",
@@ -35,5 +35,18 @@
   },
   "devDependencies": {
     "jest": "^29.5.0"
-  }
+  },
+  "files": [
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "package.json",
+    "README.md",
+    "README.test.js",
+    "stated.js",
+    "yarn.lock",
+    "src/**/*",
+    "example/**/*",
+    "!**/.idea",
+    "!**/.github"
+  ]
 }
