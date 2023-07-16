@@ -139,6 +139,7 @@ falken$ cat example/hello.json
 {
 "to": "world",
 "msg": "${'hello ' & to}"
+}
 ``` 
 
 ### Dollars-Variables
@@ -151,7 +152,7 @@ dollars sign.
 }
 ```
 However the `foo$` style can only be used when the expression is being assigned to a field. It won't work for array 
-elements like this, where there is no field name:
+elements like this, where there is no field name. For array elements the `${}` must be used:
 ```json
 [1, 2, "${$[0]+$[1]}"]
 ```
