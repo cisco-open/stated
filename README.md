@@ -125,25 +125,36 @@ What makes a Stated template different from an ordinary JSON file? JSONata Expre
 Abstract Syntax Tree of every JSONata expression in the file, and learns what _references_ are made by each expression
 to other fields of the document. The _references_ of an expression become the _dependencies_ of the field, which are 
 used to build a DAG. The DAG allows Stated to know what expressions to compute if any fields of the document change. 
-Fields of the document are changed either via the REPL `$set` function, or by calling the equivalent library function.
+Fields of the document are changed either via the REPL `.set` function, or by calling the equivalent library function.
 Many classes of _reactive_ application need to maintain state, and need to propagate state changes through the _dependees_
-of a particular field (a _dependee_ of foo is a field that _depends_ on foo).
+of a particular field (a _dependee_ of foo is a field that _depends_ on foo). Stated can be used as state store for
+reactiver applications.
 ### Dollars-Moustache
-returning to our `example/hello.json`, the `msg` field is a simple example of a dollars-moustache
+returning to our `example/hello.json`, the `msg` field is a simple example of a dollars-moustache. 
+Stated allows JSONata _expressions_ to be embedded in a JSON document using `${<...JSONata here...>}` syntax. The `${}`
+tells stated that a field such as `msg` is not an ordinary string field, but rather a JSONata expression that has to be 
+evaluated in order to _compute_ the value of the field.
 ```bash
 falken$ cat example/hello.json
 {
 "to": "world",
 "msg": "${'hello ' & to}"
-
-```
-Stated allows JSONata _expressions_ to be embedded in a JSON document using `${}` syntax. An expression is any valid 
-JSONata. The result of evaluating the JSONata gets assigned to the field. 
+``` 
 
 ### Dollars-Variables
-When an expression is used to compute a field, it is possible to use a more concise 
-syntax to identify the field's string as containing a JSONata expression. The field can simply be named with a trailing
-dollars sign. Such as `"foo$": "'hello' & to"`. 
+There is also a more concise alternative to `${}`. The field can simply be named with a trailing
+dollars sign.
+```json
+{
+  "to": "world",
+  "msg$": "'hello ' & to"
+}
+```
+However the `foo$` style can only be used when the expression is being assigned to a field. It won't work for array 
+elements like this, where there is no field name:
+```json
+[1, 2, "${$[0]+$[1]}"]
+```
 ### References
 In the example below, a JSONata [_block_](https://docs.jsonata.org/programming) is used to produce `defcon$`. It 
 defines local variables like `$tmp` which are pure JSONata constructs. The JSONata program also references fields 
