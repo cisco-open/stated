@@ -65,6 +65,16 @@ REPL:
 ```bash
 > .init -f "example/ex01.json"
 ```
+### Oneshot mode
+in oneshot mode, stated.js simply computes the output template and exits. This is useful when you do not intend to 
+change any if the fields after the initial output render
+```bash
+falken$ stated example/ex01.json
+{
+"to": "world",
+"msg": "hello world"
+}
+```
 ### Using the lib
 To use the stated-js library in your own projects, you can require it as a dependency.
 Here's an example of how you can import it into your JavaScript file:
@@ -119,15 +129,22 @@ Fields of the document are changed either via the REPL `$set` function, or by ca
 Many classes of _reactive_ application need to maintain state, and need to propagate state changes through the _dependees_
 of a particular field (a _dependee_ of foo is a field that _depends_ on foo).
 ### Dollars-Moustache
-Stated allows expressions to be embedded in a JSON document using `${}` syntax. You can use expressions in fields or arrays.
-The content between `${}` can be any valid JSONata program. We have already seen simple examples of `${}` expressions
-such as ex01.json where `"msg": "${'hello ' & to}"` is an expression. 
+returning to our `example/hello.json`, the `msg` field is a simple example of a dollars-moustache
+```bash
+falken$ cat example/hello.json
+{
+"to": "world",
+"msg": "${'hello ' & to}"
+
+```
+Stated allows JSONata _expressions_ to be embedded in a JSON document using `${}` syntax. An expression is any valid 
+JSONata. The result of evaluating the JSONata gets assigned to the field. 
+
 ### Dollars-Variables
-When an expression is used to compute a field (as opposed to an array item), it is possible to use a more concise 
+When an expression is used to compute a field, it is possible to use a more concise 
 syntax to identify the field's string as containing a JSONata expression. The field can simply be named with a trailing
 dollars sign. Such as `"foo$": "'hello' & to"`. 
 ### References
-In that example above `to` is a *reference* to another field of the object.
 In the example below, a JSONata [_block_](https://docs.jsonata.org/programming) is used to produce `defcon$`. It 
 defines local variables like `$tmp` which are pure JSONata constructs. The JSONata program also references fields 
 of the input like `MAX_DEFCON` and `threataLevel`. All 'ordinary' fields of the object such as these can be mutated

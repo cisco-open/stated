@@ -21,6 +21,26 @@ class CliCore {
         this.templateProcessor = null;
         this.logLevel = "info";
     }
+    //oneShot is used when we don't want a REPL session and we just render the output
+    async oneShot(filePath) {
+        try {
+            const fileContent = await fs.promises.readFile(filePath, 'utf8');
+            //get the file extension and kill off any non word chars including quotes that may have surrounded it
+            const fileExtension = path.extname(filePath).toLowerCase().replace(/\W/g, '');
+            let input;
+            if (fileExtension === 'yaml' || fileExtension === 'yml') {
+                input = yaml.load(fileContent); // Parse YAML file
+            } else {
+                input = JSON.parse(fileContent); // Parse JSON file
+            }
+            this.templateProcessor = new TemplateProcessor(input);
+            this.templateProcessor.logger.level = this.logLevel;
+            await this.templateProcessor.initialize();
+            return this.templateProcessor.output;
+        } catch (error) {
+            console.error(error);
+        }
+    }
     async init(args) {
         const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
         const [flag, templateOrFilePath] = options;

@@ -19,10 +19,30 @@ const CliCore = require('./src/CliCore');
 class Stated {
     constructor() {
         this.cliCore = new CliCore();
+        this.initialize();
+    }
+
+    async initialize() {
+        const filePath = this.getOneShotFilePath();
+        if (filePath) {
+            const result = await this.cliCore.oneShot(filePath);
+            console.log(Stated.stringify(result));
+            return;
+        }
+
+        // Otherwise, we crank up the interactive REPL
         this.r = repl.start({
             prompt: '> ',
         });
         this.registerCommands();
+    }
+
+    getOneShotFilePath() {
+        // Assuming the file path argument is passed as the first command line argument
+        if (process.argv.length > 2) {
+            return process.argv[2];
+        }
+        return null;
     }
 
     registerCommands() {
@@ -104,6 +124,8 @@ class Stated {
 }
 
 module.exports = Stated;
-const stated = new Stated();
+(async () => {
+    const stated = new Stated();
+})();
 
 
