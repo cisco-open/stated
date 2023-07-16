@@ -19,7 +19,6 @@ const CliCore = require('./src/CliCore');
 class Stated {
     constructor() {
         this.cliCore = new CliCore();
-        this.initialize();
     }
 
     async initialize() {
@@ -126,6 +125,7 @@ class Stated {
 module.exports = Stated;
 (async () => {
     const stated = new Stated();
+    await stated.initialize();
 })();
 
 
