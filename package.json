@@ -25,12 +25,10 @@
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "dependencies": {
-    "global": "^4.4.0",
     "js-yaml": "^4.1.0",
     "json-pointer": "^0.6.2",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21",
-    "stated": "^1.3.2",
     "winston": "^3.10.0"
   },
   "devDependencies": {
