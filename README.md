@@ -53,6 +53,43 @@ falken$ stated
   "e": 42
 }
 ```
+Stated templates are modular and can be imported from a URL:
+```bash
+> .init -f "example/ex18.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json')}"
+}
+> .out
+{
+  "noradCommander": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  }
+}
+```
 
 Applications for stated include
 * dynamic/continuous UI state
