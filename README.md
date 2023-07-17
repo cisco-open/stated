@@ -1,9 +1,29 @@
 # stated
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions. Unlike an 
+Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions, like 
+this:
+```json
+{
+  "to": "world",
+  "msg": "${'hello ' & to}"
+}
+```
+Unlike an 
 ordinary program that executes sequentially, Stated builds a directed acyclic graph (DAG) to determine which order to 
-evaluate the expressions, based on the content of the expressions themselves. The Stated library builds an execution plan
+evaluate the expressions, based on the content of the expressions themselves. This allows complex templates like this 
+to execute efficiently:
+```json
+{
+  "a": "${c}",
+  "b": "${d+1+e}",
+  "c": "${b+1}",
+  "d": "${e+1}",
+  "e": 1
+}
+```
+
+The Stated library builds an execution plan
 which it retains in memory even after calculating the output. The library (and the REPL) allow values to be pushed into the 
 object after the initial output is calculated. These values propagate through the DAG efficiently. Setting values does not 
 result in reccomputing all expressions. Only the expressions on the propagation path are recomputed.
