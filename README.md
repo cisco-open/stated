@@ -22,38 +22,42 @@ to execute efficiently:
   "e": 1
 }
 ```
-
-The Stated library builds an execution plan
-which it retains in memory even after calculating the output. The library (and the REPL) allow values to be pushed into the 
-object after the initial output is calculated. These values propagate through the DAG efficiently. Setting values does not 
-result in reccomputing all expressions. Only the expressions on the propagation path are recomputed.
+Unlike an ordinary program, Stated templates can be kept "alive" indefinitely. A change to any of the independent fields
+causes change propagation throughout the DAG. Stated includes a node REPL, `stated.js`, for testing Stated json templates, and a JS library for embedding stated
+in applications. A typical REPL session consists of loading a template with the `init` command, viewing the computed
+output with the `.out` command and then setting values with the `.set` command and observing the changed output.
+```json
+falken$ stated
+> .init -f "example/ex08.json"
+{
+  "a": "${c}",
+  "b": "${d+1+e}",
+  "c": "${b+1}",
+  "d": "${e+1}",
+  "e": 1
+}
+> .out
+{
+  "a": 5,
+  "b": 4,
+  "c": 5,
+  "d": 2,
+  "e": 1
+}
+> .set /e 42
+{
+  "a": 46,
+  "b": 45,
+  "c": 46,
+  "d": 43,
+  "e": 42
+}
+```
 
 Applications for stated include
 * dynamic/continuous UI state
 * config file templating
 * lambda-like computations
-
-Stated includes a node REPL, `stated.js`, for testing Stated json templates, and a JS library for embedding stated
-in applications. A typical REPL session consists of loading a template with the `init` command, viewing the computed
-output with the `.out` command and then setting values with the `.set` command and observing the changed output.
-```bash
-falken$ stated.js
-> .init -f "example/hello.json"
-{
-"to": "world",
-"msg": "${'hello ' & to}"
-}
-> .out
-{
-"to": "world",
-"msg": "hello world"
-}
-> .set /to "jsonata"
-{
-  "to": "jsonata",
-  "msg": "hello jsonata"
-}
-```
 
 ## Getting Started
 
