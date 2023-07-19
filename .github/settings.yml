@@ -16,7 +16,7 @@ repository:
   homepage: https://github.com/cisco-open/stated
 
   # A comma-separated list of topics to set on the repository
-  #topics: github, probot
+  topics: config, yaml, json, state-management, state, state-store, jsonata
 
   # Either `true` to enable issues for this repository, `false` to disable them.
   #has_issues: true
