@@ -10,7 +10,7 @@ repository:
   description: Stated is a REPL and library for embedding JSONata expressions into JSON or YAML
 
   # Either `true` to make the repository private, or `false` to make it public.
-  private: true
+  private: false
 
   # A URL with more information about the repository
   homepage: https://github.com/cisco-open/stated
