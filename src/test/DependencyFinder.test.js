@@ -364,6 +364,14 @@ test("products.$sum(quantity * price)", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([
         [
+            "products",
+            "quantity"
+        ],
+        [
+            "products",
+            "price"
+        ],
+        [
             "products"
         ]
     ]);
@@ -479,6 +487,13 @@ test("$import('nozzle.com/boink.json')", () => {
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual(
         [
+        ]);
+});
+test("console.log", () => {
+    const program = "$console.log(norad)";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual(
+        [['norad']
         ]);
 });
 

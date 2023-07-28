@@ -506,9 +506,9 @@ individual product pulls in its cost from the costs array.
 > .plan
 [
   "/costs",
-  "/products/0/cost",
-  "/products/1/cost",
   "/products/2/cost",
+  "/products/1/cost",
+  "/products/0/cost",
   "/totalCost"
 ]
 > .out

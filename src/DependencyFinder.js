@@ -17,7 +17,7 @@ const _ = require('lodash');
 
 
 class DependencyFinder {
-    constructor(program) { //second argument is needed when $path() function is in the program
+    constructor(program) {
         this.compiledExpression = jsonata(program);
         this.ast = this.compiledExpression.ast();
         this.currentSteps = [];
@@ -95,7 +95,13 @@ class DependencyFinder {
             const v = node[k];
             if(v) {
                 if (Array.isArray(v)) {
-                    acc.push(v);
+                    if(k==="arguments"){
+                        //arguments array needs to get pushed onto nodestack with a pseudotype so we can recognize
+                        //when we are processing arguments later
+                        acc.push({...v, "pseudoType": k});
+                    }else {
+                        acc.push(v);
+                    }
                 } else if (typeof v === 'object' && v !== null) {
                     acc.push({...v, "pseudoType": k});
                 }
@@ -111,7 +117,7 @@ class DependencyFinder {
             _.last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
         }
     }
-
+    //this is where we capture the path and name expressions like a.b.c or $.a
     capturePathExpressions(node) {
         const {type, value} = node;
         if (type !== "name" && type !== "variable") {
@@ -138,9 +144,15 @@ class DependencyFinder {
             return;
 
         }
-        //if we are here then we are dealing with names, which are identifiers like 'a' which can occur in a.b.c or $.a or $$.a or $foo.a, etc
-        //The decision to emit a name is made based on its ancestor, or lack thereof
-        //this.currentSteps.push({type, value, "emit": !this.isNested(["path", "filter"])});
+        //if we are here then we are dealing with names, which are identifiers like 'a' which can occur in a.b.c or
+        // just plain a
+        //if the name is an argument to a function, then it should be emitted as a dependency
+        if(this.hasAncestor(n=>n.pseudoType === "arguments")){
+            _.last(this.currentSteps).push({type, value, "emit": true});
+            return;
+        }
+        //...however if it is occurring inside a map function like a.$sum(x,y) then it must be ignored since these
+        //names refer only to the fields x and y of the array we are mapping over
         if (!this.isUnderTreeShape(["path", "function"])) {
             _.last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
         }
@@ -149,7 +161,8 @@ class DependencyFinder {
 
 
     hasParent(parentType) {
-        return this.nodeStack.length !==0  &&  _.last(this.nodeStack).type === parentType;
+        return this.nodeStack.length !==0  &&
+            ( _.last(this.nodeStack).type === parentType || _.last(this.nodeStack).pseudoType === parentType);
     }
 
     hasAncestor(matcher) {
@@ -162,7 +175,7 @@ class DependencyFinder {
 
     isUnderTreeShape(pathTypes) {
         return this.nodeStack.reduce((_pathTypes, curr) => {
-            if (_pathTypes[0] === curr.type) {
+            if (_pathTypes[0] === curr.type || _pathTypes[0] === curr.pseudoType) {
                 _pathTypes.shift(); //if the curr path item is the first element of the _pathTypes we remove it from _path
             }
             return _pathTypes;
@@ -217,14 +230,14 @@ class DependencyFinder {
 
     emitPaths() {
         const emitted = [];
-        const steps = this.currentSteps.flat();
-        const last = _.last(this.currentSteps);
-        if (last.length > 0 && last.every(s => s.emit)) {
-            if (last[0].value === "$") { //corresponding to '$$' variable
+        const steps = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
+        const lastStepsArray = _.last(this.currentSteps);
+        if (lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit)) {
+            if (lastStepsArray[0].value === "$") { //corresponding to '$$' variable
                 //in this case the chain of steps must be broken as '$$' is an absolute reference to root document
-                last.forEach(s => emitted.push(s.value));
+                lastStepsArray.forEach(s => emitted.push(s.value));
             } else {
-                steps.forEach(s => emitted.push(s.value));
+                steps.forEach(s => s.emit && emitted.push(s.value));
             }
         }
         this.currentSteps.pop();

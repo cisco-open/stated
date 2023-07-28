@@ -140,7 +140,7 @@ class TemplateProcessor {
                 }
             }
             if (metaInfo.expr__ !== undefined) {
-                const depFinder = new DependencyFinder(metaInfo.expr__, metaInfo);
+                const depFinder = new DependencyFinder(metaInfo.expr__);
                 metaInfo.compiledExpr__  = depFinder.compiledExpression;
                 metaInfo.dependencies__ = depFinder.findDependencies(); //TemplateProcessor.getAncestors(depFinder.findDependencies()); //FIXME TODO
             }
