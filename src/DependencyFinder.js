@@ -149,7 +149,7 @@ class DependencyFinder {
 
 
     hasParent(parentType) {
-        return _.last(this.nodeStack).type === parentType;
+        return this.nodeStack.length !==0  &&  _.last(this.nodeStack).type === parentType;
     }
 
     hasAncestor(matcher) {

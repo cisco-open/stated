@@ -39,6 +39,9 @@ class Stated {
     getOneShotFilePath() {
         // Assuming the file path argument is passed as the first command line argument
         if (process.argv.length > 2) {
+            if(process.argv.includes("--runInBand")){
+                console.log(JSON.stringify(process.argv));
+            }
             return process.argv[2];
         }
         return null;
@@ -123,9 +126,13 @@ class Stated {
 }
 
 module.exports = Stated;
-(async () => {
-    const stated = new Stated();
-    await stated.initialize();
-})();
+//if we run states.js directly from the command line, it has no parent, and it means we want to
+//fire it up. This allows us to import it in other places to get the stringify method without triggering this
+if (!module.parent) {
+    (async () => {
+        const stated = new Stated();
+        await stated.initialize();
+    })();
+}
 
 

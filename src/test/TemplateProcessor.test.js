@@ -13,6 +13,7 @@
 // limitations under the License.
 const TemplateProcessor = require('../TemplateProcessor');
 const _ = require('lodash');
+const largeResources = require('./large');
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -610,7 +611,7 @@ test("big data block 3", async () => {
                     }
                 }
             },
-            "foo":{
+            "foo": {
                 "a": {
                     "b": {
                         "c": {
@@ -729,11 +730,11 @@ test("import 1", async () => {
 });
 
 test("context", async () => {
-    const nozzle = (something)=>"nozzle got some "+something;
-    const context = {"nozzle":nozzle, "ZOINK":"ZOINK"}
+    const nozzle = (something) => "nozzle got some " + something;
+    const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}
     const tp = new TemplateProcessor({
-          "a": "${$nozzle($ZOINK)}"
-        }, context);
+        "a": "${$nozzle($ZOINK)}"
+    }, context);
     await tp.initialize();
     expect(tp.output).toEqual(
         {
@@ -751,10 +752,60 @@ test("pass function as parameter", async () => {
         "increment": "${ function($f) { ($set('/a', a+$f()); a) } }",
     });
     await tp.initialize();
-    await tp.output.increment.apply(this, [()=>{
+    await tp.output.increment.apply(this, [() => {
         return 3;
     }]);
     expect(tp.output.a).toEqual(45);
+});
+
+test("chuck data", async () => {
+
+    const tp = new TemplateProcessor({
+        "props": {
+            "token": "ws0d-2rkn-23kl-klwej"
+        },
+        "view": [
+            [
+                "div",
+                {},
+                "/${ data.chuck.data.value }"
+            ]
+        ]
+    });
+    await tp.initialize();
+    await tp.setData("/data", {
+        chuck: {
+            data: {
+                value: "are you serious?!"
+            }
+        }
+    });
+    expect(tp.output.view[0][2]).toEqual("are you serious?!");
+});
+
+const chuck = {
+    "props": {
+        "token": "ws0d-2rkn-23kl-klwej"
+    },
+    "view": [
+        [
+            "div",
+            {},
+            "${ data.chuck.data.value }"
+        ]
+    ]
+}
+test("large resources", async () => {
+    const tp = new TemplateProcessor(largeResources);
+    await tp.initialize();
+    expect(tp.output.metrics[0].resources).toEqual(largeResources.resources[0]);
+});
+test("string in context", async () => {
+    let template = {"Aela": "${$title}"};
+    let context = {"title": "The Huntress"};
+    const tp = new TemplateProcessor(template, context);
+    await tp.initialize();
+    expect(tp.output).toStrictEqual({"Aela": "The Huntress"})
 });
 
 /*

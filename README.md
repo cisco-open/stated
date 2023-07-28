@@ -1045,7 +1045,6 @@ In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "
     "JOSHUA"
   ]
 }
-
 ```
 
 ## Why Do We Need stated?
