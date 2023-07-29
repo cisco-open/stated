@@ -35,7 +35,7 @@ class TemplateProcessor {
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
-        this.errors = [];
+        this.warnings = [];
         this.metaInfoByJsonPointer = {};
         this.logger = this.getLogger();
     }
@@ -176,7 +176,7 @@ class TemplateProcessor {
 
     //mutates all the pieces of metaInf that are path parts and turns them into JSON Pointer syntax
     static compileToJsonPointer(meta){
-        meta.absoluteDependencies__ = meta.absoluteDependencies__.map(jp.compile);
+        meta.absoluteDependencies__ = [...new Set(meta.absoluteDependencies__.map(jp.compile))];
         meta.dependencies__ = meta.dependencies__.map(jp.compile);
         meta.parentJsonPointer__ = jp.compile(meta.parentJsonPointer__);
         meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
@@ -241,9 +241,10 @@ class TemplateProcessor {
                 for (const dependency of node.absoluteDependencies__) {
                     if (recursionStack.has(dependency)) {
                         const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ')+ " → "+ dependency;
-                        this.errors.push(e);
+                        this.warnings.push(e);
                         this.logger.log('warn', e);
-                    } else if (!visited.has(dependency)) {
+                    }
+                    if (!visited.has(dependency)) {
                         const dependencyNode = jp.get(templateMeta, dependency);
                         if (dependencyNode.materialized__ === false) { // a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
                             const ancestor = this.searchUpForExpression(dependencyNode);

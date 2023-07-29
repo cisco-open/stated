@@ -1,0 +1,11 @@
+{
+  "story": "${ [partI, 'then', partII]~>$join(' ')}",
+  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "call": "${function($url){$fetch($url) ~> handleRes}}",
+  "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+  "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
+  "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
+  "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+  "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
+  "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+}

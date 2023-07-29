@@ -26,9 +26,6 @@ class DependencyFinder {
     }
 
     findDependencies(node = this.ast) {
-        if(this.isRootLevelFunctionDecalaration(node)){
-            return []; //if the expression is entirely a function declaration, it has no dependencies because nothing is ever allowed to trigger function recomplation
-        }
         if (this.currentSteps.length === 0) {
             this.currentSteps.push([]); //initialize a container for steps
         }

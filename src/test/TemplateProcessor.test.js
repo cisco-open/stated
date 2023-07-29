@@ -690,7 +690,7 @@ test("circular", async () => {
         "c": "${a}"
     });
     await tp.initialize();
-    expect(tp.errors).toEqual(
+    expect(tp.warnings).toEqual(
         ["🔃 Circular dependency  /a → /b → /c → /a"]
     );
 

@@ -461,10 +461,19 @@ test("count.{'cloud.provider': $$.providerName}", () => {
 //this is an interesting one. When the entire expression is a function, it is not something that should ever be
 //evaluated more than once. In other words, if we hace ${ function($a){ $a+42}+$$.x} }  it does not matter if $$.x changes
 //somewhere else in the template. This should not cause us to recompile the function.
-test("top level function should have no dependencies", () => {
+test("top level function", () => {
     const program = "function($a){ $a+42 +$$.x+$.y*$foo}";
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([]);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "x"
+        ],
+        [
+            "",
+            "y"
+        ]
+    ]);
 });
 
 test("data.duration.data[0].expression.[{\"name\": \"Duration\", \"data\": expression}]", () => {
@@ -498,6 +507,16 @@ test("console.log", () => {
 });
 
 
+
+test("chained function", () => {
+    const program = "function($urlArray){$fetch($urlArray~>$join('/')) ~> handleRes}";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+            [
+                "handleRes"
+            ]
+        ]);
+});
 
 
 

@@ -250,6 +250,48 @@ mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
   "threatLevel": 3.5
 }
 ```
+## Reactive Behavior
+Stated is naturally reactive. In the example below, `story` will evaluate when the promises for partI and partI have both
+resolved, simply because `story` has references to `partI` and `partII`, each of which respectively is triggered by the 
+resolution of the two fetch functions they each depend on.
+```bash
+> .init -f "example/ex21.json"
+{
+  "story": "${ [partI, 'then', partII]~>$join(' ')}",
+  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "call": "${function($url){$fetch($url) ~> handleRes}}",
+  "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+  "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
+  "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
+  "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+  "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
+  "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+}
+> .plan
+[
+  "/handleRes",
+  "/call",
+  "/falcon",
+  "/han",
+  "/luke",
+  "/partI",
+  "/xwing",
+  "/partII",
+  "/story"
+]
+> .out
+{
+  "story": "Han Solo piloted the Millennium Falcon then Luke Skywalker piloted the X-wing",
+  "handleRes": "{function:}",
+  "call": "{function:}",
+  "partI": "Han Solo piloted the Millennium Falcon",
+  "luke": "Luke Skywalker",
+  "xwing": "X-wing",
+  "partII": "Luke Skywalker piloted the X-wing",
+  "han": "Han Solo",
+  "falcon": "Millennium Falcon"
+} 
+```
 
 ## YAML
 Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 
