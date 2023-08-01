@@ -322,7 +322,7 @@ falken$ cat ex12.json
 }
 ```
 In YAML the `respHandler` function can be written as a text block, whereas in JSON it must appear on a single line.
-```yaml
+```bash
 falken$ cat ex12.yaml
 url: "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json"
 selectedGame: "${game$.selected}"
@@ -337,7 +337,7 @@ However, once a YAML file is parsed with the JavaScript runtime it becomes a Jav
 object. Hence, in the example below a YAML is the input file, but the REPL displays the resulting Javascript object 
 using JSON syntax. As we can see below, loading the yaml file still results in the function being deisplayed
 as it's parsed in-memory JS representation.
-```json
+```json lines
 > .init -f "example/ex12.yaml"
 {
   "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
@@ -345,7 +345,6 @@ as it's parsed in-memory JS representation.
   "respHandler$": "function($res){\n  $res.ok? $res.json():{'error': $res.status}\n}\n",
   "game$": "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
 }
-
 ```
 ## Setting Values in the stated REPL
 
