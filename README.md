@@ -54,7 +54,7 @@ falken$ stated
 }
 ```
 Stated templates are modular and can be imported from a URL:
-```bash
+```json
 > .init -f "example/ex18.json"
 {
   "noradCommander": "${ norad.commanderDetails  }",
@@ -178,7 +178,7 @@ stated provides a set of REPL commands to interact with the system:
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
 parses the input, builds an execution plan, and executes the result. To see the result you have to use the `.out`
-```bash
+```json
 > .init -f "example/ex09.json"
 {
   "a": [
