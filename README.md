@@ -210,7 +210,7 @@ returning to our `example/hello.json`, the `msg` field is a simple example of a 
 Stated allows JSONata _expressions_ to be embedded in a JSON document using `${<...JSONata here...>}` syntax. The `${}`
 tells stated that a field such as `msg` is not an ordinary string field, but rather a JSONata expression that has to be 
 evaluated in order to _compute_ the value of the field.
-```bash
+```json
 falken$ cat example/hello.json
 {
 "to": "world",
@@ -239,7 +239,7 @@ of the input like `MAX_DEFCON` and `threataLevel`. All 'ordinary' fields of the 
 after the initial output has been computed. As shown below after viewing the output with the `.out` commnand, we 
 mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
 
-```bash
+```json
 > .init -f "example/ex20.json"
 {
   "defcon$": "($tmp:=$floor(intelLevel * threatLevel);$tmp:= $tmp<=MAX_DEFCON?$tmp:MAX_DEFCON;$tmp>=MIN_DEFCON?$tmp:MIN_DEFCON)",
@@ -269,7 +269,7 @@ mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
 Stated is naturally reactive. In the example below, `story` will evaluate when the promises for `partI` and `partII` have both
 resolved, simply because `story` has references to `partI` and `partII`, each of which respectively is triggered by the 
 resolution of the two fetch functions they each depend on.
-```bash
+```json
 > .init -f "example/ex21.json"
 {
   "story": "${ [partI, 'then', partII]~>$join(' ')}",
@@ -312,7 +312,7 @@ resolution of the two fetch functions they each depend on.
 Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 
 support text blocks with line returns in a way that is readable. For instance if we compare ex12.json and ex12.yaml, 
 which is more readable?
-```bash
+```json
 falken$ cat ex12.json
 {
   "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
@@ -322,7 +322,7 @@ falken$ cat ex12.json
 }
 ```
 In YAML the `respHandler` function can be written as a text block, whereas in JSON it must appear on a single line.
-```bash
+```yaml
 falken$ cat ex12.yaml
 url: "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json"
 selectedGame: "${game$.selected}"
@@ -337,7 +337,7 @@ However, once a YAML file is parsed with the JavaScript runtime it becomes a Jav
 object. Hence, in the example below a YAML is the input file, but the REPL displays the resulting Javascript object 
 using JSON syntax. As we can see below, loading the yaml file still results in the function being deisplayed
 as it's parsed in-memory JS representation.
-```bash
+```json
 > .init -f "example/ex12.yaml"
 {
   "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
@@ -352,7 +352,7 @@ as it's parsed in-memory JS representation.
 The stated REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
 In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
 
-```bash
+```json
 > .init -f "example/ex09.json"
 {
   "a": [
@@ -383,7 +383,7 @@ at the absolute doc root with `/${<expr>}`. The example below shows how expressi
 explicitly set their input using the rooting syntax. Both absolute rooting, `/${...}` and relative rooting `../${...}`
 are shown.
 
-```bash
+```json
 > .init -f "example/ex04.json"
 {
   "greeting": "Hello",
@@ -428,7 +428,7 @@ stated helps you track and debug transitive dependencies in your templates. You 
 ``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
 you the order in which changes propagate.
 
-```bash
+```json
 > .init -f "example/ex01.json"
 {
 "a": 42,
@@ -462,7 +462,7 @@ you the order in which changes propagate.
 The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
 when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is
 evaluated twice.
-```bash
+```json
 > .init -f "example/ex08.json"
 {
   "a": "${c}",
@@ -491,7 +491,7 @@ evaluated twice.
 
 ## Complex Data Processing
 The example below uses JSONata `$zip` function to combine related data.
-```bash
+```json
 > .init -f "example/ex03.json"
 {
   "data": {
@@ -534,7 +534,7 @@ The example below uses the `$sum` function to compute a `costs` of each product,
 again uses `$sum` to sum over the individual product costs to get the `totalCost`. In a round-about fashion each
 individual product pulls in its cost from the costs array.
 
-```bash
+```json
 > .init -f "example/ex10.json"
 {
   "totalCost": "${$sum(costs)}",
@@ -601,7 +601,7 @@ individual product pulls in its cost from the costs array.
 ```
 Here is a different approach in which cost of each product is computed locally
 then rolled up to the totalCost. Note the difference in the execution `plan` between the example above and this example.
-```bash
+```json
 > .init -f "example/ex11.json"
 {
   "totalCost": "${ $sum(products.cost) }",
@@ -664,7 +664,7 @@ then rolled up to the totalCost. Note the difference in the execution `plan` bet
 ## Functions
 stated let's you define and call functions.
 ### Simple Function Example
-```bash
+```json
 > .init -f "example/ex05.json"
 {
   "hello": "${ (function($to){'hello ' & $to & '. How about a nice game of ' & $$.game})}",
@@ -687,7 +687,7 @@ This example fetches JSON over the network and uses the JSONata transform operat
 [Here is the JSON file](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json) that it downloads and operates on.
 You can see why DAG and evaluation order matter. selectedGame does not exist until the game field has been populated by 
 fetch.
-```bash
+```json
 > .init -f "example/ex12.json"
 {
   "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
@@ -715,7 +715,7 @@ fetch.
 }
 ```
 ### Import
-```bash
+```json
 > .note "let's take a simple template..."
 "============================================================="
 > .init -f "example/ex17.json"
@@ -887,7 +887,7 @@ using the expression ``/${fibonacci}``. The first element of the array contains 
 it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which 
 will pull in the `fibonacci` function and `$[1]` is the middle element of the array, holding the static value `6`. 
 So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, which is what `fibonacci(6)` returns. 
-```bash
+```json
 > .init -f "example/ex06.json"
 {
   "x": [
@@ -909,7 +909,7 @@ So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, 
 
 ```
 Let's take a more complex example where we generate MySQL instances:
-```bash 
+```json 
 > .init -f "example/mysql.json"
 {
   "name": "mysql",
@@ -1081,7 +1081,7 @@ other parts of the template. The function signature is `$set(jsonPointer, value)
 set command returns an array of JSON Pointers that represent the transitive updates that resulted from calling `set`.
 In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "JOSHUA" onto the `systems` array.
 
-```bash
+```json
 > .init -f "example/ex13.json"
 {
   "systems": [
