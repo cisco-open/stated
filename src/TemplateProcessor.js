@@ -15,7 +15,7 @@
 const jsonata = require('jsonata');
 const jp = require('json-pointer');
 const _ = require('lodash');
-const metaInfoProducer = require('./MetaInfoProducer');
+const getMetaInfos = require('./MetaInfoProducer');
 const DependencyFinder=require('./DependencyFinder');
 const winston = require('winston');
 
@@ -122,8 +122,11 @@ class TemplateProcessor {
     }
 
     async createMetaInfos(template, rootJsonPtr=[]) {
+        /*
         const metaInfProcessor = jsonata(metaInfoProducer);
         let metaInfos = await metaInfProcessor.evaluate(template, {"console":console});
+         */
+        let metaInfos = await getMetaInfos(template);
 
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates

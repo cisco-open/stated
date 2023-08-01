@@ -1,68 +1,73 @@
-// Copyright 2023 Cisco Systems, Inc.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// You may obtain a copy of the License at
-//
-//      http://www.apache.org/licenses/LICENSE-2.0
-//
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-
-const EMBEDDED_EXPR_REGEX = //used to test a string and see if it is of form ${<JSONata>}, that is to say a jsonata program inside dollars-moustache
+// Individual elements of the regex with comments
+const EMBEDDED_EXPR_REGEX_STR = //used to test a string and see if it is of form ${<JSONata>}, that is to say a jsonata program inside dollars-moustache
     '\\s*' +              // Match optional whitespace
     '((\\/)|((\\.\\.\\/)*))' + // Match a forward slash '/' or '../' to represent relative paths
     '\\$\\{' +            // Match the literal characters '${'
     '([\\s\\S]+)' +       // Match one or more of any character. This is the JSONata expression/program (including newline, to accommodate multiline JSONata).\s\S is a little trick for capturing everything inclusing newline
     '\\}' +               // Match the literal character '}'
     '\\s*$';              // Match optional whitespace
-module.exports = `
-(   $setInfo := function($acc, $metaInfo, $flags){(
-        $acc~>|$|{
-                    "metaInfos":metaInfos~>$append($metaInfo~>|$|{"treeHasExpressions__":$flags.treeHasExpressions__}|),
-                    "flags":flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|
-                }|;   
-    )};
-    $getPaths := function($o, $acc, $path){
-     (                              
-                $type($o)="array"
-                ?(  $flags := $acc.flags;   /*save flags before recurse into subtree*/
-                    $acc := $acc~>|flags|{"treeHasExpressions__":false}|; /*init to false upon descending)*/
-                    $acc := $o~>$reduce(function($acc, $v, $idx){
-                        $getPaths($v, $acc, $append($path, $idx))
-                    }, $acc);
-                    $flags:=$flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|;
-                    $setInfo($acc, { "materialized__": true, "jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
-                )
-                :$type($o)="object"
-                    ?(  $flags := $acc.flags; 
-                        $acc := $acc~>|flags|{"treeHasExpressions__":false}|; /*init to false upon descending)*/
-                        $acc := $spread($o)?$spread($o)~>$reduce(function($acc, $kv){
-                            (
-                                $k := $keys($kv)[0];
-                                $v := $lookup($kv, $k);
-                                $nextPath := $append($path, $k);
-                                $getPaths($v, $acc, $nextPath)
-                            )
-                        }, $acc):$acc;
-                        $flags:=$flags~>|$|{"treeHasExpressions__":($acc.flags.treeHasExpressions__ or $flags.treeHasExpressions__)}|;
-                        $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},$flags);
-                    )
-    
-                    :(
-                        $match := /${EMBEDDED_EXPR_REGEX}/($o); /* */
-                        $keyEndsWithDollars := $type($path[-1])='string'?$path[-1]~>$contains(/\\$/):null; /* let's allow keys that end with '$' to tell us it's an expression in addition to dollars moustache */
-                        $leadingSlash := $match[0].groups[1];
-                        $leadingCdUp := $match[0].groups[2];
-                        $slashOrCdUp := $leadingSlash ? $leadingSlash : $leadingCdUp;
-                        $expr := $keyEndsWithDollars?$o:$match[0].groups[4];                         
-                        $match or $keyEndsWithDollars
-                                ? $setInfo($acc, { "materialized__": true,"exprRootPath__":$slashOrCdUp, "expr__": $expr, "jsonPointer__": $path, "dependees__": [], "dependencies__": []}, {"treeHasExpressions__":true})
-                                : $setInfo($acc, { "materialized__": true,"jsonPointer__": $path, "dependees__": [], "dependencies__": []},{"treeHasExpressions__":false})
-                    )
-      ) }; 
-    $getPaths($, {"metaInfos":[],"flags":{"treeHasExpressions__":false}}, []).metaInfos; 
-)`;
+
+
+
+// Create the regex using the RegExp constructor
+const EMBEDDED_EXPR_REGEX = new RegExp(EMBEDDED_EXPR_REGEX_STR);
+async function getMetaInfos(template) {
+
+    const stack = [];
+    const emit = [];
+    async function getPaths(o, path=[]) {
+        const type = typeof o;
+        const metaInfo = {
+            "materialized__": true,
+            "jsonPointer__": path,
+            "dependees__": [],
+            "dependencies__": [],
+            treeHasExpressions__: false  };
+        stack.push(metaInfo);
+        if (Array.isArray(o)) {
+            for (let idx = 0; idx < o.length; idx++) {
+                const nextPath = path.concat(idx);
+                await getPaths(o[idx], nextPath);
+            }
+        } else if (type === 'object') {
+            for (const key in o) {
+                const v = o[key];
+                const nextPath = path.concat(key);
+                await getPaths(v, nextPath);
+            }
+        } else {
+            const match = EMBEDDED_EXPR_REGEX.exec(o);
+            const keyEndsWithDollars = typeof path[path.length - 1] === 'string' ? path[path.length - 1].endsWith('$') : null;
+            const leadingSlash = match ? match[1] : null;
+            const leadingCdUp = match ? match[2] : null;
+            const slashOrCdUp = leadingSlash || leadingCdUp;
+            const expr = keyEndsWithDollars ? o : (match ? match[5] : null);
+            const hasExpression = match || keyEndsWithDollars;
+
+            if (hasExpression) {
+                stack[stack.length-1]={
+                    ...metaInfo,
+                    "materialized__": true,
+                    "exprRootPath__": slashOrCdUp,
+                    "expr__": expr,
+                    "jsonPointer__": path
+                };
+                //the stack now holds the path from root of object graph to this node. If this node has an expression,
+                //then every node up to the root we set treeHasExpressions=true
+                stack.forEach(metaInfo=>metaInfo.treeHasExpressions__=true);
+            }
+        }
+        emit.push(stack.pop());
+    }
+
+    await getPaths(template);
+    return emit;
+    /*
+    // Prune subtrees with treeHasExpressions__ = false
+    const prunedMetaInfos = fullResult.metaInfos.filter(info => info.treeHasExpressions__);
+
+    return prunedMetaInfos;
+
+     */
+}
+module.exports = getMetaInfos;

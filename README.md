@@ -251,7 +251,7 @@ mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
 }
 ```
 ## Reactive Behavior
-Stated is naturally reactive. In the example below, `story` will evaluate when the promises for partI and partI have both
+Stated is naturally reactive. In the example below, `story` will evaluate when the promises for `partI` and `partII` have both
 resolved, simply because `story` has references to `partI` and `partII`, each of which respectively is triggered by the 
 resolution of the two fetch functions they each depend on.
 ```bash
