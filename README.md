@@ -91,10 +91,25 @@ Stated templates are modular and can be imported from a URL:
 }
 ```
 
+## Why Do We Need stated?
+
+JSONata assumes a single input document and provides a powerful complete language for manipulating that input and
+producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. stated
+provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
+is supported.
+
+For small examples it may not seem obvious why stated goes to the trouble of computing a DAG and optimizing expression
+evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data
+(such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
+with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
+was one of the motivating use cases for stated: performance critical data rendering applications.
+
+
 Applications for stated include
-* dynamic/continuous UI state
+* dynamic/continuous reactive UI state
 * config file templating
 * lambda-like computations
+* nonblocking, dependency ordered, workflow-like computations
 
 ## Getting Started
 
@@ -1088,17 +1103,3 @@ In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "
   ]
 }
 ```
-
-## Why Do We Need stated?
-
-JSONata assumes a single input document and provides a powerful complete language for manipulating that input and 
-producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. stated 
-provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
-is supported. 
-
-For small examples it may not seem obvious why stated goes to the trouble of computing a DAG and optimizing expression
-evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data 
-(such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
-with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
-was one of the motivating use cases for stated: performance critical data rendering applications.
-
