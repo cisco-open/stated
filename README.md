@@ -324,6 +324,8 @@ falken$ cat ex12.json
 In YAML the `respHandler` function can be written as a text block, whereas in JSON it must appear on a single line.
 ```bash
 falken$ cat ex12.yaml
+```
+```yaml
 url: "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json"
 selectedGame: "${game$.selected}"
 respHandler$: |
