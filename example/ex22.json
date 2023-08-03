@@ -2,7 +2,7 @@
   "story": "${ [partI, 'then', partII]~>$join(' ')}",
   "handleRes": "${ function($res){$res.ok? $res.json():res.status?{'status': $res.status}:$res} }",
   "call": "${ function($url){$fetch($url) ~> handleRes ~> toStr} }",
-  "toStr": "${ function($_){$_.error?'UNKNOWN':$_.results?$_.results[0].name:$_} }",
+  "toStr": "${ function($_){$_.error?'UNKNOWN':$_.results[0].name} }",
   "partI": "${ [han, 'piloted the', falcon]~> $join(' ')}",
   "luke": "${ call('https://*****BROKEN-ON-PURPOSE-TO-SHOW-ERROR-HANDLING*****/api/people/?search=luke')}",
   "xwing": "${ call('https://swapi.dev/api/starships/?search=x')}",
