@@ -783,18 +783,6 @@ test("chuck data", async () => {
     expect(tp.output.view[0][2]).toEqual("are you serious?!");
 });
 
-const chuck = {
-    "props": {
-        "token": "ws0d-2rkn-23kl-klwej"
-    },
-    "view": [
-        [
-            "div",
-            {},
-            "${ data.chuck.data.value }"
-        ]
-    ]
-}
 test("large resources", async () => {
     const tp = new TemplateProcessor(largeResources);
     await tp.initialize();
@@ -806,6 +794,24 @@ test("string in context", async () => {
     const tp = new TemplateProcessor(template, context);
     await tp.initialize();
     expect(tp.output).toStrictEqual({"Aela": "The Huntress"})
+});
+
+test("annotations", async () => {
+    const o = {
+        "a":42,
+        "b":"@DEV ${'if we are developing, then ' & a}",
+        "c":"${a}", //no @DEV tag so this won't execute,
+        "d":"  @DING    ${b}"
+    };
+    const tp = new TemplateProcessor(o);
+    tp.annotations = ["DEV", "DING"]
+    await tp.initialize();
+    expect(o).toEqual({
+        "a": 42,
+        "b": "if we are developing, then 42",
+        "c": "${a}",
+        "d": "if we are developing, then 42"
+    });
 });
 
 /*

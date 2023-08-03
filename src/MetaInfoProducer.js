@@ -1,6 +1,7 @@
 // Individual elements of the regex with comments
 const EMBEDDED_EXPR_REGEX_STR = //used to test a string and see if it is of form ${<JSONata>}, that is to say a jsonata program inside dollars-moustache
     '\\s*' +              // Match optional whitespace
+    '(@(\\w+))?\\s*' +       // Math the 'annotation' like @DEV or @TPC on an expression
     '((\\/)|((\\.\\.\\/)*))' + // Match a forward slash '/' or '../' to represent relative paths
     '\\$\\{' +            // Match the literal characters '${'
     '([\\s\\S]+)' +       // Match one or more of any character. This is the JSONata expression/program (including newline, to accommodate multiline JSONata).\s\S is a little trick for capturing everything inclusing newline
@@ -38,10 +39,11 @@ async function getMetaInfos(template) {
         } else {
             const match = EMBEDDED_EXPR_REGEX.exec(o);
             const keyEndsWithDollars = typeof path[path.length - 1] === 'string' ? path[path.length - 1].endsWith('$') : null;
-            const leadingSlash = match ? match[1] : null;
-            const leadingCdUp = match ? match[2] : null;
+            const annotation = match ? match[2] : null;
+            const leadingSlash = match ? match[3] : null;
+            const leadingCdUp = match ? match[4] : null;
             const slashOrCdUp = leadingSlash || leadingCdUp;
-            const expr = keyEndsWithDollars ? o : (match ? match[5] : null);
+            const expr = keyEndsWithDollars ? o : (match ? match[7] : null);
             const hasExpression = match || keyEndsWithDollars;
 
             if (hasExpression) {
@@ -50,8 +52,11 @@ async function getMetaInfos(template) {
                     "materialized__": true,
                     "exprRootPath__": slashOrCdUp,
                     "expr__": expr,
-                    "jsonPointer__": path
+                    "jsonPointer__": path,
                 };
+                if(annotation !== undefined){
+                    stack[stack.length-1].annotation__ = annotation;
+                }
                 //the stack now holds the path from root of object graph to this node. If this node has an expression,
                 //then every node up to the root we set treeHasExpressions=true
                 stack.forEach(metaInfo=>metaInfo.treeHasExpressions__=true);

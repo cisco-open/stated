@@ -142,7 +142,7 @@ test("t2", async () => {
 
 test("t3", async () => {
     const template = {
-        "x": "${  k.z~>|$|{'band':true}|}",
+        "x": " @INSTALL ${  k.z~>|$|{'band':true}|}",
         "a": 10,
         "b": 10,
         "c": "${$$.a*b}",
@@ -174,6 +174,7 @@ test("t3", async () => {
     const metaInfos = await getMetaInfos(template);
     expect(metaInfos).toEqual([
         {
+            "annotation__": "INSTALL",
             "dependees__": [],
             "dependencies__": [],
             "expr__": "  k.z~>|$|{'band':true}|",

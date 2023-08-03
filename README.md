@@ -273,7 +273,7 @@ resolution of the two fetch functions they each depend on.
 > .init -f "example/ex21.json"
 {
   "story": "${ [partI, 'then', partII]~>$join(' ')}",
-  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "handleRes": "${ function($res){$res.ok? $res.json():res.status?{'status': $res.status}:$res} }",
   "call": "${function($url){$fetch($url) ~> handleRes}}",
   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",

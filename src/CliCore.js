@@ -15,6 +15,7 @@ const fs = require('fs');
 const path = require('path');
 const TemplateProcessor = require('./TemplateProcessor');
 const yaml = require('js-yaml');
+const minimist = require('minimist');
 
 class CliCore {
     constructor() {
@@ -22,8 +23,9 @@ class CliCore {
         this.logLevel = "info";
     }
     //oneShot is used when we don't want a REPL session and we just render the output
-    async oneShot(filePath) {
+    async oneShot(argv) {
         try {
+            const {_:filepath, annotations } = minimist(argv.slice(2));
             const fileContent = await fs.promises.readFile(filePath, 'utf8');
             //get the file extension and kill off any non word chars including quotes that may have surrounded it
             const fileExtension = path.extname(filePath).toLowerCase().replace(/\W/g, '');
@@ -34,6 +36,7 @@ class CliCore {
                 input = JSON.parse(fileContent); // Parse JSON file
             }
             this.templateProcessor = new TemplateProcessor(input);
+            this.templateProcessor.annotations = JSON.parse(annotations);
             this.templateProcessor.logger.level = this.logLevel;
             await this.templateProcessor.initialize();
             return this.templateProcessor.output;

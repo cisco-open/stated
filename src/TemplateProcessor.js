@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const jsonata = require('jsonata');
 const jp = require('json-pointer');
 const _ = require('lodash');
 const getMetaInfos = require('./MetaInfoProducer');
@@ -38,6 +37,7 @@ class TemplateProcessor {
         this.warnings = [];
         this.metaInfoByJsonPointer = {};
         this.logger = this.getLogger();
+        this.annotations = [];
     }
 
     getLogger() {
@@ -356,8 +356,9 @@ class TemplateProcessor {
     async _evaluateExpression(jsonPtr){
         const {templateMeta, output} = this;
         let data;
-        const { expr__} = jp.get(templateMeta, jsonPtr);
-        if (expr__ !== undefined) {
+        const { expr__, annotation__} = jp.get(templateMeta, jsonPtr);
+        //where the expression has an annotation we only execute it if the annotation__ is in the list we should run
+        if (expr__ !== undefined && (this.annotations.length === 0 || this.annotations.length > 0 && this.annotations.includes(annotation__))) {
             data = await this._evaluateExprNode(jsonPtr);
         } else {
             try {
@@ -403,17 +404,22 @@ class TemplateProcessor {
 
     async _evaluateExprNode(jsonPtr){
         let evaluated;
+        const { compiledExpr__, callback__ , parentJsonPointer__, jsonPointer__} = jp.get(this.templateMeta, jsonPtr);
         try {
-            const { compiledExpr__, callback__ , parentJsonPointer__, jsonPointer__} = jp.get(this.templateMeta, jsonPtr);
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
             evaluated = await compiledExpr__.evaluate(
                 target,
                 _.merge(this.context, {"import":this.getImport(jsonPointer__)}));
-            this._setData(jsonPtr, evaluated, callback__);
         } catch (error) {
-            this.logger.log('error', `Error evaluating expression at ${jsonPtr}`);
+            this.logger.error(`Error evaluating expression at ${jsonPtr}`);
+            this.logger.error(error);
+            evaluated = JSON.stringify({
+                errorName: error.name,
+                errorMessage: error.message,
+            });
         }
-        return evaluated; //can be undefined if error evaluating expression
+        this._setData(jsonPtr, evaluated, callback__);
+        return evaluated;
     }
 
     _setData(jsonPtr, data, callback){
