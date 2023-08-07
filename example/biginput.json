@@ -1,0 +1,4 @@
+{
+  "a": "${ input.foo.bar + input.zap.ding}",
+  "b": "${a - input.zoink}"
+}

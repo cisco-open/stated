@@ -275,9 +275,10 @@ class TemplateProcessor {
             }
         }
         const listDependencies = (node) => {
-            visited.add(node.jsonPointer__);
-            recursionStack.add(node.jsonPointer__);
-
+            if(node.jsonPointer__) {
+                visited.add(node.jsonPointer__);
+                recursionStack.add(node.jsonPointer__);
+            }
             if (node.absoluteDependencies__) {
                 for (const dependency of node.absoluteDependencies__) {
                     if (recursionStack.has(dependency)) {
@@ -291,7 +292,7 @@ class TemplateProcessor {
                             const ancestor = this.searchUpForExpression(dependencyNode);
                             //if (ancestor && !visited.has(ancestor.jsonPointer__)) {
                             if (ancestor) {
-                                //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular depedencies as it would in ex10
+                                //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular dependencies as it would in ex10
                                 listDependencies(ancestor, exprsOnly);
                             }
                         } else {
@@ -306,12 +307,14 @@ class TemplateProcessor {
             // the topological order to see all the nodes that are dependencies of a particular target node, which
             // is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
             // literals that don't have expressions
-            if (!exprsOnly || (exprsOnly && node.expr__)) {
+            if (node.jsonPointer__ && (!exprsOnly || (exprsOnly && node.expr__))) {
                 orderedJsonPointers.add(node.jsonPointer__);
             }
             processNode(node);
 
-            recursionStack.delete(node.jsonPointer__); // Clean up after finishing with this node
+            if(node.jsonPointer__){
+                recursionStack.delete(node.jsonPointer__);
+            } // Clean up after finishing with this node
         }
 
         if (!(nodes instanceof Set || Array.isArray(nodes))) {
@@ -351,7 +354,7 @@ class TemplateProcessor {
                 }
                 firstMeta.didUpdate__ = await this.evaluateNode(first, data); // Evaluate the node provided with the data provided
                 if (!firstMeta.didUpdate__) {
-                    this.logger.log('info', `data did not change for ${first}, short circuiting dependents.`);
+                    this.logger.verbose(`data did not change for ${first}, short circuiting dependents.`);
                     return false;
                 }
             }
@@ -476,7 +479,7 @@ class TemplateProcessor {
             callback && callback(data, jsonPtr);
             return true;
         } else {
-            this.logger.log('info', `data to be set at ${jsonPtr} did not change, ignored. `);
+            this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
             return false;
         }
 
@@ -583,7 +586,7 @@ class TemplateProcessor {
                 return ancestorNode;
             }
         }
-        this.logger.log("info", `No parent or ancestor of '${childNode.jsonPointer__}'`);
+        //this.logger.info(`No parent or ancestor of '${childNode.jsonPointer__}'`);
         return undefined;
 
     }
