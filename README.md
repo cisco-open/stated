@@ -233,10 +233,12 @@ elements like this, where there is no field name. For array elements the `${}` m
 [1, 2, "${$[0]+$[1]}"]
 ```
 ### References
-In the example below, a JSONata [_block_](https://docs.jsonata.org/programming) is used to produce `defcon$`. It 
+The most important thing stated does is analyze your embedded jsonata programs to understand their _references_. This 
+means that as the user you don't have to _tell_ stated what an expression depends on, and 
+consequently you don't have to instruct Stated on how it should react to changes. It _knows_. In the example below, a JSONata [_block_](https://docs.jsonata.org/programming) is used to produce `defcon$`. It 
 defines local variables like `$tmp` which are pure JSONata constructs. The JSONata program also references fields 
-of the input like `MAX_DEFCON` and `threataLevel`. All 'ordinary' fields of the object such as these can be mutated
-after the initial output has been computed. As shown below after viewing the output with the `.out` commnand, we 
+of the input like `MAX_DEFCON` and `threatLevel`. States understands that if `threatLevel changes`, 
+`defcon$` must be recalculated.  As shown below after viewing the output with the `.out` commnand, we 
 mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
 
 ```json
@@ -265,6 +267,74 @@ mutate the `threatLevel` field which results in `defcon$` changing from 3 to 5.
   "threatLevel": 3.5
 }
 ```
+### Tags
+JSONata "dollars moustache" expressions can be _tagged_ with `@tag` syntax. In the example below our template
+declares tags WAR and PEACE. Expressions with a tag will only be executed when the corresponding tag is
+provided in the `--tags` flag. When tags are provided with `--tags` untagged expressions will be ignored. 
+Tags such as `@WAR` and `@PEACE` are automatically propagated transitively to all dependent expressions. 
+Therefore, in the example below only `peace` requires the `@PEACE` tag, which is transitively applies to 
+`peaceMsg` and `warAndPeaceMsg`. In large templates this is extrememly desirable to as it alleviates the 
+developer of having to maintain the tag by continually checking that any expressions that depend on a tagged 
+expression are also tagged.
+```json
+> .init -f "example/ex23.json"
+{
+  "peace": "@PEACE ${'DEFCON 1'}",
+  "war": "@WAR ${'DEFCON 5'}",
+  "warMsg": "${'war is ' & war}",
+  "peaceMsg": "${'Peace is ' & peace}",
+  "warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+  "untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
+> .out
+{
+  "peace": "@PEACE ${'DEFCON 1'}",
+  "war": "@WAR ${'DEFCON 5'}",
+  "warMsg": "${'war is ' & war}",
+  "peaceMsg": "${'Peace is ' & peace}",
+  "warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+  "untaggedExpr": "A strange game. The only winning move is not to play."
+}
+> .init -f "example/ex23.json" --tags=PEACE
+{
+  "peace": "@PEACE ${'DEFCON 1'}",
+  "war": "@WAR ${'DEFCON 5'}",
+  "warMsg": "${'war is ' & war}",
+  "peaceMsg": "${'Peace is ' & peace}",
+  "warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+  "untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
+> .out
+{
+  "peace": "DEFCON 1",
+  "war": "@WAR ${'DEFCON 5'}",
+  "warMsg": "${'war is ' & war}",
+  "peaceMsg": "Peace is DEFCON 1",
+  "warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+  "untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
+> .init -f "example/ex23.json" --tags=PEACE,WAR
+{
+"peace": "@PEACE ${'DEFCON 1'}",
+"war": "@WAR ${'DEFCON 5'}",
+"warMsg": "${'war is ' & war}",
+"peaceMsg": "${'Peace is ' & peace}",
+"warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+"untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
+> .out
+{
+"peace": "DEFCON 1",
+"war": "DEFCON 5",
+"warMsg": "war is DEFCON 5",
+"peaceMsg": "Peace is DEFCON 1",
+"warAndPeaceMsg": "war is DEFCON 5 Peace is DEFCON 1",
+"untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
+
+```
+
+
 ## Reactive Behavior
 Stated is naturally reactive. In the example below, `story` will evaluate when the promises for `partI` and `partII` have both
 resolved, simply because `story` has references to `partI` and `partII`, each of which respectively is triggered by the 

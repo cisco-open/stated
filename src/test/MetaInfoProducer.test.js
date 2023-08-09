@@ -1,4 +1,5 @@
 const getMetaInfos = require('../MetaInfoProducer');
+const Stated  = require("../../stated");
 
 
 test("tt1", async () => {
@@ -8,7 +9,7 @@ test("tt1", async () => {
         "c": "${'the answer is: '& b}"
     };
     const metaInfos = await getMetaInfos(template);
-    expect(metaInfos).toEqual([
+    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -16,26 +17,31 @@ test("tt1", async () => {
                 "a"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "a",
             "jsonPointer__": [
                 "b"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "'the answer is: '& b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -43,6 +49,7 @@ test("tt1", async () => {
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         }
     ]);
@@ -60,7 +67,7 @@ test("t2", async () => {
         }
     };
     const metaInfos = await getMetaInfos(template);
-    expect(metaInfos).toEqual([
+    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -68,6 +75,7 @@ test("t2", async () => {
                 "a"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -77,26 +85,31 @@ test("t2", async () => {
                 "b"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "$$.a*b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "c-a-b",
             "jsonPointer__": [
                 "d"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -107,17 +120,20 @@ test("t2", async () => {
                 "f"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "e.f",
             "jsonPointer__": [
                 "e",
                 "g"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -127,6 +143,7 @@ test("t2", async () => {
                 "e"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -134,6 +151,7 @@ test("t2", async () => {
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         }
     ]);
@@ -172,16 +190,19 @@ test("t3", async () => {
         "l": "${j}"
     };
     const metaInfos = await getMetaInfos(template);
-    expect(metaInfos).toEqual([
+    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
         {
-            "annotation__": "INSTALL",
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "  k.z~>|$|{'band':true}|",
             "jsonPointer__": [
                 "x"
             ],
             "materialized__": true,
+            "tags__": [
+                "INSTALL"
+            ],
             "treeHasExpressions__": true
         },
         {
@@ -191,6 +212,7 @@ test("t3", async () => {
                 "a"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -200,26 +222,31 @@ test("t3", async () => {
                 "b"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "$$.a*b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "c-a-b",
             "jsonPointer__": [
                 "d"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -230,6 +257,7 @@ test("t3", async () => {
                 "f"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -242,6 +270,7 @@ test("t3", async () => {
                 "g"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -251,16 +280,19 @@ test("t3", async () => {
                 "e"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "i",
             "jsonPointer__": [
                 "h"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -270,6 +302,7 @@ test("t3", async () => {
                 "i"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -282,6 +315,7 @@ test("t3", async () => {
                 0
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -294,6 +328,7 @@ test("t3", async () => {
                 1
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -307,6 +342,7 @@ test("t3", async () => {
                 0
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -320,6 +356,7 @@ test("t3", async () => {
                 1
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -330,6 +367,7 @@ test("t3", async () => {
                 2
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -340,6 +378,7 @@ test("t3", async () => {
                 3
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -350,6 +389,7 @@ test("t3", async () => {
                 4
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -359,6 +399,7 @@ test("t3", async () => {
                 "j"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -370,6 +411,7 @@ test("t3", async () => {
                 "zz"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
@@ -380,17 +422,20 @@ test("t3", async () => {
                 "z"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": false
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "$.z.zz",
             "jsonPointer__": [
                 "k",
                 "q"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -400,16 +445,19 @@ test("t3", async () => {
                 "k"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
             "dependees__": [],
             "dependencies__": [],
+            "exprRootPath__": null,
             "expr__": "j",
             "jsonPointer__": [
                 "l"
             ],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         },
         {
@@ -417,6 +465,7 @@ test("t3", async () => {
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "tags__": [],
             "treeHasExpressions__": true
         }
     ]);

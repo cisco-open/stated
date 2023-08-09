@@ -22,26 +22,18 @@ class Stated {
     }
 
     async initialize() {
-        const filePath = this.getOneShotFilePath();
-        if (filePath) {
-            const result = await this.cliCore.oneShot(filePath);
-            console.log(Stated.stringify(result));
-            return;
+        const cmdLineArgsStr = process.argv.slice(2).join(" ");
+        const {oneshot} = CliCore.parseArgs(cmdLineArgsStr)
+        const resp = await this.cliCore.init(cmdLineArgsStr)
+        if(oneshot){
+            console.log(resp);
+            return; //do not start REPL. We produced oneshot output, now bail
         }
-
-        // Otherwise, we crank up the interactive REPL
+        //crank up the interactive REPL
         this.r = repl.start({
             prompt: '> ',
         });
         this.registerCommands();
-    }
-
-    getOneShotFilePath() {
-        // Assuming the file path argument is passed as the first command line argument
-        if (process.argv.length > 2) {
-            return process.argv[2];
-        }
-        return null;
     }
 
     registerCommands() {
@@ -111,8 +103,10 @@ class Stated {
             if (_idleTimeout !== undefined && _onTimeout !== undefined) {
                 return "--interval/timeout--";
             }
+            if(value instanceof Set){
+                return Array.from(value);
+            }
         }
-
         return value;
     }
 

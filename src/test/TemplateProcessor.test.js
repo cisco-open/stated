@@ -804,7 +804,7 @@ test("annotations", async () => {
         "d":"  @DING    ${b}"
     };
     const tp = new TemplateProcessor(o);
-    tp.annotations = ["DEV", "DING"]
+    tp.tagSet.add("DEV").add("DING");
     await tp.initialize();
     expect(o).toEqual({
         "a": 42,

@@ -16,57 +16,60 @@ const path = require('path');
 const TemplateProcessor = require('./TemplateProcessor');
 const yaml = require('js-yaml');
 const minimist = require('minimist');
+const stringArgv = require('string-argv');
 
 class CliCore {
     constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";
     }
-    //oneShot is used when we don't want a REPL session and we just render the output
-    async oneShot(argv) {
-        try {
-            const {_:filepath, annotations } = minimist(argv.slice(2));
-            const fileContent = await fs.promises.readFile(filePath, 'utf8');
-            //get the file extension and kill off any non word chars including quotes that may have surrounded it
-            const fileExtension = path.extname(filePath).toLowerCase().replace(/\W/g, '');
-            let input;
-            if (fileExtension === 'yaml' || fileExtension === 'yml') {
-                input = yaml.load(fileContent); // Parse YAML file
-            } else {
-                input = JSON.parse(fileContent); // Parse JSON file
-            }
-            this.templateProcessor = new TemplateProcessor(input);
-            this.templateProcessor.annotations = JSON.parse(annotations);
-            this.templateProcessor.logger.level = this.logLevel;
-            await this.templateProcessor.initialize();
-            return this.templateProcessor.output;
-        } catch (error) {
-            console.error(error);
+
+    static parseArgs(replCmdInputStr){
+        const args = stringArgv.parseArgsStringToArgv(replCmdInputStr);
+        const parsed = minimist(args);
+        let {_:bareArgs ,f:filepath, tags = "", o:oneshot} = parsed;
+        if(tags === true){ //weird case of --tags with no arguments
+            tags = "";
         }
+        if(tags===""){
+            tags=[];
+        }else {
+            tags = tags.split(',').map(s => s.trim()); //tags are provided as JSON array
+        }
+
+        filepath = filepath?filepath:bareArgs[0];
+        oneshot = oneshot===true?oneshot:bareArgs.length > 0;
+        return {filepath, tags, oneshot};
     }
-    async init(args) {
-        const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
-        const [flag, templateOrFilePath] = options;
+    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"]
+    async init(replCmdInputStr) {
+        const parsed = CliCore.parseArgs(replCmdInputStr);
+        const {filepath, tags,oneshot} = parsed;
         let input;
 
-        if (flag === '-f') {
-            const fileContent = await fs.promises.readFile(templateOrFilePath.slice(1, -1), 'utf8');
-            //get the file extension and kill off any non word chars including quotes that may have surrounded it
-            const fileExtension = path.extname(templateOrFilePath).toLowerCase().replace(/\W/g, '');
+        if(filepath===undefined){
+            return undefined;
+        }
+        const fileContent = await fs.promises.readFile(filepath, 'utf8');
+        //get the file extension and kill off any non word chars including quotes that may have surrounded it
+        const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
 
-            if (fileExtension === 'yaml' || fileExtension === 'yml') {
-                input = yaml.load(fileContent); // Parse YAML file
-            } else {
-                input = JSON.parse(fileContent); // Parse JSON file
-            }
+        if (fileExtension === 'yaml' || fileExtension === 'yml') {
+            input = yaml.load(fileContent); // Parse YAML file
         } else {
-            input = JSON.parse(templateOrFilePath); // Parse JSON template
+            input = JSON.parse(fileContent); // Parse JSON file
         }
 
         this.templateProcessor = new TemplateProcessor(input);
+        tags.forEach(a=>this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;
+        this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
         await this.templateProcessor.initialize();
-        return this.templateProcessor.input;
+        if(oneshot === true){
+            return this.templateProcessor.output;
+        }else{
+            return this.templateProcessor.input; //in REPL mode we show the input when a template is loaded
+        }
     }
 
     async set(args) {

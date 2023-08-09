@@ -1,0 +1,9 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist/my-game",
+    "target": "es5"
+  },
+  "include": [
+    "my-game/**/*.ts"
+  ]
+}

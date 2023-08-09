@@ -39,7 +39,7 @@ class TemplateProcessor {
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
         this.warnings = [];
         this.metaInfoByJsonPointer = {};
-        this.annotations = [];
+        this.tagSet = new Set();
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
@@ -88,6 +88,8 @@ class TemplateProcessor {
     }
 
     async initialize(template = this.input, jsonPtr = "/") {
+        this.logger.verbose("initializing...");
+        this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
         this.executionPlans = {}; //clear execution plans
         let parsedJsonPtr = jp.parse(jsonPtr);
         parsedJsonPtr = _.isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
@@ -96,6 +98,7 @@ class TemplateProcessor {
         this.sortMetaInfos(metaInfos);
         this.populateTemplateMeta(metaInfos);
         this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+        this.propagateTags(metaInfos);
         await this.evaluate(jsonPtr);
     }
 
@@ -226,10 +229,12 @@ class TemplateProcessor {
                         "jsonPointer__": ptr,
                         "dependees__": [],
                         "dependencies__": [],
-                        "absoluteDependencies__": []
+                        "absoluteDependencies__": [],
+                        "tags__": new Set()
                     });
                 }
-                jp.get(this.templateMeta, ptr).dependees__?.push(i.jsonPointer__);
+                const meta = jp.get(this.templateMeta, ptr);
+                meta.dependees__?.push(i.jsonPointer__);
             });
         });
     }
@@ -258,29 +263,54 @@ class TemplateProcessor {
         return dependencies__;
     }
 
-    topologicalSort(nodes, exprsOnly = true) {
+    propagateTags(metaInfos) {
+        // Set of visited nodes to avoid infinite loops
+        const visited = new Set();
+
+        // Recursive function for DFS
+        const dfs = (node)=> {
+            if (visited.has(node.jsonPointer__)) return;
+            visited.add(node.jsonPointer__);
+            // Iterate through the node's dependencies
+            node.absoluteDependencies__.forEach(jsonPtr => {
+                const dependency = jp.get(this.templateMeta, jsonPtr);
+                // Recurse on the dependency first to ensure we collect all its tags
+                dfs(dependency);
+                // Propagate tags from the dependency to the node
+                dependency.tags__.forEach(tag => node.tags__.add(tag));
+            });
+        }
+
+        // Start DFS from all nodes in metaInfos
+        metaInfos.forEach(node => dfs(node));
+    }
+
+
+    topologicalSort(metaInfos, exprsOnly = true) {
         const visited = new Set();
         const recursionStack = new Set(); //for circular dependency detection
         const orderedJsonPointers = new Set();
         const templateMeta = this.templateMeta;
 
-        const processNode = (node) => {
-            for (const childKey in node) {
+        //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
+        //template. Fields that don't end in "__" are children of the given object in the template
+        const processNode = (metaInfoNode) => {
+            for (const childKey in metaInfoNode) {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
-                    const child = node[childKey];
+                    const child = metaInfoNode[childKey];
                     if (!visited.has(child.jsonPointer__)) {
                         listDependencies(child, exprsOnly);
                     }
                 }
             }
         }
-        const listDependencies = (node) => {
-            if(node.jsonPointer__) {
-                visited.add(node.jsonPointer__);
-                recursionStack.add(node.jsonPointer__);
+        const listDependencies = (metaInfo) => {
+            if(metaInfo.jsonPointer__) {
+                visited.add(metaInfo.jsonPointer__);
+                recursionStack.add(metaInfo.jsonPointer__);
             }
-            if (node.absoluteDependencies__) {
-                for (const dependency of node.absoluteDependencies__) {
+            if (metaInfo.absoluteDependencies__) {
+                for (const dependency of metaInfo.absoluteDependencies__) {
                     if (recursionStack.has(dependency)) {
                         const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ') + " → " + dependency;
                         this.warnings.push(e);
@@ -307,21 +337,21 @@ class TemplateProcessor {
             // the topological order to see all the nodes that are dependencies of a particular target node, which
             // is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
             // literals that don't have expressions
-            if (node.jsonPointer__ && (!exprsOnly || (exprsOnly && node.expr__))) {
-                orderedJsonPointers.add(node.jsonPointer__);
+            if (metaInfo.jsonPointer__ && (!exprsOnly || (exprsOnly && metaInfo.expr__))) {
+                orderedJsonPointers.add(metaInfo.jsonPointer__);
             }
-            processNode(node);
+            processNode(metaInfo);
 
-            if(node.jsonPointer__){
-                recursionStack.delete(node.jsonPointer__);
+            if(metaInfo.jsonPointer__){
+                recursionStack.delete(metaInfo.jsonPointer__);
             } // Clean up after finishing with this node
         }
 
-        if (!(nodes instanceof Set || Array.isArray(nodes))) {
-            nodes = [nodes];
+        if (!(metaInfos instanceof Set || Array.isArray(metaInfos))) {
+            metaInfos = [metaInfos];
         }
         // Perform topological sort
-        nodes.forEach(node => {
+        metaInfos.forEach(node => {
             if (!visited.has(node.jsonPointer__)) {
                 listDependencies(node, exprsOnly);
             }
@@ -364,7 +394,8 @@ class TemplateProcessor {
                 const didUpdate = await this.evaluateNode(jsonPtr);
                 jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
             } catch (e) {
-                this.logger.log('error', `An error occurred while evaluating dependencies for ${jsonPtr}`);
+                this.logger.error(`An error occurred while evaluating dependencies for ${jsonPtr}`);
+                this.logger.error(e);
             }
         }
         first && jsonPtrList.unshift(first);
@@ -396,10 +427,16 @@ class TemplateProcessor {
     async _evaluateExpression(jsonPtr) {
         const {templateMeta, output} = this;
         let data;
-        const {expr__, annotation__} = jp.get(templateMeta, jsonPtr);
-        //where the expression has an annotation we only execute it if the annotation__ is in the list we should run
-        if (expr__ !== undefined && (this.annotations.length === 0 || this.annotations.length > 0 && this.annotations.includes(annotation__))) {
-            data = await this._evaluateExprNode(jsonPtr);
+        const {expr__, tags__} = jp.get(templateMeta, jsonPtr);
+        //where the expression has an tag we only execute it if the tags__ is in the list we should run
+        if (expr__ !== undefined) {
+            if(this.allTagsPresent(tags__)){
+                data = await this._evaluateExprNode(jsonPtr); //run the jsonata expression
+            }else{
+                this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${Array.from(tags__)}) were set with --tags`);
+                return false;
+            }
+
         } else {
             try {
                 data = jp.get(output, jsonPtr);
@@ -444,7 +481,8 @@ class TemplateProcessor {
 
     async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__} = jp.get(this.templateMeta, jsonPtr);
+        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, tags__} = jp.get(this.templateMeta, jsonPtr);
+
         try {
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
             evaluated = await compiledExpr__.evaluate(
@@ -463,6 +501,13 @@ class TemplateProcessor {
         }
         this._setData(jsonPtr, evaluated, callback__);
         return evaluated;
+    }
+
+    allTagsPresent(tagSetOnTheExpression) {
+        if(tagSetOnTheExpression.size === 0 && this.tagSet.size > 0){
+            return false;
+        }
+        return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
     }
 
     _setData(jsonPtr, data, callback) {

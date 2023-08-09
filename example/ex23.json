@@ -1,0 +1,8 @@
+{
+  "peace": "@PEACE ${'DEFCON 1'}",
+  "war": "@WAR ${'DEFCON 5'}",
+  "warMsg": "${'war is ' & war}",
+  "peaceMsg": "${'Peace is ' & peace}",
+  "warAndPeaceMsg": "${ [warMsg,peaceMsg]~>$join(' ') }",
+  "untaggedExpr": "${'A strange game. The only winning move is not to play.'}"
+}
