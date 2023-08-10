@@ -134,7 +134,9 @@ console.log(JSON.stringify(myMonster)); // Output: 'MyMonster'
     const iterations = 100000;
     let out;
     for(let i = 0; i < iterations; i++) {
-         out = await expr.evaluate(myMonster);
+        const monsterObject = Monster.getRootAsMonster(new flatbuffers.ByteBuffer(builder.asUint8Array()));
+        const myMonster = MonsterFacade(monsterObject);
+        out = await expr.evaluate(myMonster);
     }
 
     const endTime = Date.now();
