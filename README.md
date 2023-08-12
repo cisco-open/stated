@@ -786,6 +786,8 @@ fetch.
 }
 ```
 ### Import
+The sequence below explains by example that the $import function which is used to fetch and initialize
+remote templates (or local literal templates) into the current template
 ```json
 > .note "let's take a simple template..."
 "============================================================="
@@ -952,6 +954,44 @@ fetch.
   }
 }
 ```
+### Importing bits of other templates
+Suppose you just want to import a function defined in another template. The `$import` function understands
+URL fragments with JSON Pointers. In this example we use a URL with a fragment to import just a function
+from a remote template. Note that the URL ends in `#/resourceMapperFn`
+```json
+> .init -f "example/resourceMapperB.json"
+{
+  "input": {
+    "foo": 42,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperAFn": "${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/resourceMapperA.json#/resourceMapperFn')}",
+  "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
+  "BEntities": "${ (resourceMapperBFn(input))}",
+  "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
+}
+> .out
+{
+  "input": {
+    "foo": 42,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperAFn": "{function:}",
+  "resourceMapperBFn": "{function:}",
+  "BEntities": [],
+  "entities": [
+    {
+      "Type": "A",
+      "id": 42,
+      "bar": "something"
+    }
+  ]
+}
+
+
+```
 ### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
@@ -977,7 +1017,6 @@ So `$[2]($[1])` expands to `fibonacci(6)`. The value 6th fibonacci number is 8, 
   ],
   "fibonacci": "{function:}"
 }
-
 ```
 Let's take a more complex example where we generate MySQL instances:
 ```json 

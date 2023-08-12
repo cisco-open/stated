@@ -1,10 +1,10 @@
 {
   "input": {
-    "foo": 20,
+    "foo": 42,
     "bar": "something",
     "zap": "zing"
   },
-  "resourceMapperAFn":"${$import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/resourceMapperA.json#/resourceMapperFn')}",
+  "resourceMapperAFn":"${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/resourceMapperA.json#/resourceMapperFn')}",
   "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
   "BEntities": "${ (resourceMapperBFn(input))}",
   "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
