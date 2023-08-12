@@ -1,0 +1,9 @@
+{
+  "input": {
+    "foo": 42,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperFn":"${ function($in){$in.foo>=30 and $in.zap='zing'?[{'Type': 'A', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
+  "entities": "${ resourceMapperFn(input)}"
+}

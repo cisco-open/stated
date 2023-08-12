@@ -22,7 +22,7 @@ class TemplateProcessor {
 
     constructor(template, context = {}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
-        this.import = this.import.bind(this);
+        this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = this.getLogger();
         const safe = this.withErrorHandling.bind(this);
         this.context = _.merge(context, {
@@ -64,9 +64,11 @@ class TemplateProcessor {
             } catch (error) {
                 this.logger.error(error);
                 return {
-                    message: error.message,
-                    name: error.name,
-                    stack: error.stack,
+                    "error": {
+                        message: error.message,
+                        name: error.name,
+                        stack: error.stack,
+                    }
                 };
             }
         };
@@ -131,29 +133,74 @@ class TemplateProcessor {
         return t;
     }
 
-    import(template, jsonPtrImportPath) {
-        return this.getImport(undefined)(template, jsonPtrImportPath);
+    async import(template, jsonPtrImportPath) {
+        jp.set(this.output, jsonPtrImportPath, template);
+        await this.initialize(template, jsonPtrImportPath);
     }
 
     static NOOP = Symbol('NOOP');
 
-    getImport(defaultPath) {
+    getImport(jsonPtrIntoTemplate) { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
-        return async (templateOrUrl, jsonPtrImportPath) => {
-            try {
-                new URL(templateOrUrl);
-                const res = await fetch(templateOrUrl);
-                templateOrUrl = await (res.ok ? res.json() : res.statusText);
-            } catch (_) {
-                //no-op ...it's not a URL...it must be a literal template
+        return async (urlOrObj) => {
+            let resp;
+
+            if (this.isURL(urlOrObj)) {
+                resp = await this.fetchFromURL(urlOrObj);
+                resp = this.extractFragmentIfNeeded(resp, urlOrObj);
+            } else {
+                resp = this.validateAsJSON(urlOrObj);
             }
-            if (!jsonPtrImportPath) {
-                jsonPtrImportPath = defaultPath;
-            }
-            jp.set(this.output, jsonPtrImportPath, templateOrUrl);
-            await this.initialize(templateOrUrl, jsonPtrImportPath);
-            return TemplateProcessor.NOOP; //import returns No-Op because import assigns content to jsonPointer as a side effect
+
+            await this.setContentInTemplate(resp, jsonPtrIntoTemplate);
+            return TemplateProcessor.NOOP;
         }
+    }
+    isURL(input) {
+        try {
+            new URL(input);
+            return true;
+        } catch (e) {
+            return false;
+        }
+    }
+
+    async fetchFromURL(url) {
+        try {
+            const resp = await fetch(url);
+            if (!resp.ok) return resp;
+            return await resp.json();
+        } catch (e) {
+            const msg = `error fetching ${url}`;
+            this.logger.error(e);
+            throw new Error(msg);
+        }
+    }
+
+    extractFragmentIfNeeded(response, url) {
+        const fragment = url.hash && url.hash.substring(1);
+        if (fragment && jp.has(response, fragment)) {
+            return jp.get(response, fragment);
+        } else if (fragment) {
+            throw new Error(`fragment ${fragment} does not exist in JSON received from ${url}`);
+        }
+        return response;
+    }
+
+    validateAsJSON(obj) {
+        try {
+            JSON.stringify(obj);
+            return obj;
+        } catch (e) {
+            const msg = "$import was passed invalid content (neither a URL nor an Object that can be represented as JSON)";
+            this.logger.error(msg);
+            throw e;
+        }
+    }
+
+    async setContentInTemplate(response, jsonPtrIntoTemplate) {
+        jp.set(this.output, jsonPtrIntoTemplate, response);
+        await this.initialize(response, jsonPtrIntoTemplate);
     }
 
     async createMetaInfos(template, rootJsonPtr = []) {
@@ -485,9 +532,10 @@ class TemplateProcessor {
 
         try {
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
+            const safe =  this.withErrorHandling.bind(this);
             evaluated = await compiledExpr__.evaluate(
                 target,
-                _.merge(this.context, {"import": this.getImport(jsonPointer__)}));
+                _.merge(this.context, {"import": safe(this.getImport(jsonPointer__))}));
         } catch (error) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);

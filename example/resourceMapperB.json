@@ -1,0 +1,11 @@
+{
+  "input": {
+    "foo": 20,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperAFn":"${$import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/resourceMapperA.json#/resourceMapperFn')}",
+  "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
+  "BEntities": "${ (resourceMapperBFn(input))}",
+  "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
+}

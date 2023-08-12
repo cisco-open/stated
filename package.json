@@ -32,6 +32,8 @@
     "lodash": "^4.17.21",
     "minimist": "^1.2.8",
     "string-argv": "^0.3.2",
+    "v8-profiler-next": "^1.9.0",
+    "v8-profiler-node8": "^6.4.0",
     "winston": "^3.10.0"
   },
   "devDependencies": {
