@@ -1,6 +1,6 @@
 {
   "name": "stated-js",
-  "version": "0.0.19",
+  "version": "0.0.29",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "stated.js",
