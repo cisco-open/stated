@@ -17,6 +17,7 @@ const _ = require('lodash');
 const getMetaInfos = require('./MetaInfoProducer');
 const DependencyFinder = require('./DependencyFinder');
 const winston = require('winston');
+const yaml = require('js-yaml');
 
 class TemplateProcessor {
 
@@ -170,7 +171,38 @@ class TemplateProcessor {
             this.logger.debug(`fetching ${url}`);
             const resp = await fetch(url);
             if (!resp.ok) return resp;
-            return await resp.json();
+
+            // Determine content type from headers or URL
+            const contentType = resp.headers.get("content-type");
+            let format;
+
+            if (contentType) {
+                if (contentType.includes("application/json")) {
+                    format = 'json';
+                } else if (contentType.includes("text/yaml")) {
+                    format = 'yaml';
+                }
+            } //we can still encounter incorrect conetnt-type like text/plain for json or yaml on various hosting sites like github raw
+            if(!format){
+                // If content-type is not available, check the URL file extension
+                const fileExtension = url.pathname.split('.').pop();
+                if (fileExtension === 'json') {
+                    format = 'json';
+                } else if (fileExtension === 'yaml' || fileExtension === 'yml') {
+                    format = 'yaml';
+                }
+            }
+
+            switch (format) {
+                case 'json':
+                    return await resp.json();
+                case 'yaml':
+                    const text = await resp.text();
+                    return yaml.load(text);
+                default:
+                    throw new Error(`Cannot determine response format for URL: ${url}`);
+            }
+
         } catch (e) {
             const msg = `error fetching ${url}`;
             this.logger.error(e);

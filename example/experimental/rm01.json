@@ -1,0 +1,3 @@
+{
+  "common": "${$import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/rmcommon.yaml')}",
+}
