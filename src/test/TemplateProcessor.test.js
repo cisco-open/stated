@@ -813,7 +813,37 @@ test("annotations", async () => {
         "d": "if we are developing, then 42"
     });
 });
+/*
+test("transitive annotations", async () => {
+    const settings = {
+        "dev":{
+            "a":42,
+            "b":"I am dev"
+        },
+        "prod":{
+            "a": "32",
+            "b": "I am prod"
+        },
+        "sys":"${ $exists($tag('dev'))?dev:prod}"
 
+    }
+    const o = {
+        "a":42,
+        "b": "@NOPE ${'nada'}",
+        "c": "@INSTALL${env.sys}"
+    };
+    const tp = new TemplateProcessor(o, settings);
+    //tp.tagSet.add("INSTALL");
+    tp.tagSet.add("INSTALL");
+    await tp.initialize();
+    expect(o).toEqual({
+        "a": 42,
+        "b": "if we are developing, then 42",
+        "c": "${a}",
+        "d": "if we are developing, then 42"
+    });
+});
+*/
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {
