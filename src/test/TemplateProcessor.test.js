@@ -813,37 +813,42 @@ test("annotations", async () => {
         "d": "if we are developing, then 42"
     });
 });
-/*
-test("transitive annotations", async () => {
-    const settings = {
-        "dev":{
-            "a":42,
-            "b":"I am dev"
-        },
-        "prod":{
-            "a": "32",
-            "b": "I am prod"
-        },
-        "sys":"${ $exists($tag('dev'))?dev:prod}"
 
-    }
-    const o = {
+test("Solution Environment Files", async () => {
+    //define two possible environment configurations
+    const env1 = {
         "a":42,
-        "b": "@NOPE ${'nada'}",
-        "c": "@INSTALL${env.sys}"
+        "msg":"I am env1",
+        "tag": "env1"
     };
-    const tp = new TemplateProcessor(o, settings);
-    //tp.tagSet.add("INSTALL");
+
+    const env2 = {
+        "a":24,
+        "msg":"I am env2",
+        "tag": "env2"
+    };
+    const envs = [env1, env2];
+    //randomly choose one of them
+    const whichEnvToUse = envs[Math.floor(Math.random()*2)];
+
+    const template = {
+        "somethingAtInstallTime": "@INSTALL ${$env.msg}",
+        "somethingDependsOnInstall": "${somethingAtInstallTime &  '...sure' }",
+        "somethingInCodex": "@CODEX ${'hi from codex'}",
+        "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
+    };
+
+    const tp = new TemplateProcessor(template, {env: whichEnvToUse});
     tp.tagSet.add("INSTALL");
     await tp.initialize();
-    expect(o).toEqual({
-        "a": 42,
-        "b": "if we are developing, then 42",
-        "c": "${a}",
-        "d": "if we are developing, then 42"
+    expect(tp.output).toEqual({
+        "somethingAtInstallTime": whichEnvToUse.msg,
+        "somethingDependsOnInstall": whichEnvToUse.msg + '...sure',
+        "somethingInCodex": "@CODEX ${'hi from codex'}", //as expected, this is not evaluated
+        "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}" //as expected this is not evaluated
     });
 });
-*/
+
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {
