@@ -864,7 +864,7 @@ test("remove all DEFAULT_FUNCTIONS", async () => {
     })
 });
 
-test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
+test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
     let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
     TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = ()=>'hello';
     const tp = new TemplateProcessor(template);
