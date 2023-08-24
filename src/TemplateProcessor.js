@@ -21,20 +21,27 @@ const yaml = require('js-yaml');
 
 class TemplateProcessor {
 
+    static DEFAULT_FUNCTIONS = {
+        "fetch": fetch,
+        "setInterval": setInterval,
+        "clearInterval": clearInterval,
+        "setTimeout": setTimeout,
+        "console": console
+    }
+
     constructor(template, context = {}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = this.getLogger();
+        this.context = _.merge(TemplateProcessor.DEFAULT_FUNCTIONS, context);
+        this.context = _.merge(this.context, {"set": this.setData});
         const safe = this.withErrorHandling.bind(this);
-        this.context = _.merge(context, {
-            "set": safe(this.setData),
-            "fetch": safe(fetch),
-            "setInterval": safe(setInterval),
-            "clearInterval": safe(clearInterval),
-            "setTimeout": safe(setTimeout),
-            "console": safe(console)
-        });
-        this.logger = this.getLogger();
+        for (const key in this.context) {
+            if (typeof this.context[key] === 'function') {
+                this.context[key] = safe(this.context[key]);
+            }
+        }
+        this.logger = this.getLogger({});
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta

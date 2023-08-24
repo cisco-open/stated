@@ -849,6 +849,40 @@ test("Solution Environment Files", async () => {
     });
 });
 
+test("remove all DEFAULT_FUNCTIONS", async () => {
+    let template = {"fetchFunctionShouldNotExists": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+    TemplateProcessor.DEFAULT_FUNCTIONS = {};
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.output).toStrictEqual({
+        "fetchFunctionShouldNotExists": {
+            "error": {
+                "message": "Attempted to invoke a non-function",
+                "name" : undefined
+            }
+        }
+    })
+});
+
+test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
+    let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+    TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = ()=>'hello';
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.output).toStrictEqual({
+        "fetchFunctionBecomesHello": "hello"
+    })
+});
+
+test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
+    let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+    const tp = new TemplateProcessor(template, {fetch:()=>"hello"});
+    await tp.initialize();
+    expect(tp.output).toStrictEqual({
+        "fetchFunctionBecomesHello": "hello"
+    })
+});
+
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {
