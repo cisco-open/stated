@@ -1,5 +1,5 @@
 # Helper functions for resource mapping.
-fn: ${$import('https://dl.dropboxusercontent.com/scl/fi/gj9jthk004wnirdfwurfp/resource_mapper_common_functions.yaml?rlkey=krb47hhvs20sut8rmrr579k86&dl=0')}
+fn: ${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/experimental/rmFuncs.yaml')}
 
 #### input of plugin ####
 input:
