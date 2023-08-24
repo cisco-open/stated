@@ -1,0 +1,108 @@
+# Helper functions for resource mapping.
+createEntityFn: |
+  ${ 
+    function($type, $attributes, $tags) {
+      { 
+        'id': $substring($base64encode($join([$type, $string($attributes)])), 0, 24),
+        'type': $type, 'observedAt': $millis(),
+        'attributes': $attributes, 'tags': $tags 
+      }
+    }
+  }
+containsAllFn: |
+  ${ 
+    function($list1, $list2) { 
+      $count($filter($list2, function($v) { $v in $list1})) = $count($list2) 
+    }
+  }
+flattenAttributesFn: |
+  ${
+    function($attributes) { 
+      $map($attributes, function($v, $i, $a) {{$v.key : $v.value.*}}) ~> $merge 
+    }
+  }
+filterAttributesFn: |
+  ${
+    function($attributes, $filterAttr) { 
+      $filter($attributes, function($v) { $v.key in $filterAttr })
+    }
+  }
+getDefaultIfNullFn: |
+  ${ 
+    function($val, $def) { $val ? $val : $def }  
+  }
+mergeObjectsFn: |
+  ${ 
+    function($obj1, $obj2) { 
+      $merge([ getDefaultIfNullFn($obj1, {}), getDefaultIfNullFn($obj2, {}) ])
+    } 
+  }
+createEntityReferencesFn: |
+  ${ 
+    function($entities) { 
+      $append([], [ $map($entities, function($e) {
+          {
+           'id' : $e.id, 
+            'type': $e.type 
+          } 
+        }
+      )])
+    }  
+  }
+createAssociationFn: |
+  ${ 
+    function($from, $to, $type) { 
+      { 
+        'from': $from, 
+        'to': $to, 
+        'observedAt': $millis(), 
+        'type': $type
+      } 
+    }  
+  }
+createScopesFn: |
+  ${
+    function($scopes, $entities) { 
+      $append([], $map($scopes, function($sm) {
+        {
+          'scope': $sm.scope, 
+          'metrics': $map($sm.metrics, function($metric) { 
+            { 
+              'entities': createEntityReferencesFn($entities), 
+              'name': $metric.name 
+            } 
+          }), 
+          'logs': $map($sm.logs, function($log) { 
+            { 
+              'entities': createEntityReferencesFn($entities), 
+              'timeUnixNano': $log.timeUnixNano 
+            }
+          }), 
+          'spans': $map($sm.spans, function($span) { 
+          { 
+            'entities': createEntityReferencesFn($entities), 
+            'spanId': $span.spanId, 
+            'traceId': $span.traceId 
+          } 
+        })} 
+      })) 
+    } 
+  }
+mapResourceFn: |
+  ${
+    function($resourceAttributes, $entityType, $fmmAttributes, $fmmTags, $advancedAttributeMapperFn, $advancedTagMapperFn) { 
+      (
+        $attributes := flattenAttributesFn(filterAttributesFn($resourceAttributes, $fmmAttributes));
+        $attributes := $advancedAttributeMapperFn != null ? $advancedAttributeMapperFn($resourceAttributes, $attributes) : $attributes;
+        $tags := flattenAttributesFn(filterAttributesFn($resourceAttributes, $fmmTags));
+        $tags := $advancedTagMapperFn != null ? $advancedTagMapperFn($resourceAttributes, $tags) : $tags;
+        createEntityFn($entityType,  $attributes, $tags)          
+      )
+    }
+  }
+mapAssociationFn: |
+  ${
+    function($fromType, $toType, $associationType) {
+      $fromType != null and $toType != null ? createAssociationFn($fromType, $toType, $associationType)
+    }
+  }

@@ -51,8 +51,10 @@ class DependencyFinder {
                 case "path": //a.b.c
                     //paths can happen inside paths. a.b[something].[zz] contains paths within paths
                     //so each time the path is broken we push the current paths and reset it.
-                    //this.emitPaths();
-                    this.currentSteps.push([]);
+                    const {pseudoType} = node;
+                    if(pseudoType !== "procedure") { //this means we are entering a function call and we want to collect the function name as part of the path we are currently traversing, not as a new path
+                        this.currentSteps.push([]);
+                    }
                     break;
             }
             //the children above require the special processing above. But then there are all the other
@@ -86,26 +88,46 @@ class DependencyFinder {
 
 
     collectChildren(node) {
-        //any property of node that is not type, value, or position is a child of the node
-        return Object.keys(node).filter(k => !["type", "value", "position", "pseudoType"]
-            .includes(k)).reduce((acc, k) => {
-            const v = node[k];
-            if(v) {
-                if (Array.isArray(v)) {
-                    if(k==="arguments"){
-                        //arguments array needs to get pushed onto nodestack with a pseudotype so we can recognize
-                        //when we are processing arguments later
-                        acc.push({...v, "pseudoType": k});
-                    }else {
-                        acc.push(v);
-                    }
-                } else if (typeof v === 'object' && v !== null) {
-                    acc.push({...v, "pseudoType": k});
-                }
+        function ensureProcedureBeforeArguments(arr) {
+            const procedureIndex = arr.indexOf("procedure");
+            const argumentsIndex = arr.indexOf("arguments");
+
+            // If both strings are in the array and "arguments" comes before "procedure"
+            if (procedureIndex !== -1 && argumentsIndex !== -1 && argumentsIndex < procedureIndex) {
+                // Swap the strings
+                [arr[procedureIndex], arr[argumentsIndex]] = [arr[argumentsIndex], arr[procedureIndex]];
             }
 
-            return acc;
-        }, []);
+            return arr;
+        }
+        function introducePseudoTypes(node, key) {
+            const value = node[key];
+            if (!value) return null;
+
+            if (Array.isArray(value)) {
+                if (key === "arguments") {
+                    return { ...value, "pseudoType": key };
+                }
+                return value;
+            } else if (typeof value === 'object' && value !== null) {
+                return { ...value, "pseudoType": key };
+            }
+            return null;
+        }
+
+        //any property of node that is not type, value, or position is a child of the node
+        const keysToIgnore = ["type", "value", "position", "pseudoType"];
+        const filteredKeys = Object.keys(node).filter(key => !keysToIgnore.includes(key));
+        const orderedKeys = ensureProcedureBeforeArguments(filteredKeys);
+
+        const result = [];
+        for (const key of orderedKeys) {
+            const processedAttribute = introducePseudoTypes(node, key);
+            if (processedAttribute) {
+                result.push(processedAttribute);
+            }
+        }
+        return result;
     }
 
     captureArrayIndexes(node) {
@@ -148,11 +170,13 @@ class DependencyFinder {
             _.last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
-        //...however if it is occurring inside a map function like a.$sum(x,y) then it must be ignored since these
-        //names refer only to the fields x and y of the array we are mapping over
+        /*
         if (!this.isUnderTreeShape(["path", "function"])) {
             _.last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
         }
+
+         */
+        _.last(this.currentSteps).push({type, value, "emit": true});
 
     }
 
@@ -226,6 +250,7 @@ class DependencyFinder {
     }
 
     emitPaths() {
+
         const emitted = [];
         const steps = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
         const lastStepsArray = _.last(this.currentSteps);
@@ -247,6 +272,7 @@ class DependencyFinder {
         if (emitted.length > 0) {
             this.paths.push(emitted);
         }
+
     }
 
     isRootLevelFunctionDecalaration(node){

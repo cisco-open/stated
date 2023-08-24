@@ -211,12 +211,12 @@ class TemplateProcessor {
     }
 
     extractFragmentIfNeeded(response, url) {
-        const fragment = url.hash && url.hash.substring(1);
-        if (fragment && jp.has(response, fragment)) {
-            this.logger.debug(`Extracting fragment at ${fragment}`);
-            return jp.get(response, fragment);
-        } else if (fragment) {
-            throw new Error(`fragment ${fragment} does not exist in JSON received from ${url}`);
+        const jsonPointer = url.hash && url.hash.substring(1);
+        if (jsonPointer && jp.has(response, jsonPointer)) {
+            this.logger.debug(`Extracting fragment at ${jsonPointer}`);
+            return jp.get(response, jsonPointer);
+        } else if (jsonPointer) {
+            throw new Error(`fragment ${jsonPointer} does not exist in JSON received from ${url}`);
         }
         return response;
     }
@@ -236,28 +236,7 @@ class TemplateProcessor {
         jp.set(this.output, jsonPtrIntoTemplate, response);
         await this.initialize(response, jsonPtrIntoTemplate);
     }
-    /*
-    getImport(defaultPath) {
-        //import the template to the location pointed to by jsonPtr
-        return async (templateOrUrl, jsonPtrImportPath) => {
-            try {
-                new URL(templateOrUrl);
-                const res = await fetch(templateOrUrl);
-                templateOrUrl = await (res.ok ? res.json() : res.statusText);
-            } catch (e) {
-                const msg = `error fetching ${templateOrUrl}`;
-                this.logger.error(e);
-                throw(new Error(msg));//no-op ...it's not a URL...it must be a literal template
-            }
-            if (!jsonPtrImportPath) {
-                jsonPtrImportPath = defaultPath;
-            }
-            jp.set(this.output, jsonPtrImportPath, templateOrUrl);
-            await this.initialize(templateOrUrl, jsonPtrImportPath);
-            return TemplateProcessor.NOOP; //import returns No-Op because import assigns content to jsonPointer as a side effect
-        }
-    }
-*/
+
     async createMetaInfos(template, rootJsonPtr = []) {
         /*
         const metaInfProcessor = jsonata(metaInfoProducer);
@@ -280,9 +259,14 @@ class TemplateProcessor {
                 }
             }
             if (metaInfo.expr__ !== undefined) {
-                const depFinder = new DependencyFinder(metaInfo.expr__);
-                metaInfo.compiledExpr__ = depFinder.compiledExpression;
-                metaInfo.dependencies__ = depFinder.findDependencies(); //TemplateProcessor.getAncestors(depFinder.findDependencies()); //FIXME TODO
+                try {
+                    const depFinder = new DependencyFinder(metaInfo.expr__);
+                    metaInfo.compiledExpr__ = depFinder.compiledExpression;
+                    metaInfo.dependencies__ = depFinder.findDependencies(); //TemplateProcessor.getAncestors(depFinder.findDependencies()); //FIXME TODO
+                }catch(e){
+                    this.logger.error(`problem analysing expression at : ${jp.compile(metaInfo.jsonPointer__)}`);
+                    throw(e);
+                }
             }
             return metaInfo;
         }));
@@ -371,15 +355,15 @@ class TemplateProcessor {
 
         // Recursive function for DFS
         const dfs = (node)=> {
-            if (visited.has(node.jsonPointer__)) return;
+            if (node.jsonPointer__==undefined || visited.has(node.jsonPointer__)) return;
             visited.add(node.jsonPointer__);
             // Iterate through the node's dependencies
-            node.absoluteDependencies__.forEach(jsonPtr => {
+            node.absoluteDependencies__?.forEach(jsonPtr => {
                 const dependency = jp.get(this.templateMeta, jsonPtr);
                 // Recurse on the dependency first to ensure we collect all its tags
                 dfs(dependency);
                 // Propagate tags from the dependency to the node
-                dependency.tags__.forEach(tag => node.tags__.add(tag));
+                dependency.tags__?.forEach(tag => node.tags__.add(tag));
             });
         }
 

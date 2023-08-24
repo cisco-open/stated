@@ -354,7 +354,7 @@ test("$[0][1].a", () => {
 test("$[0]($[1])", () => {
     const program = "$[0]($[1])";
     const df = new DependencyFinder(program);
-    expect(df.findDependencies()).toEqual([["", 1], ["", 0]]);
+    expect(df.findDependencies()).toEqual([["", 0],["", 1]]);
 });
 
 //we cannot note products.quantity and products.price cannot be inferred as dependencies. This is because we
@@ -517,6 +517,96 @@ test("chained function", () => {
             ]
         ]);
 });
+
+test("function/procedure name should chain to path dependency", () => {
+    const program = `a.b()`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        ['a','b']
+    ]);
+});
+
+test("function parameter should not chain", () => {
+    const program = `a.b(c)`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "a",
+            "b"
+        ],
+        [
+            "c"
+        ]
+    ]);
+});
+
+test("resourceMapper example", () => {
+    const program = `fn.containsAllFn($$.input.resource.attributes.key, [ 'container.id', 'container.name' ]) ?
+    fn.mapResourceFn($$.resource.attributes, 'infra:container', [ 'container.id', 'container.name' ], [], $$.containerAdvMapFn, null) `;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "fn",
+            "containsAllFn"
+        ],
+        [
+            "$",
+            "input",
+            "resource",
+            "attributes",
+            "key"
+        ],
+        [
+            "fn",
+            "mapResourceFn"
+        ],
+        [
+            "$",
+            "resource",
+            "attributes"
+        ],
+        [
+            "$",
+            "containerAdvMapFn"
+        ]
+    ]);
+});
+
+
+test("$$.($)", () => {
+    const program = `$$.($)`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([]); //no dependencies - we don't count dependency on template itself
+});
+
+test("$$.foo.($)", () => {
+    const program = `$$.foo.($)`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "foo"
+        ]
+    ]);
+});
+
+test("$$.foo.($=$$.a)", () => {
+    const program = `$$.foo.($=$$.a)`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "a"
+        ],
+        [
+            "$",
+            "foo"
+        ]
+    ]);
+});
+
+
+
 
 
 
