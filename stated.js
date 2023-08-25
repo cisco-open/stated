@@ -41,7 +41,7 @@ class Stated {
             ["init", '-f <fname> to Initialize the template'],
             ["set", 'Set data to a JSON pointer path and show the executed output'],
             ["in", 'Show the input template'],
-            ["out", 'Show the executed output'],
+            ["out", '[jsonPointer] Show the executed output'],
             ["state", 'Show the current state of the templateMeta'],
             ["from", 'Show the dependents of a given JSON pointer'],
             ["to", 'Show the dependencies of a given JSON pointer'],

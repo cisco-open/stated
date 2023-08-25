@@ -166,15 +166,16 @@ const stated = require('stated-js');
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command    | Description                                       | Example                      |
-|------------|---------------------------------------------------|------------------------------|
-| `.init`    | Initialize the template from a JSON file.         | `.init -f "example/hello.json"` |
-| `.set`     | Set data to a JSON pointer path.                  | `.set /to "jsonata"`         |
-| `.from`    | Show the dependents of a given JSON pointer.      | `.from /a`                   |
-| `.to`      | Show the dependencies of a given JSON pointer.    | `.to /b`                     |
-| `.in`      | Show the input template.                          | `.in`                        |
-| `.out`     | Show the current state of the template.           | `.out`                       |
-| `.state`   | Show the current state of the template metadata.  | `.state`                     |
+| Command  | Description                                       | Options                          | Example                                        |
+|----------|---------------------------------------------------|----------------------------------|------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.         | `-f <path>` , `--tags=<taglist>` | `.init -f "example/hello.json" --tags=FOO,BAR` |
+| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                  | `.set /to "jsonata"`                           |
+| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                         | `.from /a`                                     |
+| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                         | `.to /b`                                       |
+| `.in`    | Show the input template.                          | `None`                           | `.in`                                          |
+| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                    | `.out` <br>`.out /data/accounts`                   |
+| `.state` | Show the current state of the template metadata.  | `None`                           | `.state`                                       |
+
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
 parses the input, builds an execution plan, and executes the result. To see the result you have to use the `.out`
