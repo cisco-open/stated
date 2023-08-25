@@ -833,6 +833,7 @@ test("Solution Environment Files", async () => {
 
     const template = {
         "somethingAtInstallTime": "@INSTALL ${$env.msg}",
+        "somethingElseAtInstallTime": "${ somethingAtInstallTime & '...somethingElseAtInstallTime'}",
         "somethingDependsOnInstall": "${somethingAtInstallTime &  '...sure' }",
         "somethingInCodex": "@CODEX ${'hi from codex'}",
         "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
@@ -842,10 +843,11 @@ test("Solution Environment Files", async () => {
     tp.tagSet.add("INSTALL");
     await tp.initialize();
     expect(tp.output).toEqual({
-        "somethingAtInstallTime": whichEnvToUse.msg,
-        "somethingDependsOnInstall": whichEnvToUse.msg + '...sure',
-        "somethingInCodex": "@CODEX ${'hi from codex'}", //as expected, this is not evaluated
-        "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}" //as expected this is not evaluated
+        "somethingAtInstallTime": "I am env2",
+        "somethingDependsOnInstall": "I am env2...sure",
+        "somethingElseAtInstallTime": "I am env2...somethingElseAtInstallTime",
+        "somethingInCodex": "@CODEX ${'hi from codex'}",
+        "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
     });
 });
 
