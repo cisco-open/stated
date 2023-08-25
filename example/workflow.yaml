@@ -1,0 +1,32 @@
+serial: |
+  ${
+      function($stepFuncs){
+          $stepFuncs~>$reduce(function($acc, $stepFunc){
+              (
+                $break := $acc.break;
+                $res := $stepFunc();
+                $break ? $acc :$res = 'ok'
+                            ? {'result':$append($acc.result, $res), 'break':false}
+                            : {'break':true, 'result':$acc.result};
+  
+              )
+          },{'break':false, 'result':[]})
+      }
+  }
+
+ok: |
+  ${
+      function(){
+        'ok'
+      }
+  }
+
+fail: |
+  ${
+    function(){
+      'fail'
+    }
+  }
+
+run$: |  #will stop on fail
+  [ok,ok,ok,fail,ok,ok] ~> serial
