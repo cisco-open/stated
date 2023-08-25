@@ -738,6 +738,13 @@ class TemplateProcessor {
         return metaInfos.filter(metaInof => metaInof.absoluteDependencies__.some(dep => dep.startsWith(importPathJsonPtr)));
     }
 
+    out(jsonPointer){
+        if(jp.has(this.output, jsonPointer)){
+            return jp.get(this.output, jsonPointer)
+        };
+        return null;
+    }
+
 }
 
 module.exports = TemplateProcessor;

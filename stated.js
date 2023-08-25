@@ -23,7 +23,7 @@ class Stated {
 
     async initialize() {
         const cmdLineArgsStr = process.argv.slice(2).join(" ");
-        const {oneshot} = CliCore.parseArgs(cmdLineArgsStr)
+        const {oneshot} = CliCore.parseInitArgs(cmdLineArgsStr)
         const resp = await this.cliCore.init(cmdLineArgsStr)
         if(oneshot){
             console.log(resp);

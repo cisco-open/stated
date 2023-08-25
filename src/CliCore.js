@@ -24,9 +24,14 @@ class CliCore {
         this.logLevel = "info";
     }
 
-    static parseArgs(replCmdInputStr){
+    static minimistArgs(replCmdInputStr) {
         const args = stringArgv.parseArgsStringToArgv(replCmdInputStr);
-        const parsed = minimist(args);
+        return minimist(args);
+
+    }
+    static parseInitArgs(replCmdInputStr){
+
+        const parsed = CliCore.minimistArgs(replCmdInputStr);
         let {_:bareArgs ,f:filepath, tags = "", o:oneshot} = parsed;
         if(tags === true){ //weird case of --tags with no arguments
             tags = "";
@@ -43,7 +48,7 @@ class CliCore {
     }
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"]
     async init(replCmdInputStr) {
-        const parsed = CliCore.parseArgs(replCmdInputStr);
+        const parsed = CliCore.parseInitArgs(replCmdInputStr);
         const {filepath, tags,oneshot} = parsed;
         let input;
 
@@ -110,11 +115,19 @@ class CliCore {
         return this.templateProcessor.input;
     }
 
-    out() {
+    out(replCmdInputStr) {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        return this.templateProcessor.output;
+        const parsed = CliCore.minimistArgs(replCmdInputStr)
+        let {_:jsonPointer=""} = parsed;
+        if(Array.isArray(jsonPointer)){
+            jsonPointer = jsonPointer[0];
+            if(jsonPointer===undefined){
+                jsonPointer = "";
+            }
+        }
+        return this.templateProcessor.out(jsonPointer);
     }
 
     state() {
