@@ -32,7 +32,7 @@ class CliCore {
     static parseInitArgs(replCmdInputStr){
 
         const parsed = CliCore.minimistArgs(replCmdInputStr);
-        let {_:bareArgs ,f:filepath, tags = "", o:oneshot} = parsed;
+        let {_:bareArgs ,f:filepath, tags = "", o:oneshot,options="{}"} = parsed;
         if(tags === true){ //weird case of --tags with no arguments
             tags = "";
         }
@@ -41,17 +41,18 @@ class CliCore {
         }else {
             tags = tags.split(',').map(s => s.trim()); //tags are provided as JSON array
         }
+        options = JSON.parse(options);
 
         filepath = filepath?filepath:bareArgs[0];
         oneshot = oneshot===true?oneshot:bareArgs.length > 0;
-        return {filepath, tags, oneshot};
+        const processedArgs = {filepath, tags, oneshot, options};
+        return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"]
     async init(replCmdInputStr) {
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot} = parsed;
+        const {filepath, tags,oneshot, options} = parsed;
         let input;
-
         if(filepath===undefined){
             return undefined;
         }
@@ -65,15 +66,23 @@ class CliCore {
             input = JSON.parse(fileContent); // Parse JSON file
         }
 
-        this.templateProcessor = new TemplateProcessor(input);
+        this.templateProcessor = new TemplateProcessor(input,{},options);
         tags.forEach(a=>this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
-        await this.templateProcessor.initialize();
         if(oneshot === true){
+            await this.templateProcessor.initialize(); //we *want* to throw exceptions caused by strict.refs in oneshot mode
             return this.templateProcessor.output;
         }else{
-            return this.templateProcessor.input; //in REPL mode we show the input when a template is loaded
+            try{
+                await this.templateProcessor.initialize(); //we *want* to throw exceptions caused by strict.refs in oneshot mode
+                return this.templateProcessor.input; //in REPL mode we show the input when a template is loaded
+            }catch(error){
+                return {
+                    name: error.name,
+                    message: error.message
+                }
+            }
         }
     }
 

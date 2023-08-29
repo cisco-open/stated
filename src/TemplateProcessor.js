@@ -322,7 +322,9 @@ class TemplateProcessor {
                     if(this.options.strict?.refs){
                         const msg = `${ptr} does not exist (strict.refs option enabled)`
                         this.logger.error(msg);
-                        throw new Error(msg);
+                        const error = new Error(msg);
+                        error.name = "strict.refs"
+                        throw error;
                     }
                     jp.set(this.templateMeta, ptr, {
                         "materialized__": false,

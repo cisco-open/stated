@@ -166,15 +166,15 @@ const stated = require('stated-js');
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command  | Description                                       | Options                          | Example                                        |
-|----------|---------------------------------------------------|----------------------------------|------------------------------------------------|
-| `.init`  | Initialize the template from a JSON file.         | `-f <path>` , `--tags=<taglist>` | `.init -f "example/hello.json" --tags=FOO,BAR` |
-| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                  | `.set /to "jsonata"`                           |
-| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                         | `.from /a`                                     |
-| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                         | `.to /b`                                       |
-| `.in`    | Show the input template.                          | `None`                           | `.in`                                          |
-| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                    | `.out` <br>`.out /data/accounts`                   |
-| `.state` | Show the current state of the template metadata.  | `None`                           | `.state`                                       |
+| Command  | Description                                       | Options                                                            | Example                                        |
+|----------|---------------------------------------------------|--------------------------------------------------------------------|------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.         | `-f <path>` , `--tags=<taglist>`, `--options={strict:{refs:true}}` | `.init -f "example/hello.json" --tags=FOO,BAR` |
+| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                                                    | `.set /to "jsonata"`                           |
+| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                                                           | `.from /a`                                     |
+| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                                                           | `.to /b`                                       |
+| `.in`    | Show the input template.                          | `None`                                                             | `.in`                                          |
+| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                                                      | `.out` <br>`.out /data/accounts`               |
+| `.state` | Show the current state of the template metadata.  | `None`                                                             | `.state`                                       |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -1213,4 +1213,39 @@ In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "
     "JOSHUA"
   ]
 }
+```
+
+# options
+The cli and REPL both support `--options`. Options are set using a json object
+## strict
+The `strict` option currently supports the `refs` property. Setting `{"strict":{"refs":true}}` will cause templates
+to throw an Exception when references in the template cannot be resolved. Reference checking is only performed against 
+the template itself; it is not performed agains variables that are injected into the execution context by the TemplateProcessor
+library.
+```json
+>  .init -f "example/strictref.json" --options={"strict":{"refs":true}}
+error: /z does not exist (strict.refs option enabled)
+{
+  "name": "strict.refs",
+  "message": "/z does not exist (strict.refs option enabled)"
+}
+```
+Options can also be used in oneshot mode. Note the use of backslashes to escape quotes in the JSON on the CLI
+```shell
+falken$ stated --options={\"strict\":{\"refs\":true}} example/strictref.json
+error: /z does not exist (strict.refs option enabled)
+/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:325
+const error = new Error(msg);
+^
+
+strict.refs: /z does not exist (strict.refs option enabled)
+at /Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:325:39
+at Array.forEach (<anonymous>)
+at /Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:320:39
+at Array.forEach (<anonymous>)
+at TemplateProcessor.setupDependees (/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:319:19)
+at TemplateProcessor.initialize (/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:112:14)
+at async CliCore.init (/Users/ghendrey/proj/jsonataexperiments/src/CliCore.js:74:13)
+at async Stated.initialize (/Users/ghendrey/proj/jsonataexperiments/stated.js:27:22)
+at async /Users/ghendrey/proj/jsonataexperiments/stated.js:125:9
 ```
