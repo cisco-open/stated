@@ -18,6 +18,7 @@ const getMetaInfos = require('./MetaInfoProducer');
 const DependencyFinder = require('./DependencyFinder');
 const winston = require('winston');
 const yaml = require('js-yaml');
+const jsonata = require("jsonata");
 
 class TemplateProcessor {
 
@@ -29,7 +30,7 @@ class TemplateProcessor {
         "console": console
     }
 
-    constructor(template, context = {}) {
+    constructor(template, context = {}, options={}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = this.getLogger();
@@ -48,6 +49,7 @@ class TemplateProcessor {
         this.warnings = [];
         this.metaInfoByJsonPointer = {};
         this.tagSet = new Set();
+        this.options = options;
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
@@ -317,6 +319,11 @@ class TemplateProcessor {
         metaInfos.forEach(i => {
             i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
+                    if(this.options.strict?.refs){
+                        const msg = `${ptr} does not exist (strict.refs option enabled)`
+                        this.logger.error(msg);
+                        throw new Error(msg);
+                    }
                     jp.set(this.templateMeta, ptr, {
                         "materialized__": false,
                         "jsonPointer__": ptr,

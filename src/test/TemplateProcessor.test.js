@@ -829,7 +829,8 @@ test("Solution Environment Files", async () => {
     };
     const envs = [env1, env2];
     //randomly choose one of them
-    const whichEnvToUse = envs[Math.floor(Math.random()*2)];
+    const indexToUse = Math.floor(Math.random()*2);
+    const whichEnvToUse = envs[indexToUse];
 
     const template = {
         "somethingAtInstallTime": "@INSTALL ${$env.msg}",
@@ -842,13 +843,25 @@ test("Solution Environment Files", async () => {
     const tp = new TemplateProcessor(template, {env: whichEnvToUse});
     tp.tagSet.add("INSTALL");
     await tp.initialize();
-    expect(tp.output).toEqual({
-        "somethingAtInstallTime": "I am env2",
-        "somethingDependsOnInstall": "I am env2...sure",
-        "somethingElseAtInstallTime": "I am env2...somethingElseAtInstallTime",
-        "somethingInCodex": "@CODEX ${'hi from codex'}",
-        "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
-    });
+    let expected;
+    if(indexToUse === 0){
+        expected = {
+            "somethingAtInstallTime": "I am env1",
+            "somethingDependsOnInstall": "I am env1...sure",
+            "somethingElseAtInstallTime": "I am env1...somethingElseAtInstallTime",
+            "somethingInCodex": "@CODEX ${'hi from codex'}",
+            "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
+        }
+    }else{
+        expected = {
+            "somethingAtInstallTime": "I am env2",
+            "somethingDependsOnInstall": "I am env2...sure",
+            "somethingElseAtInstallTime": "I am env2...somethingElseAtInstallTime",
+            "somethingInCodex": "@CODEX ${'hi from codex'}",
+            "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
+        }
+    }
+    expect(tp.output).toEqual(expected);
 });
 
 test("remove all DEFAULT_FUNCTIONS", async () => {
@@ -883,6 +896,16 @@ test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
     expect(tp.output).toStrictEqual({
         "fetchFunctionBecomesHello": "hello"
     })
+});
+
+test("strict.refs", async () => {
+    let template = {
+        "a":42,
+        "b":"${a}",
+        "c": "${z}"
+    };
+    const tp = new TemplateProcessor(template, {}, {strict:{refs:true}});
+    await expect(tp.initialize()).rejects.toThrow("/z does not exist (strict.refs option enabled)");
 });
 
 /*
