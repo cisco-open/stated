@@ -12,7 +12,6 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 const StatedWorkflow = require('../StatedWorkflow');
-const _ = require('lodash');
 
 test("test all", async () => {
     const statedWorkflow = new StatedWorkflow({
