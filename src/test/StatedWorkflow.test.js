@@ -16,6 +16,10 @@ const StatedWorkflow = require('../StatedWorkflow');
 test("test all", async () => {
     const statedWorkflow = new StatedWorkflow({
         "startEven": "tada",
+        // a,b,c,d are workflow stages, which include a callable stated expression, and an output object to
+        // store the results of the expression and any errors that occur
+        // it will allow workflow stages to be skipped if they have already been run or stop processing next
+        // stages if the current stage fails.
         "a": {
             "function": "${ function($in) { ( $console.log($in); [$in, 'a'] ~> $join('->') )} }",
             "output": {
