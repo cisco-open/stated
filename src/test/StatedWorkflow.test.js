@@ -14,17 +14,6 @@
 const StatedWorkflow = require('../StatedWorkflow');
 const _ = require('lodash');
 
-test("test serial", async () => {
-    const statedWorkflow = new StatedWorkflow({
-        "a": "${ function() { 'a' } }",
-        "b": "${ function() { 'b' } }",
-        "workflow1": "${ $serial([a,b]) }",
-        // "workflow2": "${ $parallel([a,b]) }"
-    });
-    await statedWorkflow.initialize();
-    expect(statedWorkflow.templateProcessor.output.workflow1).toEqual(['a','b'])
-});
-
 test("test all", async () => {
     const statedWorkflow = new StatedWorkflow({
         "a": "${ function() { 'a' } }",
@@ -32,7 +21,10 @@ test("test all", async () => {
         "workflow1": "${ $serial([a,b]) }",
         "workflow2": "${ $parallel([a,b]) }"
     });
-    statedWorkflow.initialize();
+    await statedWorkflow.initialize();
+    expect(statedWorkflow.templateProcessor.output.workflow1).toEqual(['a','b'])
+    expect(statedWorkflow.templateProcessor.output.workflow2).toContain('a')
+    expect(statedWorkflow.templateProcessor.output.workflow2).toContain('b')
 });
 
 

@@ -43,8 +43,8 @@ class StatedWorkflow {
     }
 
     async parallel(stages) {
-        const promises = stages.map(stage => stage());
-        return Promise.all(promises);
+        const promises = stages.map(stage => stage.apply(this, []));
+        return await Promise.all(promises);
     }
 }
 
