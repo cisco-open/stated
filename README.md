@@ -166,15 +166,15 @@ const stated = require('stated-js');
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command  | Description                                       | Options                                                            | Example                                        |
-|----------|---------------------------------------------------|--------------------------------------------------------------------|------------------------------------------------|
-| `.init`  | Initialize the template from a JSON file.         | `-f <path>` , `--tags=<taglist>`, `--options={strict:{refs:true}}` | `.init -f "example/hello.json" --tags=FOO,BAR` |
-| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                                                    | `.set /to "jsonata"`                           |
-| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                                                           | `.from /a`                                     |
-| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                                                           | `.to /b`                                       |
-| `.in`    | Show the input template.                          | `None`                                                             | `.in`                                          |
-| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                                                      | `.out` <br>`.out /data/accounts`               |
-| `.state` | Show the current state of the template metadata.  | `None`                                                             | `.state`                                       |
+| Command  | Description                                       | Options                                                                                               | Example                                                        |
+|----------|---------------------------------------------------|-------------------------------------------------------------------------------------------------------|----------------------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.         | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=myEnv.json` |
+| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                                                                                       | `.set /to "jsonata"`                                           |
+| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                                                                                              | `.from /a`                                                     |
+| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                                                                                              | `.to /b`                                                       |
+| `.in`    | Show the input template.                          | `None`                                                                                                | `.in`                                                          |
+| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                                                                                         | `.out` <br>`.out /data/accounts`                               |
+| `.state` | Show the current state of the template metadata.  | `None`                                                                                                | `.state`                                                       |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -1223,8 +1223,9 @@ to throw an Exception when references in the template cannot be resolved. Refere
 the template itself; it is not performed agains variables that are injected into the execution context by the TemplateProcessor
 library.
 ```json
->  .init -f "example/strictref.json" --options={"strict":{"refs":true}}
-error: /z does not exist (strict.refs option enabled)
+> .log fatal
+null
+> .init -f "example/strictref.json" --options={"strict":{"refs":true}}
 {
   "name": "strict.refs",
   "message": "/z does not exist (strict.refs option enabled)"
@@ -1248,4 +1249,30 @@ at TemplateProcessor.initialize (/Users/ghendrey/proj/jsonataexperiments/src/Tem
 at async CliCore.init (/Users/ghendrey/proj/jsonataexperiments/src/CliCore.js:74:13)
 at async Stated.initialize (/Users/ghendrey/proj/jsonataexperiments/stated.js:27:22)
 at async /Users/ghendrey/proj/jsonataexperiments/stated.js:125:9
+```
+## Setting the context
+The `--xf` argument can be used to provide a context file. Context is used
+to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expressionevaluateinput-bindings-callback)
+```shell
+> .note here is a regular json file
+"============================================================="
+> .init -f "example/env.json" 
+{
+  "env": {
+    "name": "Dr. Stephen Falken",
+    "addr": "Goose Island, OR, USA"
+  }
+}
+> .note let's use it as context to a stated template
+"============================================================="
+> .init -f "example/useEnv.json" --xf=example/env.json
+{
+  "name": "${$env.name}",
+  "address": "${$env.addr}"
+}
+> .out
+{
+  "name": "Dr. Stephen Falken",
+  "address": "Goose Island, OR, USA"
+}
 ```

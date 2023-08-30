@@ -48,43 +48,49 @@ class CliCore {
         const processedArgs = {filepath, tags, oneshot, options};
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
-    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"]
-    async init(replCmdInputStr) {
-        const parsed = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot, options} = parsed;
-        let input;
-        if(filepath===undefined){
-            return undefined;
-        }
+
+    async readFileAndParse(filepath) {
         const fileContent = await fs.promises.readFile(filepath, 'utf8');
-        //get the file extension and kill off any non word chars including quotes that may have surrounded it
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
-            input = yaml.load(fileContent); // Parse YAML file
+            return yaml.load(fileContent);
         } else {
-            input = JSON.parse(fileContent); // Parse JSON file
+            return JSON.parse(fileContent);
         }
+    }
 
-        this.templateProcessor = new TemplateProcessor(input,{},options);
-        tags.forEach(a=>this.templateProcessor.tagSet.add(a));
+    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
+    async init(replCmdInputStr) {
+        const parsed = CliCore.parseInitArgs(replCmdInputStr);
+        const {filepath, tags,oneshot, options, xf:contextFilePath} = parsed;
+        if(filepath===undefined){
+            return undefined;
+        }
+        const input = await this.readFileAndParse(filepath);
+        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
+
+        this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        tags.forEach(a => this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
-        if(oneshot === true){
-            await this.templateProcessor.initialize(); //we *want* to throw exceptions caused by strict.refs in oneshot mode
+
+        if (oneshot === true) {
+            await this.templateProcessor.initialize();
             return this.templateProcessor.output;
-        }else{
-            try{
-                await this.templateProcessor.initialize(); //we *want* to throw exceptions caused by strict.refs in oneshot mode
-                return this.templateProcessor.input; //in REPL mode we show the input when a template is loaded
-            }catch(error){
+        } else {
+            try {
+                await this.templateProcessor.initialize();
+                return this.templateProcessor.input;
+            } catch (error) {
                 return {
                     name: error.name,
                     message: error.message
-                }
+                };
             }
         }
     }
+
 
     async set(args) {
         const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);

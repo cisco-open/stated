@@ -1,0 +1,4 @@
+{
+  "name": "${$env.name}",
+  "address": "${$env.addr}"
+}
