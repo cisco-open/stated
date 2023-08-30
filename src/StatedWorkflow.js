@@ -36,7 +36,7 @@ class StatedWorkflow {
     async serial(stages) {
         const results = [];
         for (let stage of stages) {
-            const result = await this.templateProcessor.evaluate(stage);
+            const result = await stage.apply(this, []);
             results.push(result);
         }
         return results;
