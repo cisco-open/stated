@@ -13,6 +13,7 @@
 // limitations under the License.
 const TemplateProcessor = require('./TemplateProcessor');
 
+//This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
 
     constructor(template) {
@@ -21,24 +22,54 @@ class StatedWorkflow {
             "parallel": this.parallel.bind(this)
         };
         this.templateProcessor = new TemplateProcessor(template, this.context);
-        this.logLevel = "debug";
+        this.templateProcessor.logLevel = "debug";
     }
 
     async initialize() {
         await this.templateProcessor.initialize();
     }
 
-    async serial(stages) {
-        const results = [];
+    //This function is called by the template processor to execute an array of stages in serial
+    async serial(initialInput, stages) {
+        let results = [];
+        let currentInput = initialInput;
         for (let stage of stages) {
-            const result = await stage.apply(this, []);
+            if (stage.output.results.length > 0 || stage.output.errors.length > 0) {
+                //if we have already run this stage, skip it
+                console.log("Skipping stage " + stage.name)
+                continue;
+            }
+            const result = await stage.function.apply(this, [currentInput]);
+            stage.output.results.push(result);
+            currentInput = result;
             results.push(result);
         }
         return results;
     }
 
-    async parallel(stages) {
-        const promises = stages.map(stage => stage.apply(this, []));
+    //This function is called by the template processor to execute an array of stages in parallel
+    async parallel(initialInput, stages) {
+        let promises = [];
+
+        for (let stage of stages) {
+            if (stage.output.results.length > 0 || stage.output.errors.length > 0) {
+                //if we have already run this stage, skip it
+                continue;
+            }
+
+            const promise = stage.function.apply(this, [initialInput])
+                .then(result => {
+                    stage.output.results.push(result);
+                    return result;
+                })
+                .catch(error => {
+                    stage.output.errors.push(error);
+                    return error;
+                });
+
+            promises.push(promise);
+        }
+
         return await Promise.all(promises);
     }
 }

@@ -15,15 +15,43 @@ const StatedWorkflow = require('../StatedWorkflow');
 
 test("test all", async () => {
     const statedWorkflow = new StatedWorkflow({
-        "a": "${ function() { 'a' } }",
-        "b": "${ function() { 'b' } }",
-        "workflow1": "${ $serial([a,b]) }",
-        "workflow2": "${ $parallel([a,b]) }"
+        "startEven": "tada",
+        "a": {
+            "function": "${ function($in) { ( $console.log($in); [$in, 'a'] ~> $join('->') )} }",
+            "output": {
+                "results": [],
+                "errors": {}
+            }
+        },
+        "b": {
+            "function": "${ function($in) { [$in, 'b'] ~> $join('->') } }",
+            "output": {
+                "results": [],
+                "errors": {}
+            }
+        },
+        "c": {
+            "function": "${ function($in) { ( $console.log($in); [$in, 'c'] ~> $join('->') )} }",
+            "output": {
+                "results": [],
+                "errors": {}
+            }
+        },
+        "d": {
+            "function": "${ function($in) { ( $console.log($in); [$in, 'd'] ~> $join('->') )} }",
+            "output": {
+                "results": [],
+                "errors": {}
+            }
+        },
+        "workflow1": "${ startEven ~> $serial([a, b]) }",
+        "workflow2": "${ startEven ~> $parallel([c,d]) }"
     });
     await statedWorkflow.initialize();
-    expect(statedWorkflow.templateProcessor.output.workflow1).toEqual(['a','b'])
-    expect(statedWorkflow.templateProcessor.output.workflow2).toContain('a')
-    expect(statedWorkflow.templateProcessor.output.workflow2).toContain('b')
+    expect(statedWorkflow.templateProcessor.output.workflow1)
+        .toEqual(['tada->a','tada->a->b']);
+    expect(statedWorkflow.templateProcessor.output.workflow2)
+        .toEqual(expect.arrayContaining(['tada->c', 'tada->d']));
 });
 
 
