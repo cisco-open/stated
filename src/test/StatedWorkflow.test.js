@@ -21,7 +21,8 @@ test("test serial", async () => {
         "workflow1": "${ $serial([a,b]) }",
         // "workflow2": "${ $parallel([a,b]) }"
     });
-    statedWorkflow.initialize();
+    await statedWorkflow.initialize();
+    expect(statedWorkflow.templateProcessor.output.workflow1).toEqual(['a','b'])
 });
 
 test("test all", async () => {
