@@ -11,12 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const fs = require('fs');
-const path = require('path');
 const TemplateProcessor = require('./TemplateProcessor');
-const yaml = require('js-yaml');
-const minimist = require('minimist');
-const stringArgv = require('string-argv');
 
 class StatedWorkflow {
 
