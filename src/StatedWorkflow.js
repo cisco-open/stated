@@ -26,7 +26,7 @@ class StatedWorkflow {
             "parallel": this.parallel.bind(this)
         };
         this.templateProcessor = new TemplateProcessor(template, this.context);
-        this.logLevel = "info";
+        this.logLevel = "debug";
     }
 
     async initialize() {
@@ -36,7 +36,7 @@ class StatedWorkflow {
     async serial(stages) {
         const results = [];
         for (let stage of stages) {
-            const result = await stage();
+            const result = await this.templateProcessor.evaluate(stage);
             results.push(result);
         }
         return results;

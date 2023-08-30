@@ -14,7 +14,17 @@
 const StatedWorkflow = require('../StatedWorkflow');
 const _ = require('lodash');
 
-test("test 1", async () => {
+test("test serial", async () => {
+    const statedWorkflow = new StatedWorkflow({
+        "a": "${ function() { 'a' } }",
+        "b": "${ function() { 'b' } }",
+        "workflow1": "${ $serial([a,b]) }",
+        // "workflow2": "${ $parallel([a,b]) }"
+    });
+    statedWorkflow.initialize();
+});
+
+test("test all", async () => {
     const statedWorkflow = new StatedWorkflow({
         "a": "${ function() { 'a' } }",
         "b": "${ function() { 'b' } }",
