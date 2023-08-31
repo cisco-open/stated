@@ -1,6 +1,6 @@
 start$: $nextCloudEvent(subscribeParams)
-
-subscribeParams:  #parameters for subscribing to a cloud event
+name: fredsWorkflow
+subscribeParams: #parameters for subscribing to a cloud event
   type: sys:cron
   filter$: function($e){ $e.name='nozzleTime' }
   to: myWorkflow$
@@ -20,10 +20,9 @@ step2:
   function: ${function($e){ $e~>|$|{'sprayed':true}|  }}
 log:
   retention:
-    maxRecords: 100
-    maxDuration: 24h
-  nozzleWork: [
-    [
+    maxWorkflowLogs: 100
+  nozzleWork: {
+    nozzleWork-132494877: [
       {
         context: nozzleWork-132494877,
         function: primeTheNozzle,
@@ -35,7 +34,7 @@ log:
         args: [ { name:nozzleTime, primed:false } ]
       }
     ],
-    [
+    nozzleWork-230838937: [
       {
         context: nozzleWork-230838937,
         start: 30-aug-20203 05:22:02.124 PST,
@@ -51,6 +50,6 @@ log:
         args: [ { name:nozzleTime, primed:true } ]
       }
     ]
-  ]
+  }
 
 
