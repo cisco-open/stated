@@ -10,7 +10,7 @@ myWorkflow$: |
   function($e){
       $e ~> $serial(
                     [step1, step2], 
-                    {name:nozzleWork)
+                    {name:nozzleWork})
   }
 step1:
   name: primeTheNozzle
