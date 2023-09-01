@@ -28,8 +28,27 @@ class StatedWorkflow {
         return templateProcessor;
     }
 
+    static logFunctionInvocation(stage, args, result, error = null) {
+        const log = {
+            context: stage.name,
+            function: stage.function.name,
+            start: new Date().toISOString(),
+            args: args
+        };
+        if (error) {
+            log.error = {
+                timestamp: new Date().toISOString(),
+                message: error.message
+            };
+        } else {
+            log.finish = new Date().toISOString();
+            log.out = result;
+        }
+        console.log(JSON.stringify(log));
+    }
+
     static async nextCloudEvent(subscriptionParams) {
-        if (subscriptionParams.data && Array.isArray(subscriptionParams.data)) {
+        if (subscriptionParams.data ) {
             const toFunc = this.templateProcessor.getFunction(subscriptionParams.to);
             for (const eventData of subscriptionParams.data) {
                 // const filtered = this.templateProcessor.execute(subscriptionParams['filter$'], {$e: eventData});
