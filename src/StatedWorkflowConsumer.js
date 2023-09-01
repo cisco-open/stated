@@ -11,39 +11,20 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const TemplateProcessor = require('./TemplateProcessor');
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
-class StatedWorkflow {
+class StatedWorkflowConsumer {
 
-    static async newWorkflow(template) {
-        this.context = {
-            "serial": StatedWorkflow.serial.bind(this),
-            "parallel": StatedWorkflow.parallel.bind(this)
-            "nextCloudEvent": this.nextCloudEvent.bind(this)
-        };
-        const templateProcessor = new TemplateProcessor(template, this.context);
-        templateProcessor.logLevel = "debug";
-        await templateProcessor.initialize();
-        return templateProcessor;
+    constructor(subscriptionParams) {
+        this.subscriptionParams = subscriptionParams;
     }
 
-
-    async nextCloudEvent(subscriptionParams) {
-        if (subscriptionParams.data && Array.isArray(subscriptionParams.data)) {
-            const toFunc = this.templateProcessor.getFunction(subscriptionParams.to);
-            for (const eventData of subscriptionParams.data) {
-                // const filtered = this.templateProcessor.execute(subscriptionParams['filter$'], {$e: eventData});
-                // if (filtered) {
-                //     await toFunc.apply(this, [eventData]);
-                // }
-                await toFunc.apply(this, [eventData]);
-            }
-        }
+    async initialize() {
+        await this.templateProcessor.initialize();
     }
 
     //This function is called by the template processor to execute an array of stages in serial
-    static async serial(initialInput, stages) {
+    async serial(initialInput, stages) {
         let results = [];
         let currentInput = initialInput;
         for (let stage of stages) {
@@ -61,7 +42,7 @@ class StatedWorkflow {
     }
 
     //This function is called by the template processor to execute an array of stages in parallel
-    static async parallel(initialInput, stages) {
+    async parallel(initialInput, stages) {
         let promises = [];
 
         for (let stage of stages) {
@@ -87,5 +68,4 @@ class StatedWorkflow {
     }
 }
 
-module.exports = StatedWorkflow;
-
+module.exports = StatedWorkflowConsumer;
