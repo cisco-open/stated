@@ -14,7 +14,7 @@
 const StatedWorkflow = require('../StatedWorkflow');
 
 test("test all", async () => {
-    const statedWorkflow = new StatedWorkflow({
+    const tp = await StatedWorkflow.newWorkflow({
         "startEven": "tada",
         // a,b,c,d are workflow stages, which include a callable stated expression, and an output object to
         // store the results of the expression and any errors that occur
@@ -51,10 +51,9 @@ test("test all", async () => {
         "workflow1": "${ startEven ~> $serial([a, b]) }",
         "workflow2": "${ startEven ~> $parallel([c,d]) }"
     });
-    await statedWorkflow.initialize();
-    expect(statedWorkflow.templateProcessor.output.workflow1)
+    expect(tp.output.workflow1)
         .toEqual(['tada->a','tada->a->b']);
-    expect(statedWorkflow.templateProcessor.output.workflow2)
+    expect(tp.output.workflow2)
         .toEqual(expect.arrayContaining(['tada->c', 'tada->d']));
 });
 
