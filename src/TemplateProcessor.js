@@ -112,6 +112,7 @@ class TemplateProcessor {
         this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
         this.propagateTags(metaInfos);
         await this.evaluate(jsonPtr);
+        this.removeTemporaryVariables(metaInfos);
     }
 
 
@@ -385,6 +386,14 @@ class TemplateProcessor {
 
         // Start DFS from all nodes in metaInfos
         metaInfos.forEach(node => dfs(node));
+    }
+
+    removeTemporaryVariables(metaInfos){
+        metaInfos.forEach(metaInfo=>{
+            if(metaInfo.temp__){
+                jp.remove(this.output, metaInfo.jsonPointer__);
+            }
+        })
     }
 
 

@@ -908,6 +908,58 @@ test("strict.refs", async () => {
     await expect(tp.initialize()).rejects.toThrow("/z does not exist (strict.refs option enabled)");
 });
 
+test("remove temp vars 1", async () => {
+    let template = {
+        "a":42,
+        "b":{
+            "b1":10,
+            "b2":"!${b1}",
+        },
+        "c":"!${a}"
+    };
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize()
+    expect(tp.output).toEqual({
+        "a": 42,
+        "b": {
+            "b1": 10
+        }
+    })
+});
+test("remove temp vars", async () => {
+    let template = {
+        "a":42,
+        "b":{
+            "b1":10,
+            "b2":"!${b1}",
+            "b3": "!${b2+10}",
+            "b4":{
+                "b5":"!../${b3+10}",
+                "b6":"  !  /${b.b3+10}",
+                "b7":"  !/${b.b3+b.b2}",
+                "b8":" !  ../${b3+b2}",
+            }
+        },
+        "c": "${b.b4.b5}",
+        "d": "${b.b4.b6}",
+        "e": "${b.b4.b7}",
+        "f": "${b.b4.b8}"
+    };
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "a": 42,
+        "b": {
+            "b1": 10,
+            "b4": {}
+        },
+        "c": 30,
+        "d": 30,
+        "e": 30,
+        "f": 30
+    })
+});
+
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
 test("import 2", async () => {
