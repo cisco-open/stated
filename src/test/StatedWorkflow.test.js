@@ -92,8 +92,6 @@ test ("workflow logs", async () => {
         }
     };
     const statedWorkflow = new StatedWorkflow(template);
-
-    await statedWorkflow.initialize();
 });
 
 test("test all", async () => {

@@ -19,8 +19,8 @@ class StatedWorkflow {
     static async newWorkflow(template) {
         this.context = {
             "serial": StatedWorkflow.serial.bind(this),
-            "parallel": StatedWorkflow.parallel.bind(this)
-            "nextCloudEvent": this.nextCloudEvent.bind(this)
+            "parallel": StatedWorkflow.parallel.bind(this),
+            "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
         templateProcessor.logLevel = "debug";
@@ -28,8 +28,7 @@ class StatedWorkflow {
         return templateProcessor;
     }
 
-
-    async nextCloudEvent(subscriptionParams) {
+    static async nextCloudEvent(subscriptionParams) {
         if (subscriptionParams.data && Array.isArray(subscriptionParams.data)) {
             const toFunc = this.templateProcessor.getFunction(subscriptionParams.to);
             for (const eventData of subscriptionParams.data) {
