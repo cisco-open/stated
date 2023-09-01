@@ -16,7 +16,7 @@ const StatedWorkflow = require('../StatedWorkflow');
 test ("workflow logs", async () => {
     var template = {
         "testData": ['a', 'b', 'c'],
-        "start": "${ $nextCloudEvent(subscriptionParams) }",
+        "start": "${ $nextCloudEvent(subscriptionParams, log) }",
         "subscriptionParams": {
             "type": "testdata",
             "data": "/${ testData }",
@@ -24,7 +24,7 @@ test ("workflow logs", async () => {
             "to": "myWorkflow$",
             "parallelism": 2
         },
-        "myWorkflow$": "function($e){$e ~> $serial([step1, step2], {name:nozzleWork})}",
+        "myWorkflow$": "function($e){$e ~> $serial([step1, step2], {name:nozzleWork}, log)}",
         "step1": {
             "name": "primeTheNozzle",
             "function$": "function($e){ $e~>|$|{'primed':true}|  }"
