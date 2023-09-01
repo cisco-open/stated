@@ -20,7 +20,8 @@ class StatedWorkflow {
         this.context = {
             "serial": StatedWorkflow.serial.bind(this),
             "parallel": StatedWorkflow.parallel.bind(this),
-            "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this)
+            "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
+            "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
         templateProcessor.logLevel = "debug";
@@ -28,40 +29,75 @@ class StatedWorkflow {
         return templateProcessor;
     }
 
-    static logFunctionInvocation(stage, args, result, error = null) {
-        const log = {
+    static async logFunctionInvocation(stage, args, result, error = null, log) {
+        const logMessage = {
             context: stage.name,
             function: stage.function.name,
             start: new Date().toISOString(),
             args: args
         };
+
         if (error) {
-            log.error = {
+            logMessage.error = {
                 timestamp: new Date().toISOString(),
                 message: error.message
             };
         } else {
-            log.finish = new Date().toISOString();
-            log.out = result;
+            logMessage.finish = new Date().toISOString();
+            logMessage.out = result;
         }
-        console.log(JSON.stringify(log));
+        console.log(JSON.stringify(logMessage));
+
+        // Assuming 'logs' array is inside 'log' object
+        if (log.logs) {
+            log.logs.push(logMessage);
+        } else {
+            log.logs = [logMessage];
+        }
     }
 
-    static async nextCloudEvent(subscriptionParams) {
+    // static async logFunctionInvocation(stage, args, result, error = null, logMessage) {
+    //     logMessage = {
+    //         context: stage.name,
+    //         function: stage.function.name,
+    //         start: new Date().toISOString(),
+    //         args: args
+    //     };
+    //     if (error) {
+    //         logMessage.error = {
+    //             timestamp: new Date().toISOString(),
+    //             message: error.message
+    //         };
+    //     } else {
+    //         logMessage.finish = new Date().toISOString();
+    //         logMessage.out = result;
+    //     }
+    //     console.log(JSON.stringify(logMessage));
+    //     log.add(logMessage);
+    // }
+
+    static async nextCloudEvent(subscriptionParams, log) {
         if (subscriptionParams.data ) {
-            const toFunc = this.templateProcessor.getFunction(subscriptionParams.to);
             for (const eventData of subscriptionParams.data) {
                 // const filtered = this.templateProcessor.execute(subscriptionParams['filter$'], {$e: eventData});
                 // if (filtered) {
                 //     await toFunc.apply(this, [eventData]);
                 // }
-                await toFunc.apply(this, [eventData]);
+                try {
+                    // The below function is needed to make a useful call
+                    // const toFunction = this.templateProcessor.getFunction(subscriptionParams.to);
+                    const result = await subscriptionParams.to.apply(this, [eventData]);
+                    await StatedWorkflow.logFunctionInvocation(to, [eventData], result, null, log);
+                } catch (error) {
+                    await StatedWorkflow.logFunctionInvocation(to, [currentInput], result, error, log);
+                }
+
             }
         }
     }
 
     //This function is called by the template processor to execute an array of stages in serial
-    static async serial(initialInput, stages) {
+    static async serial(initialInput, stages, log) {
         let results = [];
         let currentInput = initialInput;
         for (let stage of stages) {
@@ -70,7 +106,12 @@ class StatedWorkflow {
                 console.log("Skipping stage " + stage.name)
                 continue;
             }
-            const result = await stage.function.apply(this, [currentInput]);
+            try {
+                const result = await stage.function.apply(this, [currentInput]);
+                await StatedWorkflow.logFunctionInvocation(stage, [currentInput], result, null, log);
+            } catch (error) {
+                await StatedWorkflow.logFunctionInvocation(stage, [currentInput], result, error, log);
+            }
             stage.output.results.push(result);
             currentInput = result;
             results.push(result);
@@ -79,7 +120,7 @@ class StatedWorkflow {
     }
 
     //This function is called by the template processor to execute an array of stages in parallel
-    static async parallel(initialInput, stages) {
+    static async parallel(initialInput, stages, log) {
         let promises = [];
 
         for (let stage of stages) {
