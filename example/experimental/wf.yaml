@@ -1,7 +1,7 @@
 start$: $nextCloudEvent(subscribeParams)
 name: nozzleWork
 subscribeParams: #parameters for subscribing to a cloud event
-  testData: [{name: nozzleTime}]
+  testData: "${  [1..10].({'name': 'nozzleTime', 'order':$})  }"
   type: sys:cron
   filter$: function($e){ $e.name='nozzleTime' }
   to: ../${myWorkflow$}
