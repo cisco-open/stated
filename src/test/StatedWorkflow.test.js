@@ -514,6 +514,57 @@ test("workflow logs", async () => {
     ];
     expect(removeUncomparableTimestamps).toEqual(expectedLog);
 });
+
+test("workflow perf", async () => {
+    console.time("workflow perf total time"); // Start the timer with a label
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../', '../', 'example', 'experimental', 'wfPerf01.yaml');
+    console.time("Read YAML file"); // Start the timer for reading the file
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    console.timeEnd("Read YAML file"); // End the timer for reading the file
+
+    // Parse the YAML
+    console.time("Parse YAML"); // Start the timer for parsing the YAML
+    var template = yaml.load(templateYaml);
+    console.timeEnd("Parse YAML"); // End the timer for parsing the YAML
+
+    // Initialize the template
+    console.time("Initialize workflow"); // Start the timer for initializing the workflow
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    console.timeEnd("Initialize workflow"); // End the timer for initializing the workflow
+
+    console.timeEnd("workflow perf total time"); // End the total time timer
+});
+
+
+test("webserver", async () => {
+    console.time("workflow perf total time"); // Start the timer with a label
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../', '../', 'example', 'experimental', 'wfHttp01.yaml');
+    console.time("Read YAML file"); // Start the timer for reading the file
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    console.timeEnd("Read YAML file"); // End the timer for reading the file
+
+    // Parse the YAML
+    console.time("Parse YAML"); // Start the timer for parsing the YAML
+    var template = yaml.load(templateYaml);
+    console.timeEnd("Parse YAML"); // End the timer for parsing the YAML
+
+    // Initialize the template
+    console.time("Initialize workflow"); // Start the timer for initializing the workflow
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    console.timeEnd("Initialize workflow"); // End the timer for initializing the workflow
+
+    console.timeEnd("workflow perf total time"); // End the total time timer
+});
+
+
+
+
 /*
 test("test all", async () => {
     const tp = await StatedWorkflow.newWorkflow({

@@ -1,0 +1,16 @@
+start$: $onHttp(subscribeParams)
+subscribeParams: #parameters for subscribing to a http request
+  to: ../${myWebLambda$}
+  parallelism: 2
+
+myWebLambda$: |
+  function($con){
+      $con.res.send("Hello Stated Lambda") 
+  }
+
+
+
+
+
+
+

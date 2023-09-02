@@ -12,9 +12,13 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 const TemplateProcessor = require('./TemplateProcessor');
+const express = require('express');
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
+    static express = require('express');
+    static app = express();
+    static port = 3000;
 
     static newWorkflow(template) {
         this.context = {
@@ -22,6 +26,7 @@ class StatedWorkflow {
             "serial": StatedWorkflow.serial.bind(this),
             "parallel": StatedWorkflow.parallel.bind(this),
             "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
+            "onHttp": StatedWorkflow.onHttp.bind(this),
             "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
@@ -78,13 +83,31 @@ class StatedWorkflow {
 
     static async nextCloudEvent(subscriptionParams) {
         const dispatcher = new WorkflowDispatcher(
-            subscriptionParams.to, // Bind 'this' context for the 'to' function
+            subscriptionParams.to,
             subscriptionParams.parallelism
         );
 
         dispatcher.addBatch(subscriptionParams.testData);
         // Wait for all workflows to complete (since this is test data) before returning
         await dispatcher.drainBatch();
+    }
+
+    static onHttp(subscriptionParams) {
+        const dispatcher = new WorkflowDispatcher(
+            subscriptionParams.to,
+            subscriptionParams.parallelism
+        );
+
+        StatedWorkflow.app.all('*', (req, res) => {
+            // Push the request and response objects to the dispatch queue to be handled by callback
+            dispatcher.addToQueue({ req, res });
+        });
+
+        StatedWorkflow.app.listen(StatedWorkflow.port, () => {
+            console.log(`Server started on http://localhost:${StatedWorkflow.port}`);
+        });
+
+
     }
 
     static async serial(input, steps, options) {
@@ -244,7 +267,7 @@ class WorkflowDispatcher {
         this._dispatch();
     }
 
-
+    //this is used for testing
     addBatch(dataArray) {
         this.batchMode = true;
         this.batchCount += dataArray.length;
