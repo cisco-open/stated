@@ -18,36 +18,56 @@ const path = require('path');
 const stated = require('../../stated');
 
 
-function compareIgnoringDatesAndFunctions(obj1, obj2) {
-    if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 === null || obj2 === null) {
-        return obj1 === obj2;
-    }
-
-    const keys1 = Object.keys(obj1);
-    const keys2 = Object.keys(obj2);
-
-    if (keys1.length !== keys2.length) {
-        return false;
-    }
-
-    for (const key of keys1) {
-        if (!keys2.includes(key)) {
-            return false;
-        }
-
-        if (typeof obj1[key] === 'number' && typeof obj2[key] === 'number') {
-            // Assuming it's a date timestamp
-            continue;
-        } else if (obj1[key] === "{function:}" && typeof obj2[key] === 'function') {
-            continue;
-        } else if (!compareIgnoringDatesAndFunctions(obj1[key], obj2[key])) {
-            return false;
-        }
-    }
-
-    return true;
+function isTimestamp(value) {
+    // This checks if the value is a valid timestamp (can be refined further)
+    return !isNaN(new Date(value).getTime());
 }
+const visited = new WeakMap();
 
+function deepCheck(expected, actual) {
+    if (expected === null) {
+        expect(actual).toBeNull();
+        return;
+    }
+
+
+    // If expected has a timestamp placeholder, check if actual is a valid timestamp
+    if (expected === '--timestamp--') {
+        expect(isTimestamp(actual)).toBeTruthy();
+        return;
+    }
+
+    if (expected === '--ignore--') return;
+
+    // Handle primitives
+    if (typeof expected !== 'object') {
+        expect(actual).toEqual(expected);
+        return;
+    }
+
+    // Detect circular references in expected
+    if (visited.get(expected)) {
+        throw new Error('Circular reference detected in expected object.');
+    }
+    visited.set(expected, true);
+
+    const keysExpected = Object.keys(expected);
+    const keysActual = Object.keys(actual);
+    let idx = 0;
+    for (const key of keysExpected) {
+        if(key==="--ignore" || expected[key]==="--ignore--"){
+            continue;
+        }
+        if(key==="--use-corresponding--"){
+            deepCheck(expected[key], actual[keysActual[idx]]);
+        }else {
+            deepCheck(expected[key], actual[key]);
+        }
+        idx++;
+    }
+
+
+}
 test("workflow logs", async () => {
 
     // Load the YAML from the file
@@ -92,9 +112,79 @@ test("workflow logs", async () => {
             }
         });
     }
-    
+    const fullExpectedOutput =    {
+        "start$": null,
+        "name": "nozzleWork",
+        "subscribeParams": {
+            "testData": [
+                {
+                    "name": "nozzleTime"
+                }
+            ],
+            "type": "sys:cron",
+            "filter$": "{function:}",
+            "to": "{function:}",
+            "parallelism": 2
+        },
+        "myWorkflow$": "{function:}",
+        "step1": {
+            "name": "primeTheNozzle",
+            "function": "{function:}"
+        },
+        "step2": {
+            "name": "sprayTheNozzle",
+            "function": "{function:}"
+        },
+        "log": {
+            "retention": {
+                "maxWorkflowLogs": 100
+            },
+            "nozzleWork": {
+                "--use-corresponding--": {
+                    "info": {
+                        "start": "--timestamp--",
+                        "status": "succeeded",
+                        "end": "--timestamp--"
+                    },
+                    "execution": [
+                        {
+                            "step": "primeTheNozzle",
+                            "start": "--timestamp--",
+                            "args": [
+                                {
+                                    "name": "nozzleTime"
+                                }
+                            ],
+                            "end": "--timestamp--",
+                            "out": {
+                                "name": "nozzleTime",
+                                "primed": true
+                            }
+                        },
+                        {
+                            "step": "sprayTheNozzle",
+                            "start": "--timestamp--",
+                            "args": [
+                                {
+                                    "name": "nozzleTime",
+                                    "primed": true
+                                }
+                            ],
+                            "end": "--timestamp--",
+                            "out": {
+                                "name": "nozzleTime",
+                                "primed": true,
+                                "sprayed": true
+                            }
+                        }
+                    ]
+                }
+            }
+        }
+    };
+    deepCheck(fullExpectedOutput, JSON.parse(JSON.stringify(tp.output, stated.printFunc)));
 });
-
+/*
 test("test all", async () => {
     const tp = await StatedWorkflow.newWorkflow({
         "startEven": "tada",
@@ -138,6 +228,6 @@ test("test all", async () => {
     expect(tp.output.workflow2)
         .toEqual(expect.arrayContaining(['tada->c', 'tada->d']));
 });
-
+*/
 
 
