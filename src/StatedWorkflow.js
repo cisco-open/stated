@@ -18,6 +18,7 @@ class StatedWorkflow {
 
     static async newWorkflow(template) {
         this.context = {
+            "id": StatedWorkflow.generateDateAndTimeBasedID.bind(this),
             "serial": StatedWorkflow.serial.bind(this),
             "parallel": StatedWorkflow.parallel.bind(this),
             "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
@@ -77,47 +78,99 @@ class StatedWorkflow {
     // }
 
     static async nextCloudEvent(subscriptionParams, log) {
-        if (subscriptionParams.data ) {
-            for (const eventData of subscriptionParams.data) {
+        if (subscriptionParams.testData ) {
+            for (const eventData of subscriptionParams.testData) {
                 // const filtered = this.templateProcessor.execute(subscriptionParams['filter$'], {$e: eventData});
                 // if (filtered) {
                 //     await toFunc.apply(this, [eventData]);
                 // }
-                try {
-                    // The below function is needed to make a useful call
-                    // const toFunction = this.templateProcessor.getFunction(subscriptionParams.to);
-                    const result = await subscriptionParams.to.apply(this, [eventData]);
-                    await StatedWorkflow.logFunctionInvocation(to, [eventData], result, null, log);
-                } catch (error) {
-                    await StatedWorkflow.logFunctionInvocation(to, [currentInput], result, error, log);
-                }
+
+                const result = await subscriptionParams.to.apply(this, [eventData]);
+
 
             }
         }
     }
 
-    //This function is called by the template processor to execute an array of stages in serial
-    static async serial(initialInput, stages, log) {
-        let results = [];
-        let currentInput = initialInput;
-        for (let stage of stages) {
-            if (stage.output.results.length > 0 || stage.output.errors.length > 0) {
-                //if we have already run this stage, skip it
-                console.log("Skipping stage " + stage.name)
-                continue;
-            }
-            try {
-                const result = await stage.function.apply(this, [currentInput]);
-                await StatedWorkflow.logFunctionInvocation(stage, [currentInput], result, null, log);
-            } catch (error) {
-                await StatedWorkflow.logFunctionInvocation(stage, [currentInput], result, error, log);
-            }
-            stage.output.results.push(result);
-            currentInput = result;
-            results.push(result);
+    static async serial(input, steps, options) {
+        const {name:workflowName, log} = options;
+        let {id} = options;
+
+        if(log === undefined){
+            throw new Error('log is missing from options');
         }
-        return results;
+
+        if(id === undefined){
+            id = this.generateUniqueId();
+            options.id = id;
+        }
+
+        this.initializeLog(log, workflowName, id);
+
+        let currentInput = input;
+        for (let step of steps) {
+            currentInput = await this.executeStep(step, currentInput, log[workflowName][id]);
+        }
+
+        this.finalizeLog(log[workflowName][id]);
+        this.ensureRetention(log[workflowName]);
+
+        return currentInput;
     }
+
+    static generateUniqueId() {
+        return `${new Date().getTime()}-${Math.random().toString(36).slice(2, 7)}`;
+    }
+
+    static initializeLog(log, workflowName, id) {
+        log[workflowName] = log[workflowName] || {};
+        log[workflowName][id] = {
+            info: {
+                start: new Date().getTime(),
+                status: 'in-progress'
+            },
+            execution: []
+        };
+    }
+
+    static async executeStep(step, input, currentLog) {
+        const stepLog = {
+            step: step.name,
+            start: new Date().getTime(),
+            args: [input]
+        };
+
+        try {
+            const result = await step.function.apply(this, [input]);
+            stepLog.end = new Date().getTime();
+            stepLog.out = result;
+            currentLog.execution.push(stepLog);
+            return result;
+        } catch (error) {
+            stepLog.end = new Date().getTime();
+            stepLog.error = { message: error.message };
+            currentLog.info.status = 'failed';
+            currentLog.execution.push(stepLog);
+            throw error;
+        }
+    }
+
+    static finalizeLog(currentLog) {
+        currentLog.info.end = new Date().getTime();
+        if (currentLog.info.status !== 'failed') {
+            currentLog.info.status = 'succeeded';
+        }
+    }
+
+    static ensureRetention(workflowLogs) {
+        const maxLogs = 100;
+        const sortedKeys = Object.keys(workflowLogs).sort((a, b) => workflowLogs[b].info.start - workflowLogs[a].info.start);
+        while (sortedKeys.length > maxLogs) {
+            const oldestKey = sortedKeys.pop();
+            delete workflowLogs[oldestKey];
+        }
+    }
+
 
     //This function is called by the template processor to execute an array of stages in parallel
     static async parallel(initialInput, stages, log) {
@@ -143,6 +196,15 @@ class StatedWorkflow {
         }
 
         return await Promise.all(promises);
+    }
+
+    static generateDateAndTimeBasedID() {
+        const date = new Date();
+        const dateStr = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+        const timeInMs = date.getTime();
+        const randomPart = Math.random().toString(36).substring(2, 6);  // 4 random characters for added uniqueness
+
+        return `${dateStr}-${timeInMs}-${randomPart}`;
     }
 }
 

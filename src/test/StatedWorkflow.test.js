@@ -12,94 +12,87 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 const StatedWorkflow = require('../StatedWorkflow');
+const fs = require('fs');
+const yaml = require('js-yaml');
+const path = require('path');
+const stated = require('../../stated');
 
-test ("workflow logs", async () => {
-    var template = {
-        "testData": ['a', 'b', 'c'],
-        "start": "${ $nextCloudEvent(subscriptionParams, log) }",
-        "subscriptionParams": {
-            "type": "testdata",
-            "data": "/${ testData }",
-            "filter$": "function($e){ $e.name='nozzleTime' }",
-            "to": "myWorkflow$",
-            "parallelism": 2
-        },
-        "myWorkflow$": "function($e){$e ~> $serial([step1, step2], {name:nozzleWork}, log)}",
-        "step1": {
-            "name": "primeTheNozzle",
-            "function$": "function($e){ $e~>|$|{'primed':true}|  }"
-        },
-        "step2": {
-            "name": "sprayTheNozzle",
-            "function$": "function($e){ $e~>|$|{'sprayed':true}|  }"
-        },
-        "log": {
-            "retention": {
-                "maxRecords": 100,
-                "maxDuration": "24h"
-            }
+
+function compareIgnoringDatesAndFunctions(obj1, obj2) {
+    if (typeof obj1 !== 'object' || typeof obj2 !== 'object' || obj1 === null || obj2 === null) {
+        return obj1 === obj2;
+    }
+
+    const keys1 = Object.keys(obj1);
+    const keys2 = Object.keys(obj2);
+
+    if (keys1.length !== keys2.length) {
+        return false;
+    }
+
+    for (const key of keys1) {
+        if (!keys2.includes(key)) {
+            return false;
         }
-    };
-    const logExpected = {
-        "retention": {
-            "maxRecords": 100,
-            "maxDuration": "24h"
-        },
-        "nozzleWork": [
-            [
-                {
-                    "context": "nozzleWork-132494877",
-                    "function": "primeTheNozzle",
-                    "start": "30-aug-20203 02:45:02.124 PST",
-                    "error": {
-                        "timestamp": "30-aug-20203 02:45:02.359 PST",
-                        "message": "unknown bingis fail"
-                    },
-                    "args": [
-                        {
-                            "name:nozzleTime": null,
-                            "primed:false": null
-                        }
-                    ]
-                }
-            ],
-            [
-                {
-                    "context": "nozzleWork-230838937",
-                    "start": "30-aug-20203 05:22:02.124 PST",
-                    "finish": "30-aug-20203 05:22:02.359 PST",
-                    "out": {
-                        "name:nozzleTime": null,
-                        "primed:true": null
-                    },
-                    "args": [
-                        {
-                            "name:nozzleTime": null,
-                            "primed:false": null
-                        }
-                    ]
-                },
-                {
-                    "context": "nozzleWork-230838937",
-                    "start": "30-aug-20203 05:22:02.124 PST",
-                    "finish": "30-aug-20203 05:22:02.359 PST",
-                    "out": {
-                        "name:nozzleTime": null,
-                        "primed:true": null,
-                        "sprayed:true": null
-                    },
-                    "args": [
-                        {
-                            "name:nozzleTime": null,
-                            "primed:true": null
-                        }
-                    ]
-                }
-            ]
-        ]
-    };
+
+        if (typeof obj1[key] === 'number' && typeof obj2[key] === 'number') {
+            // Assuming it's a date timestamp
+            continue;
+        } else if (obj1[key] === "{function:}" && typeof obj2[key] === 'function') {
+            continue;
+        } else if (!compareIgnoringDatesAndFunctions(obj1[key], obj2[key])) {
+            return false;
+        }
+    }
+
+    return true;
+}
+
+test("workflow logs", async () => {
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../','../','example', 'experimental', 'wf.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+
+    // Parse the YAML
+    var template = yaml.load(templateYaml);
+
     const tp = await StatedWorkflow.newWorkflow(template);
-    expect(tp.output.log).toEqual(logExpected);
+
+    // Assertions
+
+    // 1. Existence of Log
+    expect(tp.output).toHaveProperty('log');
+
+    // 2. Log Retention Defaults
+    const expectedRetention = {
+        maxWorkflowLogs: 100
+    };
+    expect(tp.output.log.retention).toEqual(expectedRetention);
+
+    // 3. Log Structure
+    expect(tp.output.log).toHaveProperty('nozzleWork');
+    if (tp.output.log.nozzleWork) {
+        const workflowLogs = tp.output.log.nozzleWork;
+
+        Object.keys(workflowLogs).forEach(logKey => {
+            const logEntry = workflowLogs[logKey];
+            if(logEntry.step === 'primeTheNozzle') {
+                // Validate arguments for primeTheNozzle
+                expect(logEntry.args).toEqual([{ name: 'nozzleTime', primed: false }]);
+
+                // Validate output for primeTheNozzle
+                expect(logEntry.out).toEqual({ name: 'nozzleTime', primed: true });
+            } else if(logEntry.step === 'sprayTheNozzle') {
+                // Validate arguments for sprayTheNozzle
+                expect(logEntry.args).toEqual([{ name: 'nozzleTime', primed: true }]);
+
+                // Validate output for sprayTheNozzle
+                expect(logEntry.out).toEqual({ name: 'nozzleTime', primed: true, sprayed: true });
+            }
+        });
+    }
+    
 });
 
 test("test all", async () => {

@@ -1,16 +1,20 @@
 start$: $nextCloudEvent(subscribeParams)
-name: fredsWorkflow
+name: nozzleWork
 subscribeParams: #parameters for subscribing to a cloud event
+  testData: [{name: nozzleTime}]
   type: sys:cron
   filter$: function($e){ $e.name='nozzleTime' }
-  to: myWorkflow$
+  to: ../${myWorkflow$}
   parallelism: 2
 
 myWorkflow$: |
   function($e){
-      $e ~> $serial(
-                    [step1, step2], 
-                    {name:nozzleWork})
+      $e ~> $serial([step1, step2], 
+                    {
+                      'name':$$.name, 
+                      'log':$$.log, 
+                      'id':$id($$.name)
+                    })
   }
 step1:
   name: primeTheNozzle
@@ -21,35 +25,9 @@ step2:
 log:
   retention:
     maxWorkflowLogs: 100
-  nozzleWork: {
-    nozzleWork-132494877: [
-      {
-        context: nozzleWork-132494877,
-        function: primeTheNozzle,
-        start: 30-aug-20203 02:45:02.124 PST,
-        error: {
-          timestamp: 30-aug-20203 02:45:02.359 PST,
-          message: unknown bingis fail
-        },
-        args: [ { name:nozzleTime, primed:false } ]
-      }
-    ],
-    nozzleWork-230838937: [
-      {
-        context: nozzleWork-230838937,
-        start: 30-aug-20203 05:22:02.124 PST,
-        finish: 30-aug-20203 05:22:02.359 PST,
-        out: { name:nozzleTime, primed:true },
-        args: [ { name:nozzleTime, primed:false } ],
-      },
-      {
-        context: nozzleWork-230838937,
-        start: 30-aug-20203 05:22:02.124 PST,
-        finish: 30-aug-20203 05:22:02.359 PST,
-        out: { name:nozzleTime, primed:true, sprayed:true },
-        args: [ { name:nozzleTime, primed:true } ]
-      }
-    ]
-  }
+
+
+
+
 
 
