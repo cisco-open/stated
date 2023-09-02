@@ -1,0 +1,33 @@
+start$: $nextCloudEvent(subscribeParams)
+name: nozzleWork
+subscribeParams: #parameters for subscribing to a cloud event
+  testData: "${  [1..10000].({'name': 'nozzleTime', 'order':$})  }"
+  type: sys:cron
+  filter$: function($e){ $e.name='nozzleTime' }
+  to: ../${myWorkflow$}
+  parallelism: 8
+
+myWorkflow$: |
+  function($e){
+      $e ~> $serial([step1, step2], 
+                    {
+                      'name':$$.name, 
+                      'log':$$.log, 
+                      'id':$id($$.name)
+                    })
+  }
+step1:
+  name: primeTheNozzle
+  function: ${function($e){ ($e~>|$|{'primed':true}|)  }}
+step2:
+  name: sprayTheNozzle
+  function: ${function($e){ $e~>|$|{'sprayed':true}|  }}
+log:
+  retention:
+    maxWorkflowLogs: 100
+
+
+
+
+
+
