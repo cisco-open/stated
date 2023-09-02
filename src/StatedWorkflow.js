@@ -16,7 +16,7 @@ const TemplateProcessor = require('./TemplateProcessor');
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
 
-    static async newWorkflow(template) {
+    static newWorkflow(template) {
         this.context = {
             "id": StatedWorkflow.generateDateAndTimeBasedID.bind(this),
             "serial": StatedWorkflow.serial.bind(this),
@@ -26,7 +26,6 @@ class StatedWorkflow {
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
         templateProcessor.logLevel = "debug";
-        await templateProcessor.initialize();
         return templateProcessor;
     }
 
@@ -77,19 +76,15 @@ class StatedWorkflow {
     //     log.add(logMessage);
     // }
 
-    static async nextCloudEvent(subscriptionParams, log) {
-        if (subscriptionParams.testData ) {
-            for (const eventData of subscriptionParams.testData) {
-                // const filtered = this.templateProcessor.execute(subscriptionParams['filter$'], {$e: eventData});
-                // if (filtered) {
-                //     await toFunc.apply(this, [eventData]);
-                // }
+    static async nextCloudEvent(subscriptionParams) {
+        const dispatcher = new WorkflowDispatcher(
+            subscriptionParams.to, // Bind 'this' context for the 'to' function
+            subscriptionParams.parallelism
+        );
 
-                const result = await subscriptionParams.to.apply(this, [eventData]);
-
-
-            }
-        }
+        dispatcher.addBatch(subscriptionParams.testData);
+        // Wait for all workflows to complete (since this is test data) before returning
+        await dispatcher.drainBatch();
     }
 
     static async serial(input, steps, options) {
@@ -207,6 +202,65 @@ class StatedWorkflow {
         return `${dateStr}-${timeInMs}-${randomPart}`;
     }
 }
+
+class WorkflowDispatcher {
+    constructor(workflowFunction, parallelism) {
+        this.workflowFunction = workflowFunction;
+        this.parallelism = parallelism || 1;
+        this.queue = [];
+        this.active = 0;
+        this.promises = [];
+        this.batchMode = false;
+        this.batchCount = 0; // Counter to keep track of items in the batch
+    }
+
+    _dispatch() {
+        while (this.active < this.parallelism && this.queue.length > 0) {
+            this.active++;
+            const eventData = this.queue.shift();
+
+            const promise = this.workflowFunction.apply(null, [eventData])
+                .catch(error => {
+                    console.error("Error executing workflow:", error);
+                })
+                .finally(() => {
+                    this.active--;
+                    if (this.batchMode) {
+                        this.batchCount--;
+                    }
+                    const index = this.promises.indexOf(promise);
+                    if (index > -1) {
+                        this.promises.splice(index, 1);
+                    }
+                    this._dispatch();
+                });
+
+            this.promises.push(promise);
+        }
+    }
+
+    addToQueue(data) {
+        this.queue.push(data);
+        this._dispatch();
+    }
+
+
+    addBatch(dataArray) {
+        this.batchMode = true;
+        this.batchCount += dataArray.length;
+        dataArray.forEach(data => this.addToQueue(data));
+    }
+
+    //this is used for testing
+    async drainBatch() {
+        while (this.batchMode && this.batchCount > 0) {
+            await new Promise(resolve => setTimeout(resolve, 50)); // Poll every 50ms
+        }
+        this.batchMode = false;
+    }
+}
+
+
 
 module.exports = StatedWorkflow;
 
