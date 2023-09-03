@@ -1,4 +1,4 @@
-start$: $nextCloudEvent(subscribeParams)
+start$: $subscribe(subscribeParams)
 name: nozzleWork
 subscribeParams: #parameters for subscribing to a cloud event
   testData: "${  [1..10000].({'name': 'nozzleTime', 'order':$})  }"
@@ -6,6 +6,7 @@ subscribeParams: #parameters for subscribing to a cloud event
   filter$: function($e){ $e.name='nozzleTime' }
   to: ../${myWorkflow$}
   parallelism: 8
+  source: data
 
 myWorkflow$: |
   function($e){

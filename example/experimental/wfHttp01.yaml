@@ -1,7 +1,8 @@
-start$: $onHttp(subscribeParams)
+start$: $subscribe(subscribeParams)
 subscribeParams: #parameters for subscribing to a http request
   to: ../${myWebLambda$}
   parallelism: 2
+  source: http
 
 myWebLambda$: |
   function($con){
