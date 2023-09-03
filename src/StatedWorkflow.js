@@ -27,6 +27,7 @@ class StatedWorkflow {
             "parallel": StatedWorkflow.parallel.bind(this),
             "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
             "onHttp": StatedWorkflow.onHttp.bind(this),
+            "subscribe": StatedWorkflow.subscribe.bind(this),
             "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
@@ -80,6 +81,20 @@ class StatedWorkflow {
     //     console.log(JSON.stringify(logMessage));
     //     log.add(logMessage);
     // }
+
+    static async subscribe(params) {
+        const {source} = params;
+        if(source === 'http'){
+            return StatedWorkflow.onHttp(params);
+        }
+        if(source === 'cloudEvent' || source === 'data'){
+            return StatedWorkflow.nextCloudEvent(params);
+        }
+        if(!source){
+            throw new Error("Subscribe source not set");
+        }
+        throw new Error(`Unknown subscribe source ${source}`);
+    }
 
     static async nextCloudEvent(subscriptionParams) {
         const dispatcher = new WorkflowDispatcher(
