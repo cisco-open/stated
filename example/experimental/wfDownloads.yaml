@@ -1,0 +1,18 @@
+start$: $nextCloudEvent(subscribeParams)
+name: testConcurrentFetch
+subscribeParams: #parameters for subscribing to a cloud event
+  to: ../${downloader$}
+  parallelism: 500
+  testData: ${[1..1000]}
+
+downloader$: |
+  function($noop){
+      $fetch("https://google.com")
+  }
+
+
+
+
+
+
+
