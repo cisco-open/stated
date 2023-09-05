@@ -13,6 +13,7 @@
 // limitations under the License.
 const TemplateProcessor = require('./TemplateProcessor');
 const express = require('express');
+const Pulsar = require('pulsar-client');
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
@@ -82,13 +83,13 @@ class StatedWorkflow {
     //     log.add(logMessage);
     // }
 
-    static async subscribe(params) {
-        const {source} = params;
+    static async subscribe(subscribeOptions) {
+        const {source} = subscribeOptions;
         if(source === 'http'){
-            return StatedWorkflow.onHttp(params);
+            return StatedWorkflow.onHttp(subscribeOptions);
         }
         if(source === 'cloudEvent' || source === 'data'){
-            return StatedWorkflow.nextCloudEvent(params);
+            return StatedWorkflow.nextCloudEvent(subscribeOptions);
         }
         if(!source){
             throw new Error("Subscribe source not set");
@@ -96,15 +97,67 @@ class StatedWorkflow {
         throw new Error(`Unknown subscribe source ${source}`);
     }
 
-    static async nextCloudEvent(subscriptionParams) {
-        const dispatcher = new WorkflowDispatcher(
-            subscriptionParams.to,
-            subscriptionParams.parallelism
-        );
+    static pulsarClient = new Pulsar.Client({
+        serviceUrl: 'pulsar://localhost:6650',
+    });
+    static consumers = new Map(); //key is type, value is pulsar consumer
+    static dispatchers = new Map(); //key is type, value Set of WorkflowDispatcher
 
-        dispatcher.addBatch(subscriptionParams.testData);
-        // Wait for all workflows to complete (since this is test data) before returning
-        await dispatcher.drainBatch();
+    static pulsarSubscribe(subscriptionParams) {
+        const { type} = subscriptionParams;
+
+        let consumer, dispatcher;
+        //make sure a dispatcher exists for the combination of type and subscriberId
+        WorkflowDispatcher.getDispatcher(subscriptionParams);
+        // Check if a consumer already exists for the given subscription
+        if (StatedWorkflow.consumers.has(type)) {
+           return ; //bail, we are already consuming and dispatching this type
+        }
+        (async () => {
+            const consumer = await StatedWorkflow.pulsarClient.subscribe({
+                topic:type,
+                subscription:type, //we will have only one shared-mode consumer group per message type/topics and we name it after the type of the message
+                subscriptionType: 'Shared',
+            });
+            // Store the consumer in the map
+            StatedWorkflow.consumers.set(type, consumer);
+            let data;
+            while (true) {
+                try {
+                    data = await consumer.receive();
+                    let obj;
+                    try {
+                        const str = data.getData().toString();
+                        obj = JSON.parse(str);
+                        console.log(`got data from pulsar: ${str}` );
+                    }catch(error){
+                        console.error("unable to parse data to json:", error);
+                    }
+                    WorkflowDispatcher.dispatchToAllSubscribers(type, obj);
+                } catch (error) {
+                    console.error("Error receiving or dispatching message:", error);
+                }finally {
+                    if(data !== undefined){
+                        consumer.acknowledge(data);
+                    }
+                }
+            }
+        })();
+    }
+
+
+    static async nextCloudEvent(subscriptionParams) {
+
+        const {testData} = subscriptionParams;
+        if(testData){
+            const dispatcher = WorkflowDispatcher.getDispatcher(subscriptionParams);
+            dispatcher.addBatch(testData);
+            await dispatcher.drainBatch(); // in test mode we wanna actually wait for all the test events to process
+            return;
+        }
+        //in real-life we take messages off pulsar
+        this.pulsarSubscribe(subscriptionParams);
+
     }
 
     static onHttp(subscriptionParams) {
@@ -242,14 +295,59 @@ class StatedWorkflow {
 }
 
 class WorkflowDispatcher {
-    constructor(workflowFunction, parallelism) {
+    constructor(subscribeParams) {
+        const {to: workflowFunction, parallelism, type, subscriberId} = subscribeParams;
         this.workflowFunction = workflowFunction;
         this.parallelism = parallelism || 1;
+        this.subscriberId = subscriberId;
+        this.type = type;
         this.queue = [];
         this.active = 0;
         this.promises = [];
         this.batchMode = false;
         this.batchCount = 0; // Counter to keep track of items in the batch
+    }
+
+    _getKey() {
+        return WorkflowDispatcher._generateKey(this.type, this.subscriberId);
+    }
+
+    static dispatchers = new Map();       // key is type, value is a Set of keys
+    static dispatcherObjects = new Map(); // key is composite key, value is WorkflowDispatcher object
+
+    static _generateKey(type, subscriberId) {
+        return `${type}-${subscriberId}`;
+    }
+
+    static _addDispatcher(dispatcher) {
+        if (!this.dispatchers.has(dispatcher.type)) {
+            this.dispatchers.set(dispatcher.type, new Set());
+        }
+        const key = dispatcher._getKey();
+        this.dispatchers.get(dispatcher.type).add(key);
+        this.dispatcherObjects.set(key, dispatcher);
+    }
+
+    static getDispatcher(subscriptionParams) {
+        const {type, subscriberId} = subscriptionParams;
+        const key = this._generateKey(type, subscriberId);
+        if (!this.dispatcherObjects.has(key)) {
+            const newDispatcher = new WorkflowDispatcher(subscriptionParams);
+            this._addDispatcher(newDispatcher);
+        }
+        return this.dispatcherObjects.get(key);
+    }
+
+    static dispatchToAllSubscribers(type, data) {
+        const keysSet = this.dispatchers.get(type);
+        if (keysSet) {
+            for (let key of keysSet) {
+                const dispatcher = this.dispatcherObjects.get(key);
+                dispatcher.addToQueue(data); // You can pass the actual data you want to dispatch here
+            }
+        } else {
+            console.log(`No subscribers found for type ${type}`);
+        }
     }
 
     _dispatch() {

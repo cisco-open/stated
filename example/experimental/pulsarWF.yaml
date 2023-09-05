@@ -2,7 +2,6 @@ start$: $subscribe(subscribeParams)
 name: nozzleWork
 subscribeParams: #parameters for subscribing to a cloud event
   source: cloudEvent
-  testData: "${  [1..10].({'name': 'nozzleTime', 'order':$})  }"
   type: 'my-topic'
   filter$: function($e){ $e.name='nozzleTime' }
   to: ../${myWorkflow$}
