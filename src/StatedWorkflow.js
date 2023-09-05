@@ -162,8 +162,7 @@ class StatedWorkflow {
 
     static onHttp(subscriptionParams) {
         const dispatcher = new WorkflowDispatcher(
-            subscriptionParams.to,
-            subscriptionParams.parallelism
+            subscriptionParams
         );
 
         StatedWorkflow.app.all('*', (req, res) => {
