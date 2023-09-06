@@ -17,7 +17,7 @@ const fs = require('fs');
 const {stringify} = require("./stated");
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
- * that begin and and with ``` (markdown syntax for code block) and it extracts the cli command and the
+ * that begin and end with ``` (markdown syntax for code block) and it extracts the cli command and the
  * response. It then runs the cli command and compares the response to what is in the README.md. This ensures
  * that the README is always accurate.
  *

@@ -175,6 +175,8 @@ stated provides a set of REPL commands to interact with the system:
 | `.in`    | Show the input template.                          | `None`                                                                                                | `.in`                                                          |
 | `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                                                                                         | `.out` <br>`.out /data/accounts`                               |
 | `.state` | Show the current state of the template metadata.  | `None`                                                                                                | `.state`                                                       |
+| `.plan`  | Show the execution plan for rendering the template.  | `None`                                                                                             | `.plan`                                                        |
+| `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                    | `.note "Example 8"`                                            |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
