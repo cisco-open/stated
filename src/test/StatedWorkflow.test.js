@@ -66,6 +66,19 @@ function sortLogs(output, workflowName) {
     });
 }
 
+test("pubsub", async () => {
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../', '../', 'example', 'experimental', 'pubsub.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    var template = yaml.load(templateYaml);
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    while(tp.output.stop$ === 'still going'){
+        await new Promise(resolve => setTimeout(resolve, 50)); // Poll every 50ms
+    }
+    expect(tp.output.rxLog.length).toBe(20);
+});
 
 test("workflow logs", async () => {
 
