@@ -1,0 +1,23 @@
+# to run this locally you need to have pulsar running in standalone mode
+send$: $setInterval(function(){$publish(pubParams)}, 100)
+pubParams:
+  type: /${ subscribeParams.type} #pub to same type we subscribe on
+  data: "${ function(){  {'name': 'nozzleTime', 'rando': $random()}}  }"
+recv$: $subscribe(subscribeParams)
+subscribeParams: #parameters for subscribing to a cloud event
+  source: cloudEvent
+  type: 'my-topic'
+  to: /${ function($e){(
+            $console.log('received - ' & $string($e) );
+            $set('/rxLog', rxLog~>$append($e));            
+      )}  }
+  subscriberId: dingus
+  initialPosition: latest
+rxLog: []
+stop$: $count(rxLog)=20?$clearInterval(send$):'still going'
+
+
+
+
+
+

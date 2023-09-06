@@ -29,6 +29,7 @@ class StatedWorkflow {
             "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
             "onHttp": StatedWorkflow.onHttp.bind(this),
             "subscribe": StatedWorkflow.subscribe.bind(this),
+            "publish": StatedWorkflow.pulsarPublish.bind(this),
             "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
@@ -103,8 +104,32 @@ class StatedWorkflow {
     static consumers = new Map(); //key is type, value is pulsar consumer
     static dispatchers = new Map(); //key is type, value Set of WorkflowDispatcher
 
+    static pulsarPublish(params){
+        const {type, data} = params;
+        (async () => {
+
+
+            // Create a producer
+            const producer = await this.pulsarClient.createProducer({
+                topic: type,
+            });
+
+            let _data = data;
+            if(data._jsonata_lambda === true){
+                _data = await data.apply(this, []); //data is a function, call it
+            }
+            // Send a message
+            const messageId = await producer.send({
+                data: Buffer.from(JSON.stringify(_data, null, 2)),
+            });
+
+            // Close the producer and client when done
+            await producer.close();
+        })();
+
+    }
     static pulsarSubscribe(subscriptionParams) {
-        const { type} = subscriptionParams;
+        const { type, initialPosition = 'earliest'} = subscriptionParams;
 
         let consumer, dispatcher;
         //make sure a dispatcher exists for the combination of type and subscriberId
@@ -118,6 +143,7 @@ class StatedWorkflow {
                 topic:type,
                 subscription:type, //we will have only one shared-mode consumer group per message type/topics and we name it after the type of the message
                 subscriptionType: 'Shared',
+                subscriptionInitialPosition:initialPosition
             });
             // Store the consumer in the map
             StatedWorkflow.consumers.set(type, consumer);
@@ -129,7 +155,6 @@ class StatedWorkflow {
                     try {
                         const str = data.getData().toString();
                         obj = JSON.parse(str);
-                        console.log(`got data from pulsar: ${str}` );
                     }catch(error){
                         console.error("unable to parse data to json:", error);
                     }
