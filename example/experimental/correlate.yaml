@@ -33,7 +33,10 @@ listenForCommand:
       )}  }
   subscriberId: commandReceiver
   initialPosition: latest
+  maxConsume: 1 #close the consumer afer we get our event
 state: "IDLE"
+
+
 
 
 
