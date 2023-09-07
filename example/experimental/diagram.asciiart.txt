@@ -1,64 +1,64 @@
-                  ┌───────────────────────────────────┐
-                  │                                   │             Key Elements of the design
-                  │                                   │             1) Single Kafka Partition has single kafka consumer
-                  │                                   │                 advantage: not spraying/duplicaitng entire topic to mutiple receivers
-                  │         kafka multiplexed         │             2) Single Pulsar topic per event type
-                  │         Events Topic              │                advantage: infrequent event types with long running workflows do not
-                  │                                   │                           interfere or slow down fast arriving event types
-                  │                                   │             3) Single Pulsar consumer per pulsar event topic
-                  │                                   │                 advantage: "dispatcher pattern" consumer does no work, no unmarshalling
-                  │                                   │             4) workflow parallel Execution
-                  │                                   │                  advantage: work flows can be I/O bound. Parallel non-blocking I/O allows
-                  └────────┬──────────────────▲───────┘                             independent workflows to proceed without blocking each other
-                           │                  │
-                        Event               Ack
-                           │                  │
-                  ┌────────▼──────────────────┴───────┐
-                  │                                   │
-                  │                                   │
-                  │                                   │
-                  │       Kafka Consumer Demux        │
-                  │                                   │
-                  │                                   │
-                  │                                   │
-                  └──────┬────────────────────┬───────┘
-                         │                    │
-                         │                    │
-                         │                    │
-                   ┌─────▼─────┐        ┌─────▼─────┐
-                   │           │        │           │
-                   │ Pulsar    │        │ Pulsar    │
-                   │ Topic     │        │ Topic     │
-                   │ Event     │        │ Event     │
-            ┌──────► Type      │        │ Type      │
-            │      │ 1         │        │ n         │
-            │      │           │        │           │
-            │      └─────┬─────┘        └───────────┘
-            │            │
-         Ack│afer        │
-      all WF's           │
-      processed    ┌─────▼─────┐
-      event │      │           │
-            └──────┤ Pulsar    │
-                   │ Consumer  │
-            ┌──────►           │
-            │      │           │
-            │      └─────┬─────┘
-            │            │
-            │            │
-            │      ┌─────▼─────┐
-            │      │           │
-            │      │ Workflows │
-            │      │ Parallel  │
-            │      │ Execution │
-All Workflows      │           │
-Processed Event    │           │
-            │      │           │
-            │      │           │
-            │      │           │
-            │      └────┬──────┘
-            │           │
-            │           │
-            │           │
-            │           │
-            └───────────┘
+                                       ┌───────────────┐
+                                       │               │
+                                       │               │
+                                       │               │
+                                       │ Kafka Domain  │
+              multi-tenant             │  Event Topic  │
+                                       │               │
+                                       │               │
+                                       │               │
+                                       └───────────────┘
+                                               │
+                                               │
+                                               ▼
+                                       ┌───────────────┐
+                                       │               │
+                                       │               │
+                                       │               │
+                                       │Kafka-to-Pulsar│
+                                       │   Consumer    │
+                                       │               │
+                                       │               │
+                                       │               │
+                                       └───────────────┘
+                                               │
+                                               │
+                                  ┌────────────┴───────────────┐
+                                  │                            │
+                                  ▼                            ▼
+                        ┌───────────────────┐        ┌───────────────────┐
+                        │                   │        │                   │
+                        │                   │        │                   │
+                        │      Pulsar       │        │      Pulsar       │
+                        │ Tenant-Event-Type │        │ Tenant-Event-Type │
+        per-tenant      │       Topic       │   ...  │       Topic       │
+                        │                   │        │                   │
+                        │                   │        │                   │
+                        │                   │        │                   │
+                        └───────────────────┘        └───────────────────┘
+                                  │                            │
+                                  │                            │
+                                  │                            │
+                                  │                            │
+                                  │                            │
+                         ┌────────┴───────┐           ┌────────┴───────┐
+                         │                │           │                │
+                         │                │           │                │
+                         │                │           │          ┌─────┼─────┐
+                         │                │           │          │     │     │
+                         ▼                ▼           ▼          │     ▼     │
+                    ┌─────────┐      ┌─────────┐ ┌─────────┐     │┌─────────┐│
+                    │Workflow │      │Workflow │ │Workflow │     ││Workflow ││
+                    │Consumer │ ...  │Consumer │ │Consumer │ ... ││Consumer ││
+  single-tenant     │         │      │         │ │         │     ││         ││
+                    │         │      │         │ │         │     ││         ││
+                    └─────────┘      └─────────┘ └─────────┘     │└─────────┘│                 Stated
+                         │                │           │          │     │     │ ─ ─ ─ ─   TemplateProcessor
+                         ▼                ▼           ▼          │     ▼     │
+                    ┌────────┐       ┌────────┐  ┌────────┐      │┌────────┐ │
+                    │        │       │        │  │        │      ││        │ │
+                    │workflow│  ...  │workflow│  │workflow│  ... ││workflow│ │
+ single-tenant      │        │       │        │  │        │      ││        │ │
+                    │        │       │        │  │        │      ││        │ │
+                    └────────┘       └────────┘  └────────┘      │└────────┘ │
+                                                                 └───────────┘                                
