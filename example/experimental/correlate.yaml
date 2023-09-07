@@ -1,0 +1,43 @@
+# to run this locally you need to have pulsar running in standalone mode
+sequence$: ["/${$subscribe(listenForCommand)}", "/${$subscribe(listenForResponse)}", "/${$publish(command)}"]
+listenForResponse:
+  source: cloudEvent
+  type: 'my-topic'
+  maxConsume: 1 #close the consumer afer we get our event
+  to: |
+    /${ function($e){(
+          $e.type = 'DONE_IT'?(
+            $console.log('RECEIVED_RESPONSE ' & $e);
+            $set('/state', 'RECEIVED_RESPONSE');
+          ):0;           
+      )}  }
+  subscriberId: commander
+  initialPosition: latest
+command:
+  type: 'my-topic'
+  data: {type: 'DO_IT', correlationId: "${ $floor($random()*100000) }" }
+resp:
+  type: 'my-topic'
+  data: {type: 'DONE_IT', correlationId: 'set me'}
+listenForCommand:
+  source: cloudEvent
+  type: 'my-topic'
+  to: |
+    /${ function($e){(
+          $e.type = 'DO_IT'?(
+            $console.log('RECEIVED_COMMAND ' & $e);
+            $set('/state', 'RECEIVED_COMMAND');
+            $set('/resp/data/correlationId', $e.correlationId);
+            $publish(resp);
+          ):0;           
+      )}  }
+  subscriberId: commandReceiver
+  initialPosition: latest
+state: "IDLE"
+
+
+
+
+
+
+

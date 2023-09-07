@@ -14,12 +14,25 @@
 const TemplateProcessor = require('./TemplateProcessor');
 const express = require('express');
 const Pulsar = require('pulsar-client');
+const winston = require("winston");
+const stated = require("../stated");
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
     static express = require('express');
     static app = express();
     static port = 3000;
+    static logger = winston.createLogger({
+        format: winston.format.json(),
+        transports: [
+            new winston.transports.Console({
+                format: winston.format.combine(
+                    winston.format.colorize(),
+                    winston.format.simple()
+                )
+            })
+        ],
+    });
 
     static newWorkflow(template) {
         this.context = {
@@ -86,13 +99,14 @@ class StatedWorkflow {
 
     static async subscribe(subscribeOptions) {
         const {source} = subscribeOptions;
-        if(source === 'http'){
+        this.logger.debug(`subscribing ${stated.stringify(source)}`);
+        if (source === 'http') {
             return StatedWorkflow.onHttp(subscribeOptions);
         }
-        if(source === 'cloudEvent' || source === 'data'){
+        if (source === 'cloudEvent' || source === 'data') {
             return StatedWorkflow.nextCloudEvent(subscribeOptions);
         }
-        if(!source){
+        if (!source) {
             throw new Error("Subscribe source not set");
         }
         throw new Error(`Unknown subscribe source ${source}`);
@@ -104,7 +118,8 @@ class StatedWorkflow {
     static consumers = new Map(); //key is type, value is pulsar consumer
     static dispatchers = new Map(); //key is type, value Set of WorkflowDispatcher
 
-    static pulsarPublish(params){
+    static pulsarPublish(params) {
+        this.logger.debug(`pulsar publish params ${stated.stringify(params)}`);
         const {type, data} = params;
         (async () => {
 
@@ -114,40 +129,46 @@ class StatedWorkflow {
                 topic: type,
             });
 
-            let _data = data;
-            if(data._jsonata_lambda === true){
-                _data = await data.apply(this, []); //data is a function, call it
+            try {
+                let _data = data;
+                if (data._jsonata_lambda === true) {
+                    _data = await data.apply(this, []); //data is a function, call it
+                }
+                this.logger.debug(`pulsar producer sending ${stated.stringify(_data)}`);
+                // Send a message
+                const messageId = await producer.send({
+                    data: Buffer.from(JSON.stringify(_data, null, 2)),
+                });
+            }finally {
+                // Close the producer and client when done
+                producer.close();
             }
-            // Send a message
-            const messageId = await producer.send({
-                data: Buffer.from(JSON.stringify(_data, null, 2)),
-            });
-
-            // Close the producer and client when done
-            await producer.close();
         })();
 
     }
-    static pulsarSubscribe(subscriptionParams) {
-        const { type, initialPosition = 'earliest'} = subscriptionParams;
 
+    static pulsarSubscribe(subscriptionParams) {
+        const {type, initialPosition = 'earliest', maxConsume = -1} = subscriptionParams;
+        this.logger.debug(`pulsar subscribe params ${stated.stringify(subscriptionParams)}`);
         let consumer, dispatcher;
         //make sure a dispatcher exists for the combination of type and subscriberId
         WorkflowDispatcher.getDispatcher(subscriptionParams);
         // Check if a consumer already exists for the given subscription
         if (StatedWorkflow.consumers.has(type)) {
-           return ; //bail, we are already consuming and dispatching this type
+            this.logger.debug(`pulsar subscriber already started. Bail.`);
+            return; //bail, we are already consuming and dispatching this type
         }
         (async () => {
             const consumer = await StatedWorkflow.pulsarClient.subscribe({
-                topic:type,
-                subscription:type, //we will have only one shared-mode consumer group per message type/topics and we name it after the type of the message
+                topic: type,
+                subscription: type, //we will have only one shared-mode consumer group per message type/topics and we name it after the type of the message
                 subscriptionType: 'Shared',
-                subscriptionInitialPosition:initialPosition
+                subscriptionInitialPosition: initialPosition
             });
             // Store the consumer in the map
             StatedWorkflow.consumers.set(type, consumer);
             let data;
+            let countdown = maxConsume;
             while (true) {
                 try {
                     data = await consumer.receive();
@@ -155,18 +176,23 @@ class StatedWorkflow {
                     try {
                         const str = data.getData().toString();
                         obj = JSON.parse(str);
-                    }catch(error){
+                    } catch (error) {
                         console.error("unable to parse data to json:", error);
                     }
                     WorkflowDispatcher.dispatchToAllSubscribers(type, obj);
+                    if(countdown && --countdown===0){
+                        break;
+                    }
                 } catch (error) {
                     console.error("Error receiving or dispatching message:", error);
-                }finally {
-                    if(data !== undefined){
+                } finally {
+                    if (data !== undefined) {
                         consumer.acknowledge(data);
                     }
                 }
             }
+            this.logger.debug(`closing consumer with params ${stated.stringify(subscriptionParams)}`);
+            await consumer.close()
         })();
     }
 
@@ -174,7 +200,7 @@ class StatedWorkflow {
     static async nextCloudEvent(subscriptionParams) {
 
         const {testData} = subscriptionParams;
-        if(testData){
+        if (testData) {
             const dispatcher = WorkflowDispatcher.getDispatcher(subscriptionParams);
             dispatcher.addBatch(testData);
             await dispatcher.drainBatch(); // in test mode we wanna actually wait for all the test events to process
@@ -192,7 +218,7 @@ class StatedWorkflow {
 
         StatedWorkflow.app.all('*', (req, res) => {
             // Push the request and response objects to the dispatch queue to be handled by callback
-            dispatcher.addToQueue({ req, res });
+            dispatcher.addToQueue({req, res});
         });
 
         StatedWorkflow.app.listen(StatedWorkflow.port, () => {
@@ -203,14 +229,14 @@ class StatedWorkflow {
     }
 
     static async serial(input, steps, options) {
-        const {name:workflowName, log} = options;
+        const {name: workflowName, log} = options;
         let {id} = options;
 
-        if(log === undefined){
+        if (log === undefined) {
             throw new Error('log is missing from options');
         }
 
-        if(id === undefined){
+        if (id === undefined) {
             id = this.generateUniqueId();
             options.id = id;
         }
@@ -258,7 +284,7 @@ class StatedWorkflow {
             return result;
         } catch (error) {
             stepLog.end = new Date().getTime();
-            stepLog.error = { message: error.message };
+            stepLog.error = {message: error.message};
             currentLog.info.status = 'failed';
             currentLog.execution.push(stepLog);
             throw error;
@@ -419,7 +445,6 @@ class WorkflowDispatcher {
         this.batchMode = false;
     }
 }
-
 
 
 module.exports = StatedWorkflow;
