@@ -19,6 +19,7 @@ const DependencyFinder = require('./DependencyFinder');
 const winston = require('winston');
 const yaml = require('js-yaml');
 const jsonata = require("jsonata");
+const stated = require('../stated');
 
 class TemplateProcessor {
 
@@ -111,6 +112,9 @@ class TemplateProcessor {
         this.populateTemplateMeta(metaInfos);
         this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
         this.propagateTags(metaInfos);
+        if(this.logger.level === 'debug' || this.logger.level === 'silly'){
+            this.logger.debug(`metaInfos: ${JSON.stringify(metaInfos, null, 2)}`);
+        }
         await this.evaluate(jsonPtr);
         this.removeTemporaryVariables(metaInfos);
     }
@@ -280,7 +284,6 @@ class TemplateProcessor {
             }
             return metaInfo;
         }));
-
         return metaInfos;
     }
 
@@ -344,6 +347,7 @@ class TemplateProcessor {
 
     async evaluateDependencies(metaInfos) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
+        this.logger.debug(`plan: ${JSON.stringify(evaluationPlan)}`);
         return await this.evaluateJsonPointersInOrder(evaluationPlan);
     }
 
@@ -472,6 +476,9 @@ class TemplateProcessor {
 
 
     async setData(jsonPtr, data) {
+        if(this.logger.level === "debug" || this.logger.level === "silly"){
+            this.logger.debug(`set ${jsonPtr} to ${stated.stringify(data)}`);
+        }
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
         return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
@@ -591,11 +598,14 @@ class TemplateProcessor {
 
     async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, tags__} = jp.get(this.templateMeta, jsonPtr);
+        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, tags__, expr__} = jp.get(this.templateMeta, jsonPtr);
 
         try {
             const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
+            if(this.logger.level === 'debug' || this.logger.level === 'silly'){
+                this.logger.debug(`Evaluating expression at ${jsonPointer__}: ${expr__}`);
+            }
             evaluated = await compiledExpr__.evaluate(
                 target,
                 _.merge(this.context, {"import": safe(this.getImport(jsonPointer__))}));
