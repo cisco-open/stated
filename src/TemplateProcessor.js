@@ -19,7 +19,6 @@ const DependencyFinder = require('./DependencyFinder');
 const winston = require('winston');
 const yaml = require('js-yaml');
 const jsonata = require("jsonata");
-const stated = require('../stated');
 
 class TemplateProcessor {
 
@@ -476,9 +475,9 @@ class TemplateProcessor {
 
 
     async setData(jsonPtr, data) {
-        if(this.logger.level === "debug" || this.logger.level === "silly"){
-            this.logger.debug(`set ${jsonPtr} to ${stated.stringify(data)}`);
-        }
+        // if(this.logger.level === "debug" || this.logger.level === "silly"){
+        //     this.logger.debug(`set ${jsonPtr} to ${stated.stringify(data)}`);
+        // }
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
         return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order

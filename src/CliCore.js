@@ -17,6 +17,7 @@ const TemplateProcessor = require('./TemplateProcessor');
 const yaml = require('js-yaml');
 const minimist = require('minimist');
 const stringArgv = require('string-argv');
+const vm = require("vm");
 
 class CliCore {
     constructor() {
@@ -52,13 +53,16 @@ class CliCore {
     async readFileAndParse(filepath) {
         const fileContent = await fs.promises.readFile(filepath, 'utf8');
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
-
-        if (fileExtension === 'yaml' || fileExtension === 'yml') {
+        if (fileExtension === 'js') {
+            return this.readAndParseJS(filepath);
+        }
+        else if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
         } else {
             return JSON.parse(fileContent);
         }
     }
+
 
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
     async init(replCmdInputStr) {
@@ -68,7 +72,9 @@ class CliCore {
             return undefined;
         }
         const input = await this.readFileAndParse(filepath);
-        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
+        const contextDataFromJS = await this.getContextFromJSModule(contextFilePath);
+        // const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
+        const contextData = {...contextDataFromJS, ...contextFilePath ? await this.readFileAndParse(contextFilePath) : {}};
 
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
@@ -91,6 +97,100 @@ class CliCore {
         }
     }
 
+    async importJSModule(jsFilePath) {
+        let jsCode = await fs.promises.readFile(jsFilePath, 'utf8');
+        return this.loadJSModule(jsCode);
+    }
+
+    async getContextFromJSModule(jsFilePath) {
+        const context = {};
+
+        const exported = await this.importJSModule(jsFilePath);
+
+        for (const key in exported) {
+            if (typeof exported[key] === 'function' && exported[key].prototype) { // It's a class
+                const classMethods = Object.getOwnPropertyNames(exported[key]).filter(name => {
+                    const method = exported[key][name];
+                    return typeof method === 'function' && !['length', 'prototype', 'name'].includes(name);
+                });
+
+                classMethods.forEach(methodName => {
+                    context[methodName] = exported[key][methodName].bind(exported[key]);
+                });
+            }
+        }
+
+        return context;
+    }
+
+    // async getContextFromJSModule(jsFilePath) {
+    //     const context = {};
+    //
+    //     const exported = await this.importJSModule(jsFilePath);
+    //
+    //     for (const key in exported) {
+    //         if (typeof exported[key] === 'function' && exported[key].prototype) { // It's a class
+    //             const classMethods = Object.getOwnPropertyNames(exported[key]).filter(name => {
+    //                 const method = exported[key][name];
+    //                 return typeof method === 'function' && !['length', 'prototype', 'name'].includes(name);
+    //             });
+    //
+    //             classMethods.forEach(methodName => {
+    //                 context[methodName] = exported[key][methodName].bind(exported[key]);
+    //             });
+    //         }
+    //     }
+    //
+    //     return context;
+    // }
+
+    async readAndParseJS(contextFilePath) {
+        let jsCode;
+        if (this.isURL(contextFilePath)) {
+            const response = await fetch(contextFilePath);
+            const mimeType = response.headers.get('content-type');
+
+            if (mimeType && mimeType.includes('application/javascript')) {
+                jsCode = await response.text();
+            } else {
+                throw new Error("The URL does not point to a JS file.");
+            }
+        } else {
+            jsCode = await fs.promises.readFile(contextFilePath, 'utf8');
+        }
+        return this.loadJSModule(jsCode);
+    }
+
+    isURL(str) {
+        try {
+            new URL(str);
+            return true;
+        } catch (_) {
+            return false;
+        }
+    }
+
+    loadJSModule(jsCode) {
+        // const sandbox = {};
+        // vm.createContext(sandbox);
+        // vm.runInThisContext(jsCode);
+        // return sandbox;
+        const sandbox = {
+            require: require,
+            console: console,
+            module: module,
+            __filename: __filename,
+            __dirname: __dirname
+        };
+
+        vm.createContext(sandbox);
+        vm.runInContext(jsCode, sandbox);
+
+        // Merge properties from sandbox into existingContext
+        // Object.assign(existingContext, sandbox);
+
+        return sandbox.module.exports;
+    }
 
     async set(args) {
         const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
