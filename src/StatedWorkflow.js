@@ -17,23 +17,23 @@ const Pulsar = require('pulsar-client');
 const winston = require("winston");
 const stated = require("../stated");
 
+const app = express();
+const port = 3000;
+const logger = winston.createLogger({
+    format: winston.format.json(),
+    transports: [
+        new winston.transports.Console({
+            format: winston.format.combine(
+                winston.format.colorize(),
+                winston.format.simple()
+            )
+        })
+    ],
+});
+
+
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 class StatedWorkflow {
-    static express = require('express');
-    static app = express();
-    static port = 3000;
-    static logger = winston.createLogger({
-        format: winston.format.json(),
-        transports: [
-            new winston.transports.Console({
-                format: winston.format.combine(
-                    winston.format.colorize(),
-                    winston.format.simple()
-                )
-            })
-        ],
-    });
-
     static newWorkflow(template) {
         this.context = {
             "id": StatedWorkflow.generateDateAndTimeBasedID.bind(this),

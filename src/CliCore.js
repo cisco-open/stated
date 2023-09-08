@@ -108,10 +108,11 @@ class CliCore {
         const exported = await this.importJSModule(jsFilePath);
 
         for (const key in exported) {
-            if (typeof exported[key] === 'function' && exported[key].prototype) { // It's a class
+            if (typeof exported[key] === 'function' && exported[key].prototype) {
+                // Capture only first-level functions (static methods)
                 const classMethods = Object.getOwnPropertyNames(exported[key]).filter(name => {
-                    const method = exported[key][name];
-                    return typeof method === 'function' && !['length', 'prototype', 'name'].includes(name);
+                    return typeof exported[key][name] === 'function' &&
+                        !['length', 'prototype', 'name'].includes(name);
                 });
 
                 classMethods.forEach(methodName => {
