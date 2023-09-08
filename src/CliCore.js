@@ -72,9 +72,9 @@ class CliCore {
             return undefined;
         }
         const input = await this.readFileAndParse(filepath);
-        const contextDataFromJS = await this.getContextFromJSModule(contextFilePath);
-        // const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
-        const contextData = {...contextDataFromJS, ...contextFilePath ? await this.readFileAndParse(contextFilePath) : {}};
+        // const contextDataFromJS = await this.getContextFromJSModule(contextFilePath);
+        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
+        // const contextData = {...contextDataFromJS, ...contextFilePath ? await this.readFileAndParse(contextFilePath) : {}};
 
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
