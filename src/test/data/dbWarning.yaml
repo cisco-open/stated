@@ -1,0 +1,66 @@
+
+  props:
+    regions:
+      - "all"
+    types:
+      - "all"
+    entityType: "ec2"
+    showAsPercent: false
+    showExpanded: true
+  since: "/${ globals.timerange.since }"
+  until: "/${ globals.timerange.until }"
+  fetch: "FETCH count"
+  from: "FROM entities(aws:ec2)"
+  normalStatusFilter: "attributes(status) = 0"
+  warningStatusFilter: "attributes(status) = 2"
+  criticalStatusFilter: "attributes(status) = 3"
+  unknownStatusFilter: "attributes(status) IN [1,null]"
+  typeFilter: "/${ 'attributes(cloud.host.type) IN ' & props.types }"
+  regionFilter: "/${ 'attributes(cloud.region) IN ' & props.regions }"
+  andRegionFilter: "/${ $count(props.regions) >= 1 and props.regions[0] != 'all' ? ' && ' & regionFilter }"
+  andTypeFilter: "/${ $count(props.types) >= 1 and props.types[0] != 'all' ? ' && ' & typeFilter }"
+  normal_filter: "/${ '[' & normalStatusFilter & andRegionFilter & andTypeFilter & ']' }"
+  warning_filter: "/${ '[' & warningStatusFilter & andRegionFilter & andTypeFilter & ']' }"
+  critical_filter: "/${ '[' & criticalStatusFilter & andRegionFilter & andTypeFilter & ']' }"
+  unknown_filter: "/${ '[' & unknownStatusFilter & andRegionFilter & andTypeFilter & ']' }"
+  limits: " LIMITS topology.count(1000)"
+  datasources:
+    normalStatus:
+      type: "uql"
+      options:
+        since: "/${ globals.timerange.since }"
+        until: "/${ globals.timerange.until }"
+        queryStr: "/${ $join([fetch, from, normal_filter, limits], ' ') }"
+    warningStatus:
+      type: "uql"
+      options:
+        since: "/${ globals.timerange.since }"
+        until: "/${ globals.timerange.until }"
+        queryStr: "/${ $join([fetch, from, warning_filter, limits], ' ') }"
+    criticalStatus:
+      type: "uql"
+      options:
+        since: "/${ globals.timerange.since }"
+        until: "/${ globals.timerange.until }"
+        queryStr: "/${ $join([fetch, from, critical_filter, limits], ' ') }"
+    unknownStatus:
+      type: "uql"
+      options:
+        since: "/${ globals.timerange.since }"
+        until: "/${ globals.timerange.until }"
+        queryStr: "/${ $join([fetch, from, unknown_filter, limits], ' ') }"
+
+  view:
+    -
+      - "div"
+      - className: "grow"
+      -
+        -
+          - "dashify:HealthCounts"
+          - entityType: "aws:ec2"
+            showAsPercent: "/${ props.showAsPercent }"
+            showExpanded: "/${ props.showExpanded }"
+            critical: "/${ data.criticalStatus.data[0].count ? data.criticalStatus.data[0].count : 0 }"
+            warning: "/${ data.warningStatus.data[0].count ? data.warningStatus.data[0].count : 0 }"
+            unknown: "/${ data.unknownStatus.data[0].count ? data.unknownStatus.data[0].count : 0 }"
+            normal: "/${ data.normalStatus.data[0].count ? data.normalStatus.data[0].count : 0 }"

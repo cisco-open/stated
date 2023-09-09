@@ -14,6 +14,9 @@
 const TemplateProcessor = require('../TemplateProcessor');
 const _ = require('lodash');
 const largeResources = require('./large');
+const path = require("path");
+const fs = require("fs");
+const yaml = require("js-yaml");
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -959,6 +962,24 @@ test("remove temp vars", async () => {
         "f": 30
     })
 });
+
+
+test("dashboard", async () => {
+
+    const yamlFilePath = path.join(__dirname, 'data', 'dbWarning.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    const template = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize();
+    expect(tp.getDependenciesTransitiveExecutionPlan('/view/0/2/0/1/warning')).toEqual([
+        "/data/warningStatus/data/0/count",
+        "/view/0/2/0/1/warning"
+    ])
+});
+
+
+
+
 
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
