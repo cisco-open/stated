@@ -13,6 +13,27 @@
 // limitations under the License.
 const DependencyFinder = require('../DependencyFinder');
 
+
+test('data warning', () => {
+    const df = new DependencyFinder('data.warningStatus.data[0].count ? data.warningStatus.data[0].count : 0');
+    expect(df.findDependencies()).toEqual([
+        [
+            "data",
+            "warningStatus",
+            "data",
+            0,
+            "count"
+        ],
+        [
+            "data",
+            "warningStatus",
+            "data",
+            0,
+            "count"
+        ]
+    ]);
+});
+
 test('$$.aaa', () => {
     const df = new DependencyFinder('$$.aaa');
     expect(df.findDependencies()).toEqual([["$", 'aaa']]);

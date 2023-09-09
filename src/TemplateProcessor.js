@@ -436,9 +436,8 @@ class TemplateProcessor {
                                 //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular dependencies as it would in ex10
                                 listDependencies(ancestor, exprsOnly);
                             }
-                        } else {
-                            listDependencies(dependencyNode, exprsOnly);
                         }
+                        listDependencies(dependencyNode, exprsOnly);
                     }
                 }
             }
