@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="ff199005-910f-40d6-b61c-2b3467f34c8d" name="Changes" comment="">
+      <change beforePath="$PROJECT_DIR$/README.md" beforeDir="false" afterPath="$PROJECT_DIR$/README.md" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/README.module_tester.js" beforeDir="false" afterPath="$PROJECT_DIR$/README.module_tester.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/ex25.json" beforeDir="false" afterPath="$PROJECT_DIR$/example/ex25.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/example/module_exports.js" beforeDir="false" afterPath="$PROJECT_DIR$/example/module_exports.js" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/package.json" beforeDir="false" afterPath="$PROJECT_DIR$/package.json" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/yarn.lock" beforeDir="false" afterPath="$PROJECT_DIR$/yarn.lock" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="KubernetesApiPersistence">
+    <option name="context" value="k3d-t1" />
+  </component>
+  <component name="MarkdownSettingsMigration">
+    <option name="stateVersion" value="1" />
+  </component>
+  <component name="ProjectId" id="2VMbPvhmW1LTlB5YsBB4Pb9uCqC" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent"><![CDATA[{
+  "keyToString": {
+    "RunOnceActivity.OpenProjectViewOnStart": "true",
+    "RunOnceActivity.ShowReadmeOnStart": "true",
+    "WebServerToolWindowFactoryState": "false",
+    "last_opened_file_path": "/Users/sesergee/projects/sandbox/stated/example",
+    "nodejs.jest.jest_package": "/Users/sesergee/projects/sandbox/stated/node_modules/jest",
+    "nodejs_interpreter_path": "/usr/local/Cellar/node/20.5.1/bin/node",
+    "nodejs_package_manager_path": "yarn",
+    "settings.editor.selected.configurable": "settings.nodejs"
+  }
+}]]></component>
+  <component name="RecentsManager">
+    <key name="CopyFile.RECENT_KEYS">
+      <recent name="$PROJECT_DIR$/example" />
+    </key>
+  </component>
+  <component name="RunManager" selected="Node.js.module_exports.js">
+    <configuration name="README.test.js" type="JavaScriptTestRunnerJest" temporary="true" nameIsGenerated="true">
+      <node-interpreter value="project" />
+      <node-options value="" />
+      <jest-package value="$PROJECT_DIR$/node_modules/jest" />
+      <working-dir value="$PROJECT_DIR$" />
+      <envs />
+      <scope-kind value="TEST_FILE" />
+      <test-file value="$PROJECT_DIR$/README.test.js" />
+      <method v="2" />
+    </configuration>
+    <configuration name="README.module_tester.js" type="NodeJSConfigurationType" temporary="true" nameIsGenerated="true" path-to-js-file="README.module_tester.js" working-dir="$PROJECT_DIR$">
+      <method v="2" />
+    </configuration>
+    <configuration name="module_exports.js" type="NodeJSConfigurationType" temporary="true" nameIsGenerated="true" path-to-js-file="$PROJECT_DIR$/example/module_exports.js" working-dir="$PROJECT_DIR$/example">
+      <method v="2" />
+    </configuration>
+    <configuration name="module_import.js" type="NodeJSConfigurationType" temporary="true" nameIsGenerated="true" path-to-js-file="$PROJECT_DIR$/module_import.js" working-dir="$PROJECT_DIR$">
+      <method v="2" />
+    </configuration>
+    <list>
+      <item itemvalue="Jest.README.test.js" />
+      <item itemvalue="Node.js.module_exports.js" />
+      <item itemvalue="Node.js.module_import.js" />
+      <item itemvalue="Node.js.README.module_tester.js" />
+    </list>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Node.js.module_exports.js" />
+        <item itemvalue="Node.js.module_import.js" />
+        <item itemvalue="Node.js.README.module_tester.js" />
+        <item itemvalue="Jest.README.test.js" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="ff199005-910f-40d6-b61c-2b3467f34c8d" name="Changes" comment="" />
+      <created>1694648879529</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1694648879529</updated>
+      <workItem from="1694648883208" duration="12730000" />
+    </task>
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="XDebuggerManager">
+    <breakpoint-manager>
+      <breakpoints>
+        <line-breakpoint enabled="true" type="javascript">
+          <condition expression="i===77" language="JavaScript" />
+          <url>file://$PROJECT_DIR$/README.test.js</url>
+          <line>88</line>
+          <properties lambdaOrdinal="-1" />
+          <option name="timeStamp" value="3" />
+        </line-breakpoint>
+        <line-breakpoint enabled="true" type="javascript">
+          <url>file://$PROJECT_DIR$/README.module_tester.js</url>
+          <line>66</line>
+          <properties lambdaOrdinal="-1" />
+          <option name="timeStamp" value="8" />
+        </line-breakpoint>
+      </breakpoints>
+    </breakpoint-manager>
+  </component>
+</project>

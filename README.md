@@ -1013,8 +1013,6 @@ from a remote template. Note that the URL ends in `#/resourceMapperFn`
     }
   ]
 }
-
-
 ```
 ### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
@@ -1297,5 +1295,25 @@ to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expre
 {
   "name": "Dr. Stephen Falken",
   "address": "Goose Island, OR, USA"
+}
+```
+### Importing JS modules
+stated supports importing JavaScript modules. All objects exported by the module will be added to the stated context. 
+"example/module_exports.js" exports an object with a multiple functions. 
+
+The example below  `myFunction` function from an external
+module. Note, that we are removing non-json representation of the classes and modules in the output to keep it a valid
+json.
+```
+> .note "integration test - this test can't be reliably run with jest framework"
+> .init -f "example/ex25.json" --xf "example/module_exports.js"
+{
+  "a": "${ $MyClass.foo() }",
+  "b": "${ $myFunction() }"
+}
+> .note "integration test - this test can't be reliably run with jest framework"
+> .out
+{
+  "b": "Hello from myFunction"
 }
 ```

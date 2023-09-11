@@ -18,17 +18,23 @@ import StatedREPL  from './src/StatedREPL.js';
 
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
- * that begin and end with ``` (markdown syntax for code block) and it extracts the cli command and the
- * response. It then runs the cli command and compares the response to what is in the README.md. This ensures
- * that the README is always accurate.
+ * that begin and end with ``` (markdown syntax for code block). It first checks for an optional note
+ * (starting with '> .note') before extracting the cli command and the response. It then runs the cli
+ * command and compares the response to what is in the README.md. This ensures that the README is always accurate.
  *
- * /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm
+ * /^(?:> \.note (?<note>.+)[\r\n])?^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm
  *
  * Breakdown:
  *
  * ^: Start of a line (because we're using the 'm' flag which makes ^ and $ match start and end of lines respectively)
  *
+ * (?:...): Non-capturing group.
+ *
  * > : Matches the ">" character literally. This assumes that your command lines in the README start with ">".
+ *
+ * \.note : Matches the ".note" literal string, denoting a note for the command.
+ *
+ * (?<note>.+[\r\n]): Optional named capturing group 'note'. Matches any number of characters (using .+), followed by a line break (using [\r\n]).
  *
  * \. : Matches the "." character literally.
  *
@@ -49,7 +55,7 @@ import StatedREPL  from './src/StatedREPL.js';
  * m: Multiline flag, to allow ^ and $ to match the start and end of lines, not just the start and end of the whole string.
  */
 const markdownContent = fs.readFileSync("README.md", 'utf-8');
-const commandRegex  = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;;
+const commandRegex = /^(?:^> \.note (?<note>.+)[\r\n])?^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;
 let match;
 const cliCore = new CliCore();
 const testData = [];
@@ -57,6 +63,7 @@ const testData = [];
 while ((match = commandRegex.exec(markdownContent)) !== null) {
     const command = match.groups.command.trim();
     const expectedResponseString = match.groups.expectedResponse.trim();
+    const note = match.groups.note?.trim();
     const args = command.split(' ');
 
     if (args.length > 0) {
@@ -64,7 +71,13 @@ while ((match = commandRegex.exec(markdownContent)) !== null) {
         const method = cliCore[cmdName];
 
         if (typeof method === 'function') {
-            testData.push([cmdName, args, expectedResponseString]);
+            if (note && note.includes("integration test")) {
+                console.log(`Skipping integration test: ${cmdName} ${args.join(' ')}`);
+            } else if (cmdName === 'note') {
+                console.log(`Skipping integration test: ${cmdName} ${args.join(' ')}`);
+            } else {
+                testData.push([cmdName, args, expectedResponseString]);
+            }
         } else {
             throw Error(`Unknown command: .${cmdName}`);
         }
@@ -73,6 +86,7 @@ while ((match = commandRegex.exec(markdownContent)) !== null) {
 
 testData.forEach(([cmdName, args, expectedResponseString], i) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
+        console.log(`Running test ${i + 1} of ${testData.length}: ${cmdName} ${args.join(' ')} and expecting ${expectedResponseString}`);
         const rest = args.join(" ");
         const resp = await cliCore[cmdName].apply(cliCore, [rest]);
         const respNormalized = JSON.parse(StatedREPL.stringify(resp));

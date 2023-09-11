@@ -159,7 +159,7 @@ export default class TemplateProcessor {
             const parsedUrl = this.parseURL(urlOrObj);
             if (parsedUrl) {
                 resp = await this.fetchFromURL(parsedUrl);
-                resp = this.extractFragmentIfNeeded(resp, parsedUrl);
+                resp = await this.extractFragmentIfNeeded(resp, parsedUrl);
             } else {
                 this.logger.debug(`argument tp $import is not a valid URL. Attempting to treat it as literal template.`);
                 resp = this.validateAsJSON(urlOrObj);
@@ -169,6 +169,7 @@ export default class TemplateProcessor {
             return TemplateProcessor.NOOP;
         }
     }
+
     parseURL(input) {
         try {
             return new URL(input);
@@ -201,6 +202,8 @@ export default class TemplateProcessor {
                     format = 'json';
                 } else if (fileExtension === 'yaml' || fileExtension === 'yml') {
                     format = 'yaml';
+                } else if (fileExtension === 'js' || fileExtension === 'mjs') {
+                    format = 'js';
                 }
             }
 
@@ -210,6 +213,9 @@ export default class TemplateProcessor {
                 case 'yaml':
                     const text = await resp.text();
                     return yaml.load(text);
+                case 'js':
+                    const respText = await resp.text();
+                    return await this.loadModule(respText);
                 default:
                     throw new Error(`Cannot determine response format for URL: ${url}`);
             }
@@ -219,6 +225,19 @@ export default class TemplateProcessor {
             this.logger.error(e);
             throw new Error(msg);
         }
+    }
+
+    static async loadModule(jsContent) {
+        try {
+            const encodedContent = encodeURIComponent(jsContent);
+            const data = `data:text/javascript;charset=utf-8,${encodedContent}`;
+            const moduleA = await import(data);
+            return moduleA;
+        } catch (error) {
+            console.error('Failed to load module:', error);
+        }
+        const encodedContent = encodeURIComponent(jsContent);
+        return `data:text/javascript;charset=utf-8,${encodedContent}`;
     }
 
     extractFragmentIfNeeded(response, url) {

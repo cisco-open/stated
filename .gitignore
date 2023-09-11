@@ -1,5 +1,8 @@
 .devcontainer/devcontainer.json
 
+# IDEs
+.idea
+
 # Logs
 logs
 *.log

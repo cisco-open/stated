@@ -1,0 +1,4 @@
+{
+  "a": "!${ $import('https://raw.githubusercontent.com/zhirafovod/shtuff/main/src/module_exports.js') }",
+  "b": "${ a.myFunction() }"
+}
