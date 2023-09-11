@@ -1,0 +1,58 @@
+{
+  "name": "stated-js",
+  "version": "0.0.42",
+  "license": "Apache-2.0",
+  "description": "JSONata embedded in JSON",
+  "main": "stated.js",
+  "scripts": {
+    "test-jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test-modules": "node README.module_tester.js",
+    "test": "npm run test-modules && npm run test-jest",
+    "start": "node index.js",
+    "stated": "./stated.js"
+  },
+  "bin": {
+    "stated": "./stated.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/cisco-open/stated"
+  },
+  "keywords": [
+    "jsonata",
+    "json",
+    "config",
+    "state",
+    "dag"
+  ],
+  "author": "Geoff Hendrey <ghendreyl@cisco.com>",
+  "dependencies": {
+    "flatbuffers": "^23.5.26",
+    "js-yaml": "^4.1.0",
+    "json-pointer": "^0.6.2",
+    "jsonata": "^2.0.3",
+    "lodash": "^4.17.21",
+    "minimist": "^1.2.8",
+    "string-argv": "^0.3.2",
+    "winston": "^3.10.0"
+  },
+  "devDependencies": {
+    "jest": "^29.5.0"
+  },
+  "jest": {
+    "transform": {}
+  },
+  "files": [
+    "CONTRIBUTING.md",
+    "LICENSE",
+    "package.json",
+    "README.md",
+    "README.test.js",
+    "stated.js",
+    "yarn.lock",
+    "src/**/*",
+    "example/**/*",
+    "!**/.idea",
+    "!**/.github"
+  ]
+}

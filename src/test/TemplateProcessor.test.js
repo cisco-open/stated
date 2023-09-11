@@ -21,6 +21,17 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 
 
+
+test("test 00", async () => {
+    const tp = new TemplateProcessor({
+        "a": "!${ $import('https://raw.githubusercontent.com/zhirafovod/shtuff/main/src/module_exports.js') }",
+        "b": "${ a.myFunction() }"
+    });
+    await tp.initialize();
+    let data = `data:text/javascript;charset=utf-8,class%20MyClass%20%7B%0A%20%20%20%20static%20foo()%20%7B%0A%20%20%20%20%20%20%20%20return%20'Hello%20from%20MyClass'%3B%0A%20%20%20%20%7D%0A%7D%0A%0Aclass%20AnotherClass%20%7B%0A%20%20%20%20static%20bar()%20%7B%0A%20%20%20%20%20%20%20%20return%20'Greetings%20from%20AnotherClass'%3B%0A%20%20%20%20%7D%0A%7D%0A%0Afunction%20myFunction()%20%7B%0A%20%20%20%20return%20'Hello%20from%20myFunction'%3B%0A%7D%0A%0Afunction%20anotherFunction()%20%7B%0A%20%20%20%20return%20'Greetings%20from%20anotherFunction'%3B%0A%7D%0A%0Aexport%20%7B%20MyClass%2C%20AnotherClass%2C%20myFunction%2C%20anotherFunction%20%7D%3B`;
+    import(data);
+});
+
 test("test 1", async () => {
     const tp = new TemplateProcessor({
         "a": "aaa",

@@ -1014,6 +1014,23 @@ from a remote template. Note that the URL ends in `#/resourceMapperFn`
   ]
 }
 ```
+### Importing JS modules
+stated supports importing JavaScript modules. The example below imports the `myFunction` function from an external
+module. Note, that we are removing non-json representation of the classes and modules in the output to keep it a valid
+json.
+
+
+> .note "integration test - this test can't be reliably run with jest"
+> .init -f "example/ex25.json" --xf "example/module_exports.js"
+{
+  "b": "${ $myFunction() }"
+}
+> .out
+{
+  "b": "Hello from myFunction"
+}
+
+
 ### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x` 
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that 
