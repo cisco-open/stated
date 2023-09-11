@@ -1,3 +1,4 @@
+statedWorkflow$: import('file://src.StatedWorkflow.js')
 start$: $subscribe(subscribeParams)
 name: nozzleWork
 subscribeParams: #parameters for subscribing to a cloud event
@@ -11,7 +12,7 @@ subscribeParams: #parameters for subscribing to a cloud event
 
 myWorkflow$: |
   function($e){
-      $e ~> $serial([step1, step2], 
+      $e ~> $StatedWorkflow.serial([step1, step2], 
                     {
                       'name':$$.name, 
                       'log':$$.log, 
