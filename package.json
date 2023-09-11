@@ -1,11 +1,13 @@
 {
   "name": "stated-js",
-  "version": "0.0.44",
+  "version": "0.0.45",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "stated.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test-jest": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test-modules": "node --experimental-vm-modules README.module_tester.js",
+    "test": "npm run test-modules && npm run test-jest",
     "start": "node index.js",
     "stated": "./stated.js"
   },
@@ -38,6 +40,10 @@
   "devDependencies": {
     "jest": "^29.5.0"
   },
+  "jest": {
+    "transform": {}
+  },
+  "type": "module",
   "files": [
     "CONTRIBUTING.md",
     "LICENSE",
@@ -50,9 +56,5 @@
     "example/**/*",
     "!**/.idea",
     "!**/.github"
-  ],
-  "jest": {
-    "transform": {}
-  },
-  "type": "module"
+  ]
 }

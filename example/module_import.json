@@ -1,0 +1,5 @@
+{
+  "something": "else",
+  "firstFunctionCall": "${ $myFunction(something) }",
+  "secondFunctionCall": "${ $anotherFunction(firstFunctionCall) }"
+}
