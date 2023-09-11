@@ -162,7 +162,6 @@ class TemplateProcessor {
             let resp;
             const parsedUrl = this.parseURL(urlOrObj);
             if (parsedUrl) {
-                const fileExtension = path.extname(urlOrObj).toLowerCase().replace(/\W/g, '');
                 resp = await this.fetchFromURL(parsedUrl);
                 resp = await this.extractFragmentIfNeeded(resp, parsedUrl);
             } else {
