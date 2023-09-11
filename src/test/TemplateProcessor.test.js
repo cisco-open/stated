@@ -21,7 +21,7 @@ const yaml = require("js-yaml");
 
 test("test 00", async () => {
     const tp = new TemplateProcessor({
-        "a": "${ import('https://raw.githubusercontent.com/cisco-open/stated/stated_workflow_import/src/A.js') }",
+        "a": "${ $import('https://raw.githubusercontent.com/cisco-open/stated/stated_workflow_import/src/A.js') }",
         "b": "${a.myFunction()}"
     });
     await tp.initialize();

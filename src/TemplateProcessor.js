@@ -164,11 +164,11 @@ class TemplateProcessor {
             if (parsedUrl) {
                 const fileExtension = path.extname(urlOrObj).toLowerCase().replace(/\W/g, '');
                 resp = await this.fetchFromURL(parsedUrl);
-                resp = this.extractFragmentIfNeeded(resp, parsedUrl);
-                if (fileExtension === 'js') {
-                    // const exports = this.loadModule(urlOrObj);
-                    this.context = {...this.context, ...resp};
-                }
+                resp = await this.extractFragmentIfNeeded(resp, parsedUrl);
+                // if (fileExtension === 'js') {
+                //     const exports = this.loadModule(urlOrObj);
+                //     this.context = {...this.context, ...exports};
+                // }
             } else {
                 this.logger.debug(`argument tp $import is not a valid URL. Attempting to treat it as literal template.`);
                 resp = this.validateAsJSON(urlOrObj);
@@ -178,6 +178,7 @@ class TemplateProcessor {
             return TemplateProcessor.NOOP;
         }
     }
+
     parseURL(input) {
         try {
             return new URL(input);
@@ -222,7 +223,8 @@ class TemplateProcessor {
                     const text = await resp.text();
                     return yaml.load(text);
                 case 'js':
-                    return await loadModule(resp.text());
+                    const respText = await resp.text();
+                    return await this.loadModule(respText);
                 default:
                     throw new Error(`Cannot determine response format for URL: ${url}`);
             }
@@ -236,6 +238,21 @@ class TemplateProcessor {
 
     async loadModule(jsContent) {
         try {
+            // const jsContent = fs.readFileSync("./A.js", "utf8");
+            const encodedContent = encodeURIComponent(jsContent);
+            const data = `data:text/javascript;charset=utf-8,${encodedContent}`;
+            const moduleA = await import(data);
+            return moduleA;
+            // console.log(moduleA.default.foo()); // Outputs: Hello from A!
+        } catch (error) {
+            console.error('Failed to load module:', error);
+        }
+        const encodedContent = encodeURIComponent(jsContent);
+        return `data:text/javascript;charset=utf-8,${encodedContent}`;
+    }
+
+    async loadModuleFromFile(jsContent) {
+        try {
             const jsContent = fs.readFileSync("./A.js", "utf8");
             const encodedContent = encodeURIComponent(jsContent);
             const data = `data:text/javascript;charset=utf-8,${encodedContent}`;
@@ -248,6 +265,7 @@ class TemplateProcessor {
         const encodedContent = encodeURIComponent(jsContent);
         return `data:text/javascript;charset=utf-8,${encodedContent}`;
     }
+
     extractFragmentIfNeeded(response, url) {
         const jsonPointer = url.hash && url.hash.substring(1);
         if (jsonPointer && jp.has(response, jsonPointer)) {

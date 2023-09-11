@@ -10,7 +10,7 @@ async function loadModule() {
         const jsContent = fs.readFileSync("./A.js", "utf8");
         let data = imortJSContent(jsContent);
         const moduleA = await import(data);
-        console.log(moduleA.default.foo()); // Outputs: Hello from A!
+        console.log(moduleA.myFunction()); // Outputs: Hello from myFunction
     } catch (error) {
         console.error('Failed to load module:', error);
     }
