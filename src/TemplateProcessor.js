@@ -165,10 +165,6 @@ class TemplateProcessor {
                 const fileExtension = path.extname(urlOrObj).toLowerCase().replace(/\W/g, '');
                 resp = await this.fetchFromURL(parsedUrl);
                 resp = await this.extractFragmentIfNeeded(resp, parsedUrl);
-                // if (fileExtension === 'js') {
-                //     const exports = this.loadModule(urlOrObj);
-                //     this.context = {...this.context, ...exports};
-                // }
             } else {
                 this.logger.debug(`argument tp $import is not a valid URL. Attempting to treat it as literal template.`);
                 resp = this.validateAsJSON(urlOrObj);
