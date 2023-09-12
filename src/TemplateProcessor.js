@@ -19,6 +19,7 @@ const DependencyFinder = require('./DependencyFinder');
 const winston = require('winston');
 const yaml = require('js-yaml');
 const jsonata = require("jsonata");
+const Debugger = require ("./Debugger");
 
 class TemplateProcessor {
 
@@ -47,9 +48,10 @@ class TemplateProcessor {
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
         this.warnings = [];
-        this.metaInfoByJsonPointer = {};
+        this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
         this.tagSet = new Set();
         this.options = options;
+        this.debugger = new Debugger(this.templateMeta, this.logger);
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that

@@ -186,6 +186,14 @@ class CliCore {
     note(note){
         return "=============================================================";
     }
+
+    async debug(replCmdInputStr) {
+        if (!this.templateProcessor) {
+            throw new Error('Initialize the template first.');
+        }
+        const parsed = CliCore.minimistArgs(replCmdInputStr)
+        return this.templateProcessor.debugger.processCommands(parsed);
+    }
 }
 
 module.exports = CliCore;

@@ -47,7 +47,8 @@ class Stated {
             ["to", 'Show the dependencies of a given JSON pointer'],
             ["plan", 'Show the evaluation plan'],
             ["note", "returns ═══ ... for creating documentation"],
-            ["log", "set the log level [debug, info, warn, error]"]
+            ["log", "set the log level [debug, info, warn, error]"],
+            ["debug", "set debug commands"]
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
