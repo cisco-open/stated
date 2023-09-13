@@ -5,7 +5,9 @@
   "description": "JSONata embedded in JSON",
   "main": "stated.js",
   "scripts": {
-    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test-w-vm-modules": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=drawSquare",
+    "test-no-vm-modules": "node node_modules/jest/bin/jest.js --testPathPattern=\"^(?!.*drawSquare)\"",
+    "test": "npm run test-w-vm-modules && npm run test-no-vm-modules",
     "start": "node index.js",
     "stated": "./stated.js"
   },
@@ -25,6 +27,7 @@
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "dependencies": {
+    "@jest/globals": "^29.7.0",
     "express": "^4.18.2",
     "flatbuffers": "^23.5.26",
     "js-yaml": "^4.1.0",
