@@ -214,6 +214,10 @@ export default class TemplateProcessor {
                     const text = await resp.text();
                     return yaml.load(text);
                 case 'js':
+                    if(!this.options.allowTemplateImport){
+                        const msg = `${ptr} does not exist (strict.refs option enabled)`
+                        throw {message: "Template imports are disabled. Start stated with allowTemplateImport option"};
+                    }
                     const respText = await resp.text();
                     return await TemplateProcessor.loadModule(respText);
                 default:

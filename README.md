@@ -1330,12 +1330,12 @@ dependencies to one file. The file should have a '.js' or '.mjs' extension. The 
 }
 ```
 #### Importing JS module from a template
-When enabled, a developer can import a JS module from a template. The file should be a vaild URL and file should have a 
+When  --options='{"allowTemplateImport":"true"}' is enabled, a developer can import a JS module from a template. The file should be a vaild URL and file should have a 
 '.js' or '.mjs' extension.
 
 ```
 > .note "integration test - skip jest"
-> .init -f "example/module_import_from_template.json"
+> .init -f "example/module_import_from_template.json" --options={"allowTemplateImport":"true"}
 {
   "a": "!${ $import('https://raw.githubusercontent.com/zhirafovod/shtuff/main/src/module_exports.js') }",
   "b": "${ a.myFunction() }"
@@ -1347,3 +1347,20 @@ When enabled, a developer can import a JS module from a template. The file shoul
 }
 ```
 
+Without the option it should fail
+```json
+> .init -f "example/module_import_from_template.json"
+{
+  "a": "!${ $import('https://raw.githubusercontent.com/zhirafovod/shtuff/main/src/module_exports.js') }",
+  "b": "${ a.myFunction() }"
+}
+> .out
+{
+  "b": {
+    "error": {
+      "name": null,
+      "message": "Attempted to invoke a non-function"
+    }
+  }
+}
+```
