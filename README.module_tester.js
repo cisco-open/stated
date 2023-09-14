@@ -25,66 +25,23 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import CliCore from "./src/CliCore.js";
-import fs from 'fs';
+import StatedREPL  from './src/StatedREPL.js';
+import { getTestDataFromReadme } from './src/testUtil.js';
 
-// const CliCore = require('./src/CliCore');
-// const fs = require('fs');
-// const {stringify} = require("./stated");
 
-const markdownContent = fs.readFileSync("README.md", 'utf-8');
-const commandRegex = /^(?:> \.note (?<note>.+)[\r\n])?^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;
-let match;
-const cliCore = new CliCore();
-const testData = [];
-
-while ((match = commandRegex.exec(markdownContent)) !== null) {
-    const command = match.groups.command.trim();
-    const expectedResponseString = match.groups.expectedResponse.trim();
-    const note = match.groups.note?.trim();
-    const args = command.split(' ');
-
-    if (args.length > 0) {
-        const cmdName = args.shift();
-        const method = cliCore[cmdName];
-
-        if (typeof method === 'function') {
-            if (note && note.includes("integration test")) {
-                testData.push([cmdName, args, expectedResponseString]);
-            }
-        } else {
-            throw Error(`Unknown command: .${cmdName}`);
-        }
+const {cliCore, testData} = getTestDataFromReadme();
+const testDataFiltered = testData.filter(data => {
+    if (data.note && data.note.includes("integration test")) {
+        console.log(`Running integration test: ${data.cmdName} ${data.args.join(' ')}`);
+        return true;
     }
-}
-
-function stringDiff(a, b) {
-    let diffPosition = -1;
-    for (let i = 0; i < Math.min(a.length, b.length); i++) {
-        if (a[i] !== b[i]) {
-            diffPosition = i;
-            break;
-        }
-    }
-
-    if (diffPosition === -1) {
-        return `Strings are of different lengths. Common prefix: ${a}`;
-    }
-
-    const contextChars = 5;
-    const start = Math.max(0, diffPosition - contextChars);
-    const end = Math.min(a.length, diffPosition + contextChars);
-    const sliceA = a.slice(start, end);
-    const sliceB = b.slice(start, end);
-
-    return `Difference at index ${diffPosition}: "${sliceA}" vs. "${sliceB}"`;
-}
+    return false;
+});
 
 async function runTestsSequentially() {
-    for (const [cmdName, args, expectedResponseString] of testData) {
-        // Use the cmdName and args to determine which method to call
-        const i = testData.indexOf([cmdName, args, expectedResponseString]);  // Find the index
-        console.log(`Starting test ${i + 1} (${cmdName} ${args.join(' ')}):`);
+    for (let i = 0; i < testDataFiltered.length; i++) {
+        const {cmdName, args, expectedResponseString} = testDataFiltered[i];
+        console.log(`Starting test ${i + 1} of ${testDataFiltered.length} (${cmdName} ${args.join(' ')}):`);
         try {
             const rest = args.join(" ");
             const output = await cliCore[cmdName].apply(cliCore, [rest]);
@@ -93,16 +50,15 @@ async function runTestsSequentially() {
             const _expected = JSON.parse(expectedResponseString);
 
             if (JSON.stringify(respNormalized) !== JSON.stringify(_expected)) {
-                const diff = stringDiff(JSON.stringify(respNormalized), JSON.stringify(_expected + ' '));
-                console.error(`Test ${i + 1} (${cmdName} ${args.join(' ')}): Expected`, _expected, 'but got', respNormalized, '. Diff:', diff);
+                console.error(`Test ${i + 1} (${cmdName} ${args.join(' ')}): Expected: ${ _expected }, but got, ${ respNormalized}`);
                 throw {expected: _expected, got: respNormalized}
             } else {
                 console.log(`Test ${i + 1} (${cmdName} ${args.join(' ')}): Passed`);
             }
         } catch (e) {
-            console.error(`Test ${i + 1} (${cmdName} ${args.join(' ')}): Failed`);
-            console.error(e);
-            throw e;
+            console.error(`Test failed:`, e);
+            console.log(`To reproduce the problem, please run the command:\nnode --experimental-vm-modules README.module_tester.js`);
+            process.exit(1);
         }
     }
 }

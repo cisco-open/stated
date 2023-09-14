@@ -1299,19 +1299,29 @@ to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expre
 ```
 ### Importing JS modules
 stated supports importing JavaScript modules. All objects exported by the module will be added to the stated context. 
-"example/module_export.js" exports 2 functions and "example/module_import.json" shows how to invoke them. 
+There are 2 different developer-focusing use cases for importing modules. 
 
-At this moment the imported file must be a JavaScript module with no additional imports in it. You have to pack all your 
-dependencies to one file.
+The first is to import a module from a local file. It is useful for development templates using external functions. 
+The second use case is importing a JS in a playground, where you can experiment with the functions exported from a 
+URL. 
+
+Both use cases are simplifying development and not intended for production use as it poses security risks.
+
+#### Importing JS module from a REPL or CLI 
+In this approach a developer can run stated REPL or CLI with `--xf` parameter pointing to a local JS module to add its 
+exported functions to the stated context. The file should have a '.js' or '.mjs' extension. The file can be local or remote.
+
+**Warning**: At this moment the imported file must be a JavaScript module with no additional imports in it. You have to pack all your 
+dependencies to one file. The file should have a '.js' or '.mjs' extension. The file can be local or remote.
 ```
-> .note "integration test - this test can't be reliably run with jest framework"
+> .note "integration test - skip jest"
 > .init -f "example/module_import.json" --xf "example/module_export.js"
 {
   "something": "else",
   "firstFunctionCall": "${ $myFunction(something) }",
   "secondFunctionCall": "${ $anotherFunction(firstFunctionCall) }"
 }
-> .note "integration test - this test can't be reliably run with jest framework"
+> .note "integration test - skip jest"
 > .out
 {
   "something": "else",
@@ -1319,3 +1329,21 @@ dependencies to one file.
   "secondFunctionCall": "Hello from myFunction with arg: Hello from myFunction with arg: else"
 }
 ```
+#### Importing JS module from a template
+When enabled, a developer can import a JS module from a template. The file should be a vaild URL and file should have a 
+'.js' or '.mjs' extension.
+
+```
+> .note "integration test - skip jest"
+> .init -f "example/module_import_from_template.json"
+{
+  "a": "!${ $import('https://raw.githubusercontent.com/zhirafovod/shtuff/main/src/module_exports.js') }",
+  "b": "${ a.myFunction() }"
+}
+> .note "integration test - skip jest"
+> .out
+{
+  "b": "Hello from myFunction"
+}
+```
+

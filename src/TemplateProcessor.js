@@ -215,7 +215,7 @@ export default class TemplateProcessor {
                     return yaml.load(text);
                 case 'js':
                     const respText = await resp.text();
-                    return await this.loadModule(respText);
+                    return await TemplateProcessor.loadModule(respText);
                 default:
                     throw new Error(`Cannot determine response format for URL: ${url}`);
             }
