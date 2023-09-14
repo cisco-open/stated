@@ -11,12 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const TemplateProcessor = require('../TemplateProcessor');
-const _ = require('lodash');
-const largeResources = require('./large');
-const path = require("path");
-const fs = require("fs");
-const yaml = require("js-yaml");
+import TemplateProcessor from '../TemplateProcessor.js';
+import _ from 'lodash';
+import largeResources from './large.js';
+import path from 'path';
+import fs from 'fs';
+import yaml from 'js-yaml';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
+
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -966,6 +969,9 @@ test("remove temp vars", async () => {
 
 test("dashboard", async () => {
 
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
     const yamlFilePath = path.join(__dirname, 'data', 'dbWarning.yaml');
     const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
     const template = yaml.load(templateYaml);

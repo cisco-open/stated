@@ -1,9 +1,9 @@
-const jp = require('json-pointer');
+import jp from 'json-pointer';
 
 /**
  * Debugger class that manages breakpoints.
  */
-class Debugger {
+export default class Debugger {
     constructor(metaInfosByJsonPointer, logger) {
         /**
          * Stores the breakpoints set by the user.
@@ -97,4 +97,3 @@ class Debugger {
     }
 }
 
-module.exports =  Debugger;

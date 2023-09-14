@@ -1,4 +1,4 @@
-module.exports = {
+const largeResources = {
     "metrics": [
         {
             "name": "spacefleet:speed",
@@ -5145,3 +5145,5 @@ module.exports = {
         }
     ]
 };
+
+export default largeResources;

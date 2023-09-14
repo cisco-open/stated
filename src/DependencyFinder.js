@@ -12,11 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const jsonata = require("jsonata");
-const _ = require('lodash');
+import jsonata from "jsonata";
+import _  from 'lodash';
 
 
-class DependencyFinder {
+
+export default class DependencyFinder {
     constructor(program) {
         this.compiledExpression = jsonata(program);
         this.ast = this.compiledExpression.ast();
@@ -282,5 +283,4 @@ class DependencyFinder {
 }
 
 
-module.exports = DependencyFinder;
 

@@ -5,7 +5,7 @@
   "description": "JSONata embedded in JSON",
   "main": "stated.js",
   "scripts": {
-    "test": "jest",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "node index.js",
     "stated": "./stated.js"
   },
@@ -49,5 +49,9 @@
     "example/**/*",
     "!**/.idea",
     "!**/.github"
-  ]
+  ],
+  "jest": {
+    "transform": {}
+  },
+  "type": "module"
 }

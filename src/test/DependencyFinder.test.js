@@ -11,8 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const DependencyFinder = require('../DependencyFinder');
-
+import DependencyFinder from "../DependencyFinder.js";
 
 test('data warning', () => {
     const df = new DependencyFinder('data.warningStatus.data[0].count ? data.warningStatus.data[0].count : 0');

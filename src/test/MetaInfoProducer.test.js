@@ -1,5 +1,5 @@
-const getMetaInfos = require('../MetaInfoProducer');
-const Stated  = require("../../stated");
+import MetaInfoProducer from '../MetaInfoProducer.js';
+import StatedREPL from '../StatedREPL.js';
 
 
 test("tt1", async () => {
@@ -8,8 +8,8 @@ test("tt1", async () => {
         "b": "${a}",
         "c": "${'the answer is: '& b}"
     };
-    const metaInfos = await getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -66,8 +66,8 @@ test("t2", async () => {
             "g": "${e.f}" //<--- this is an intentionally incorrect reference
         }
     };
-    const metaInfos = await getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -189,8 +189,8 @@ test("t3", async () => {
         },
         "l": "${j}"
     };
-    const metaInfos = await getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -475,8 +475,8 @@ test("temp vars 1", async () => {
     const template = {
         "a":"!${42}",
     };
-    const metaInfos = await getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],
@@ -517,8 +517,8 @@ test("temp vars 2", async () => {
         },
         "c": "${b4}"
     };
-    const metaInfos = await getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, Stated.printFunc, 2))).toEqual([
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
             "dependees__": [],
             "dependencies__": [],

@@ -12,16 +12,15 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const jp = require('json-pointer');
-const _ = require('lodash');
-const getMetaInfos = require('./MetaInfoProducer');
-const DependencyFinder = require('./DependencyFinder');
-const winston = require('winston');
-const yaml = require('js-yaml');
-const jsonata = require("jsonata");
-const Debugger = require ("./Debugger");
+import jp from 'json-pointer';
+import _ from 'lodash';
+import winston from 'winston';
+import yaml from 'js-yaml';
+import Debugger from './Debugger.js';
+import MetaInfoProducer from './MetaInfoProducer.js';
+import DependencyFinder from './DependencyFinder.js';
 
-class TemplateProcessor {
+export default class TemplateProcessor {
 
     static DEFAULT_FUNCTIONS = {
         "fetch": fetch,
@@ -254,7 +253,7 @@ class TemplateProcessor {
         const metaInfProcessor = jsonata(metaInfoProducer);
         let metaInfos = await metaInfProcessor.evaluate(template, {"console":console});
          */
-        let metaInfos = await getMetaInfos(template);
+        let metaInfos = await MetaInfoProducer.getMetaInfos(template);
 
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates
@@ -766,4 +765,3 @@ class TemplateProcessor {
 
 }
 
-module.exports = TemplateProcessor;

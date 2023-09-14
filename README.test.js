@@ -12,9 +12,10 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-const CliCore = require('./src/CliCore');
-const fs = require('fs');
-const {stringify} = require("./stated");
+import CliCore from './src/CliCore';
+import fs from 'fs';
+import StatedREPL  from './src/StatedREPL.js';
+
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
  * that begin and end with ``` (markdown syntax for code block) and it extracts the cli command and the
@@ -74,7 +75,7 @@ testData.forEach(([cmdName, args, expectedResponseString], i) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
         const rest = args.join(" ");
         const resp = await cliCore[cmdName].apply(cliCore, [rest]);
-        const respNormalized = JSON.parse(stringify(resp));
+        const respNormalized = JSON.parse(StatedREPL.stringify(resp));
         const _expected = JSON.parse(expectedResponseString);
         expect(respNormalized).toEqual(_expected);
     }, 30000);  // set timeout to 10 seconds for each test since in the readme we call web apis
