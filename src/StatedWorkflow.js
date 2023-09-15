@@ -11,15 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const TemplateProcessor = require('./TemplateProcessor');
-const express = require('express');
-const Pulsar = require('pulsar-client');
-const winston = require("winston");
-const stated = require("../stated");
+import TemplateProcessor from './TemplateProcessor.js';
+import StatedREPL from './StatedREPL.js';
+import express from 'express';
+import Pulsar from 'pulsar-client';
+import winston from "winston";
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
-class StatedWorkflow {
-    static express = require('express');
+export class StatedWorkflow {
+    // static express = require('express');
     static app = express();
     static port = 3000;
     static logger = winston.createLogger({
@@ -67,7 +67,7 @@ class StatedWorkflow {
             logMessage.finish = new Date().toISOString();
             logMessage.out = result;
         }
-        console.log(JSON.stringify(logMessage));
+        console.log(StatedREPL.stringify(logMessage));
 
         // Assuming 'logs' array is inside 'log' object
         if (log.logs) {
@@ -93,13 +93,13 @@ class StatedWorkflow {
     //         logMessage.finish = new Date().toISOString();
     //         logMessage.out = result;
     //     }
-    //     console.log(JSON.stringify(logMessage));
+    //     console.log(StatedREPL.stringify(logMessage));
     //     log.add(logMessage);
     // }
 
     static async subscribe(subscribeOptions) {
         const {source} = subscribeOptions;
-        this.logger.debug(`subscribing ${stated.stringify(source)}`);
+        this.logger.debug(`subscribing ${StatedREPL.stringify(source)}`);
         if (source === 'http') {
             return StatedWorkflow.onHttp(subscribeOptions);
         }
@@ -119,7 +119,7 @@ class StatedWorkflow {
     static dispatchers = new Map(); //key is type, value Set of WorkflowDispatcher
 
     static pulsarPublish(params) {
-        this.logger.debug(`pulsar publish params ${stated.stringify(params)}`);
+        this.logger.debug(`pulsar publish params ${StatedREPL.stringify(params)}`);
         const {type, data} = params;
         (async () => {
 
@@ -134,10 +134,10 @@ class StatedWorkflow {
                 if (data._jsonata_lambda === true) {
                     _data = await data.apply(this, []); //data is a function, call it
                 }
-                this.logger.debug(`pulsar producer sending ${stated.stringify(_data)}`);
+                this.logger.debug(`pulsar producer sending ${StatedREPL.stringify(_data)}`);
                 // Send a message
                 const messageId = await producer.send({
-                    data: Buffer.from(JSON.stringify(_data, null, 2)),
+                    data: Buffer.from(StatedREPL.stringify(_data, null, 2)),
                 });
             }finally {
                 // Close the producer and client when done
@@ -149,7 +149,7 @@ class StatedWorkflow {
 
     static pulsarSubscribe(subscriptionParams) {
         const {type, initialPosition = 'earliest', maxConsume = -1} = subscriptionParams;
-        this.logger.debug(`pulsar subscribe params ${stated.stringify(subscriptionParams)}`);
+        this.logger.debug(`pulsar subscribe params ${StatedREPL.stringify(subscriptionParams)}`);
         let consumer, dispatcher;
         //make sure a dispatcher exists for the combination of type and subscriberId
         WorkflowDispatcher.getDispatcher(subscriptionParams);
@@ -191,7 +191,7 @@ class StatedWorkflow {
                     }
                 }
             }
-            this.logger.debug(`closing consumer with params ${stated.stringify(subscriptionParams)}`);
+            this.logger.debug(`closing consumer with params ${StatedREPL.stringify(subscriptionParams)}`);
             await consumer.close()
         })();
     }
@@ -447,5 +447,4 @@ class WorkflowDispatcher {
 }
 
 
-module.exports = StatedWorkflow;
-
+// module.exports = StatedWorkflow;

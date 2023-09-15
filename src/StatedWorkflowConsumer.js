@@ -13,7 +13,7 @@
 // limitations under the License.
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
-class StatedWorkflowConsumer {
+export class StatedWorkflowConsumer {
 
     constructor(subscriptionParams) {
         this.subscriptionParams = subscriptionParams;
@@ -68,4 +68,4 @@ class StatedWorkflowConsumer {
     }
 }
 
-module.exports = StatedWorkflowConsumer;
+// module.exports = StatedWorkflowConsumer;

@@ -7,7 +7,7 @@
   "scripts": {
     "test-w-vm-modules": "node --experimental-vm-modules node_modules/jest/bin/jest.js --testPathPattern=drawSquare",
     "test-no-vm-modules": "node node_modules/jest/bin/jest.js --testPathPattern=\"^(?!.*drawSquare)\"",
-    "test": "npm run test-w-vm-modules && npm run test-no-vm-modules",
+    "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "start": "node index.js",
     "stated": "./stated.js"
   },

@@ -3,7 +3,7 @@ sequence$: ["/${$subscribe(listenForCommand)}", "/${$subscribe(listenForResponse
 listenForResponse:
   source: cloudEvent
   type: 'my-topic'
-  maxConsume: 1 #close the consumer afer we get our event
+  maxConsume: 1 #close the consumer after we get our event
   to: |
     /${ function($e){(
           $e.type = 'DONE_IT'?(

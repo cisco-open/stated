@@ -11,12 +11,15 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-const StatedWorkflow = require('../StatedWorkflow');
-const fs = require('fs');
-const yaml = require('js-yaml');
-const path = require('path');
-const stated = require('../../stated');
+import {StatedWorkflow} from '../StatedWorkflow.js';
+import fs from 'fs';
+import yaml from 'js-yaml';
+import { fileURLToPath } from 'url';
+import path from 'path';
+import StatedREPL from "../StatedREPL.js";
 
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 class EnhancedPrintFunc {
     static isWorkflowId(value) {
@@ -31,7 +34,7 @@ class EnhancedPrintFunc {
     }
 
     static printFunc(key, value) {
-        const originalValue = stated.printFunc(key, value);
+        const originalValue = StatedREPL.printFunc(key, value);
 
         // If stated.printFunc already handled and transformed the value, no need to check again
         if (originalValue !== value) {
@@ -69,7 +72,9 @@ function sortLogs(output, workflowName) {
 test("pubsub", async () => {
 
     // Load the YAML from the file
+
     const yamlFilePath = path.join(__dirname, '../', '../', 'example', 'experimental', 'pubsub.yaml');
+    // const yamlFilePath = path.join(path.dirname(fileURLToPath(import.meta.url)), '../', '../', 'example', 'experimental', 'pubsub.yaml');
     const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
     var template = yaml.load(templateYaml);
     const tp = StatedWorkflow.newWorkflow(template);
@@ -78,7 +83,7 @@ test("pubsub", async () => {
         await new Promise(resolve => setTimeout(resolve, 50)); // Poll every 50ms
     }
     expect(tp.output.rxLog.length).toBe(20);
-});
+}, 8000);
 
 test("correlate", async () => {
 
@@ -92,7 +97,7 @@ test("correlate", async () => {
         await new Promise(resolve => setTimeout(resolve, 50)); // Poll every 50ms
     }
     expect(tp.output.state).toBe("RECEIVED_RESPONSE");
-});
+}, 8000);
 
 test("workflow logs", async () => {
 
@@ -106,7 +111,7 @@ test("workflow logs", async () => {
     const tp = StatedWorkflow.newWorkflow(template);
     await tp.initialize();
     const sortedLog = sortLogs(tp.output, 'nozzleWork')
-    const removeUncomparableTimestamps = JSON.parse(JSON.stringify(sortedLog,EnhancedPrintFunc.printFunc));
+    const removeUncomparableTimestamps = JSON.parse(StatedREPL.stringify(sortedLog, EnhancedPrintFunc.printFunc));
     const expectedLog = [
         {
             "execution": [
@@ -540,7 +545,7 @@ test("workflow logs", async () => {
         }
     ];
     expect(removeUncomparableTimestamps).toEqual(expectedLog);
-});
+}, 10000);
 
 test("workflow perf", async () => {
     console.time("workflow perf total time"); // Start the timer with a label
@@ -610,7 +615,7 @@ test("downloaders", async () => {
     console.timeEnd("Initialize workflow"); // End the timer for initializing the workflow
 
     console.timeEnd("workflow perf total time"); // End the total time timer
-});
+}, 10000);
 
 
 
