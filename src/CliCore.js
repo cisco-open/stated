@@ -64,13 +64,13 @@ export default class CliCore {
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
     async init(replCmdInputStr) {
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot, options, xf:contextFilePath} = parsed;
+        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath} = parsed;
         if(filepath===undefined){
             return undefined;
         }
         const input = await this.readFileAndParse(filepath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
-
+        options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;

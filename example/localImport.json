@@ -1,0 +1,4 @@
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $import('ex17.json')}"
+}

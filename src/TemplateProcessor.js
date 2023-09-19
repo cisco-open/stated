@@ -19,6 +19,8 @@ import yaml from 'js-yaml';
 import Debugger from './Debugger.js';
 import MetaInfoProducer from './MetaInfoProducer.js';
 import DependencyFinder from './DependencyFinder.js';
+import path from 'path';
+import fs from 'fs';
 
 export default class TemplateProcessor {
 
@@ -61,7 +63,7 @@ export default class TemplateProcessor {
                 const result = fn(...args);
                 if (result instanceof Promise) {
                     return result.catch(error => {
-                        this.logger.error(error);
+                        this.logger.error(error.toString());
                         return {
                             "error": {
                                 message: error.message,
@@ -73,7 +75,7 @@ export default class TemplateProcessor {
                 }
                 return result;
             } catch (error) {
-                this.logger.error(error);
+                this.logger.error(error.toString());
                 return {
                     "error": {
                         message: error.message,
@@ -154,17 +156,26 @@ export default class TemplateProcessor {
 
     getImport(jsonPtrIntoTemplate) { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
-        return async (urlOrObj) => {
+        return async (importMe) => {
             let resp;
-            const parsedUrl = this.parseURL(urlOrObj);
-            if (parsedUrl) {
+            const parsedUrl = this.parseURL(importMe);
+            if (parsedUrl) { //remote download
+                const {protocol} = parsedUrl;
+                this.logger.debug(`Attempting to fetch imported URL '${importMe}'`);
                 resp = await this.fetchFromURL(parsedUrl);
                 resp = this.extractFragmentIfNeeded(resp, parsedUrl);
             } else {
-                this.logger.debug(`argument tp $import is not a valid URL. Attempting to treat it as literal template.`);
-                resp = this.validateAsJSON(urlOrObj);
+                this.logger.debug(`Attempting local file import of '${importMe}'`);
+                const mightBeAFilename= importMe;
+                resp = await this.localImport(mightBeAFilename);
+                if(resp === undefined){
+                    this.logger.debug(`Attempting literal import of '${importMe}'`);
+                    resp = this.validateAsJSON(importMe);
+                }
             }
-
+            if(resp === undefined){
+                throw new Error(`Import failed for '${importMe}' at '${jsonPtrIntoTemplate}'`);
+            }
             await this.setContentInTemplate(resp, jsonPtrIntoTemplate);
             return TemplateProcessor.NOOP;
         }
@@ -234,12 +245,15 @@ export default class TemplateProcessor {
 
     validateAsJSON(obj) {
         try {
-            JSON.stringify(obj);
+            const jsonString = JSON.stringify(obj);
+            const parsedObject = JSON.parse(jsonString);
+            const isEqual = JSON.stringify(obj) === JSON.stringify(parsedObject);
+            if(!isEqual || typeof obj !== "object"){
+                return undefined
+            }
             return obj;
         } catch (e) {
-            const msg = "$import was passed invalid content (neither a URL nor an Object that can be represented as JSON)";
-            this.logger.error(msg);
-            throw e;
+            return undefined;
         }
     }
 
@@ -761,6 +775,34 @@ export default class TemplateProcessor {
             return jp.get(this.output, jsonPointer)
         };
         return null;
+    }
+
+    async localImport(filePathInPackage) {
+        // Resolve the package path
+        const {importPath} = this.options;
+        let fullPath = filePathInPackage;
+        let content;
+        if (importPath) {
+            // Construct the full file path
+            fullPath = path.join(importPath, filePathInPackage);
+        }
+        try{
+            const fileExtension = path.extname(fullPath).toLowerCase();
+            // Read the file
+            content =  await fs.promises.readFile(fullPath, 'utf8');
+            if(fileExtension === ".json") {
+                return JSON.parse(content);
+            }else if (fileExtension === '.yaml' || fileExtension === '.yml') {
+                return yaml.load(content);
+            }else if (fileExtension === '.js' || fileExtension === '.mjs') {
+                throw new Error('js and mjs imports not implemented yet');
+             }else{
+                throw new Error('import file extension must be .json or .yaml or .yml');
+            }
+        } catch(e) {
+            this.logger.debug('import was not a local file');
+        }
+        return content;
     }
 
 }

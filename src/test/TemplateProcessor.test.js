@@ -983,6 +983,70 @@ test("dashboard", async () => {
     ])
 });
 
+test("local import without --importPath", async () => {
+    const template = {
+        "foo": "bar",
+        "baz": "${ $import('example/ex01.json') }"
+    };
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "baz": {
+            "a": 42,
+            "b": 42,
+            "c": "the answer is: 42"
+        },
+        "foo": "bar"
+    });
+});
+
+test("local import with bad filename and no --importPath", async () => {
+    const template = {
+        "foo": "bar",
+        "baz": "${ $import('example/dingus.json') }"
+    };
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize();
+    expect(tp.output.baz.error.message).toBe("Import failed for 'example/dingus.json' at '/baz'");
+});
+
+
+test("local import with absolute --importPath", async () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const importPath = path.join(__dirname, '../','../', 'example');
+    const template = {
+        "foo": "bar",
+        "baz": "${ $import('ex01.json') }"
+    };
+    const tp = new TemplateProcessor(template, {}, {importPath});
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "baz": {
+            "a": 42,
+            "b": 42,
+            "c": "the answer is: 42"
+        },
+        "foo": "bar"
+    });
+});
+
+test("local import with non-absolute --importPath", async () => {
+    const template = {
+        "foo": "bar",
+        "baz": "${ $import('ex01.json') }"
+    };
+    const tp = new TemplateProcessor(template, {}, {importPath:'example'});
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "baz": {
+            "a": 42,
+            "b": 42,
+            "c": "the answer is: 42"
+        },
+        "foo": "bar"
+    });
+});
 
 
 
