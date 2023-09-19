@@ -12,8 +12,8 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import {default as last} from 'lodash-es/last.js';
 import jsonata from "jsonata";
-import _  from 'lodash';
 
 
 
@@ -134,7 +134,7 @@ export default class DependencyFinder {
     captureArrayIndexes(node) {
         const {type, expr} = node;
         if (type === "filter" && expr?.type === "number") {
-            _.last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
+            last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
         }
     }
     //this is where we capture the path and name expressions like a.b.c or $.a
@@ -144,22 +144,22 @@ export default class DependencyFinder {
             return;
         }
         if (this.isRootedIn$$(value)) { //if the root of the expression is $$ then we will always accept the navigation downwards
-            _.last(this.currentSteps).push({type, value, "emit": true});
+            last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         if (this.isInsideAScopeWhere$IsLocal(node)) { //path expressions inside a transform are ignored modulo the $$ case just checked for above
-            _.last(this.currentSteps).push({type, value, "emit": false});
+            last(this.currentSteps).push({type, value, "emit": false});
             return;
         }
         if (this.isSingle$Var(type, value)) {  //accept the "" variable which comes from single-dollar like $.a.b when we are not inside a transform. We won't accept $foo.a.b
-            _.last(this.currentSteps).push({type, value, "emit": true});
+            last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         if (type === "variable") {
             //if we are here then the variable must be an ordinary locally named variable since it is neither $$ or $.
             //variables local to a closure cannot cause/imply a dependency for this expression
             if (!this.hasParent("function")) { //the function name is actually a variable, we want to skip such variables
-                _.last(this.currentSteps).push({type, value, "emit": false});
+                last(this.currentSteps).push({type, value, "emit": false});
             }
             return;
 
@@ -168,23 +168,23 @@ export default class DependencyFinder {
         // just plain a
         //if the name is an argument to a function, then it should be emitted as a dependency
         if(this.hasAncestor(n=>n.pseudoType === "arguments")){
-            _.last(this.currentSteps).push({type, value, "emit": true});
+            last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         /*
         if (!this.isUnderTreeShape(["path", "function"])) {
-            _.last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
+            last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
         }
 
          */
-        _.last(this.currentSteps).push({type, value, "emit": true});
+        last(this.currentSteps).push({type, value, "emit": true});
 
     }
 
 
     hasParent(parentType) {
         return this.nodeStack.length !==0  &&
-            ( _.last(this.nodeStack).type === parentType || _.last(this.nodeStack).pseudoType === parentType);
+            ( last(this.nodeStack).type === parentType || last(this.nodeStack).pseudoType === parentType);
     }
 
     hasAncestor(matcher) {
@@ -209,9 +209,9 @@ export default class DependencyFinder {
     }
 
     isRootedIn$$(value) {
-        const last = _.last(this.currentSteps);
-        return last && (last.length === 0 && value === "$"
-            || last.length > 0 && last[0].value === "$");
+        const _last = last(this.currentSteps);
+        return _last && (_last.length === 0 && value === "$"
+            || _last.length > 0 && _last[0].value === "$");
     }
 
 
@@ -254,7 +254,7 @@ export default class DependencyFinder {
 
         const emitted = [];
         const steps = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
-        const lastStepsArray = _.last(this.currentSteps);
+        const lastStepsArray = last(this.currentSteps);
         if (lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit)) {
             if (lastStepsArray[0].value === "$") { //corresponding to '$$' variable
                 //in this case the chain of steps must be broken as '$$' is an absolute reference to root document

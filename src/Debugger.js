@@ -1,4 +1,4 @@
-import jp from 'json-pointer';
+import {default as jp} from './JsonPointer.js';
 
 /**
  * Debugger class that manages breakpoints.

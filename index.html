@@ -1,0 +1,41 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Template Processor Test</title>
+</head>
+<body>
+<h1>Template Processor Test</h1>
+<div id="output"></div>
+
+<script type="module">
+    import TemplateProcessor from "/dist/bundle.mjs"
+    // Define a sample object for testing
+    const testData = {
+        a: 10,
+        b: [
+            "../${a}",
+        ],
+    };
+
+    // Wait for the document to load
+    document.addEventListener('DOMContentLoaded', async () => {
+        // Initialize the TemplateProcessor
+        const tp = new TemplateProcessor({
+            a: 10,
+            b: [
+            "../${a}",
+            ],
+        }, {},{});
+        await tp.initialize();
+
+        // Get the output element
+        const outputElement = document.getElementById('output');
+
+        // Display the processed data in the output element
+        outputElement.textContent = JSON.stringify(tp.output, null, 2);
+    });
+</script>
+</body>
+</html>

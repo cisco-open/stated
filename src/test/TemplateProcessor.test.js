@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 import TemplateProcessor from '../TemplateProcessor.js';
-import _ from 'lodash';
+import cloneDeep from 'lodash-es/cloneDeep.js';
 import largeResources from './large.js';
 import path from 'path';
 import fs from 'fs';
@@ -396,7 +396,7 @@ const mysql = {
 };
 
 test("mysql output", async () => {
-    const o = _.cloneDeep(mysql);
+    const o = cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     expect(o.instances[0]).toEqual({
@@ -411,7 +411,7 @@ test("mysql output", async () => {
 });
 
 test("mysql plan", async () => {
-    const o = _.cloneDeep(mysql);
+    const o = cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     const plan = await tp.getEvaluationPlan();
@@ -432,7 +432,7 @@ test("mysql plan", async () => {
 
 
 test("mysql to /tmp/provider", async () => {
-    const o = _.cloneDeep(mysql);
+    const o = cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
     const deps = tp.getDependenciesTransitiveExecutionPlan("/tmp/provider");

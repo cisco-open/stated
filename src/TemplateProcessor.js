@@ -12,15 +12,17 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import jp from 'json-pointer';
-import _ from 'lodash';
-import winston from 'winston';
+import { default as jp } from './JsonPointer.js';
+import isEqual from "lodash-es/isEqual.js";
+import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
 import Debugger from './Debugger.js';
 import MetaInfoProducer from './MetaInfoProducer.js';
 import DependencyFinder from './DependencyFinder.js';
 import path from 'path';
 import fs from 'fs';
+import ConsoleLogger from "./ConsoleLogger.js";
+import FancyLogger from "./FancyLogger.js";
 
 export default class TemplateProcessor {
 
@@ -35,16 +37,15 @@ export default class TemplateProcessor {
     constructor(template, context = {}, options={}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
-        this.logger = this.getLogger();
-        this.context = _.merge(TemplateProcessor.DEFAULT_FUNCTIONS, context);
-        this.context = _.merge(this.context, {"set": this.setData});
+        this.logger = new ConsoleLogger();
+        this.context = merge(TemplateProcessor.DEFAULT_FUNCTIONS, context);
+        this.context = merge(this.context, {"set": this.setData});
         const safe = this.withErrorHandling.bind(this);
         for (const key in this.context) {
             if (typeof this.context[key] === 'function') {
                 this.context[key] = safe(this.context[key]);
             }
         }
-        this.logger = this.getLogger({});
         this.output = template; //initial output is input template
         this.input = JSON.parse(JSON.stringify(template));
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
@@ -87,27 +88,15 @@ export default class TemplateProcessor {
         };
     };
 
-
-    getLogger() {
-        return winston.createLogger({
-            format: winston.format.json(),
-            transports: [
-                new winston.transports.Console({
-                    format: winston.format.combine(
-                        winston.format.colorize(),
-                        winston.format.simple()
-                    )
-                })
-            ],
-        });
-    }
-
     async initialize(template = this.input, jsonPtr = "/") {
+        if(typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web'){
+            this.logger = await FancyLogger.getLogger();
+        }
         this.logger.verbose("initializing...");
         this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
         this.executionPlans = {}; //clear execution plans
         let parsedJsonPtr = jp.parse(jsonPtr);
-        parsedJsonPtr = _.isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
+        parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
         let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
         this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
         this.sortMetaInfos(metaInfos);
@@ -167,7 +156,9 @@ export default class TemplateProcessor {
             } else {
                 this.logger.debug(`Attempting local file import of '${importMe}'`);
                 const mightBeAFilename= importMe;
-                resp = await this.localImport(mightBeAFilename);
+                if (typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web') {
+                    resp = await this.localImport(mightBeAFilename);
+                }
                 if(resp === undefined){
                     this.logger.debug(`Attempting literal import of '${importMe}'`);
                     resp = this.validateAsJSON(importMe);
@@ -613,7 +604,7 @@ export default class TemplateProcessor {
             const safe =  this.withErrorHandling.bind(this);
             evaluated = await compiledExpr__.evaluate(
                 target,
-                _.merge(this.context, {"import": safe(this.getImport(jsonPointer__))}));
+                merge(this.context, {"import": safe(this.getImport(jsonPointer__))}));
         } catch (error) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
@@ -645,7 +636,7 @@ export default class TemplateProcessor {
         if (jp.has(output, jsonPtr)) {
             existingData = jp.get(output, jsonPtr);
         }
-        if (!_.isEqual(existingData, data)) {
+        if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             callback && callback(data, jsonPtr);
             return true;
