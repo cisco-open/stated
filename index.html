@@ -16,12 +16,10 @@
     document.addEventListener('DOMContentLoaded', async () => {
         // Initialize the TemplateProcessor
         const tp = new TemplateProcessor({
-            a: 10,
-            b: [
-            "../${a}",
-            ],
+            data: ["foo", "bar", "baz"],
+            view: [["div", {}, "/${ ($XXconsole.log($string($$.data));$joiwn(data, ','))}"]]
         }, {},{});
-        tp.logger.level = "verbose"
+        tp.logger.level = "debug"
         await tp.initialize();
 
         // Get the output element

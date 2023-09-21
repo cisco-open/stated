@@ -23,6 +23,7 @@ import path from 'path';
 import fs from 'fs';
 import ConsoleLogger from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
+import StatedREPL from "./StatedREPL.js";
 
 export default class TemplateProcessor {
 
@@ -615,10 +616,10 @@ export default class TemplateProcessor {
 
     async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, tags__} = jp.get(this.templateMeta, jsonPtr);
-
+        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
+        let target;
         try {
-            const target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
+            target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
             evaluated = await compiledExpr__.evaluate(
                 target,
@@ -626,6 +627,9 @@ export default class TemplateProcessor {
         } catch (error) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
+            this.logger.debug(`Expression: ${expr__}`);
+            this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
+            this.logger.debug(`Result: ${StatedREPL.stringify(evaluated)}`);
             evaluated = {
                 "error":
                     {
