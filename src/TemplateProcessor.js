@@ -34,10 +34,11 @@ export default class TemplateProcessor {
         "console": console
     }
 
-    constructor(template, context = {}, options={}) {
+    constructor(template={}, context = {}, options={}) {
+
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
-        this.logger = new ConsoleLogger();
+        this.logger = new ConsoleLogger("info");
         this.context = merge(TemplateProcessor.DEFAULT_FUNCTIONS, context);
         this.context = merge(this.context, {"set": this.setData});
         const safe = this.withErrorHandling.bind(this);
@@ -90,7 +91,9 @@ export default class TemplateProcessor {
 
     async initialize(template = this.input, jsonPtr = "/") {
         if(typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web'){
+            const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
             this.logger = await FancyLogger.getLogger();
+            this.logger.level = _level;
         }
         this.logger.verbose("initializing...");
         this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
@@ -105,11 +108,20 @@ export default class TemplateProcessor {
         this.propagateTags(metaInfos);
         await this.evaluate(jsonPtr);
         this.removeTemporaryVariables(metaInfos);
+        this.logger.verbose("initialization complete...");
     }
 
 
     async evaluate(jsonPtr) {
+        const startTime = Date.now(); // Capture start time
+
+        this.logger.verbose("evaluating template...");
         await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
+
+        const endTime = Date.now(); // Capture end time
+
+        this.logger.verbose(`evaluation complete in ${endTime - startTime} ms...`);
+
         //the commented out approach below us necessary if we want to push in imports. It has the unsolved problem
         //that if the existing template has dependencies on the to-be-imported template, and we are not forcing it
         //in externally but rather the import is written as part of the template that the things that depend on the
@@ -541,18 +553,19 @@ export default class TemplateProcessor {
     }
 
     async _evaluateExpression(jsonPtr) {
+        const startTime = Date.now(); // Capture start time
+
         const {templateMeta, output} = this;
         let data;
         const {expr__, tags__} = jp.get(templateMeta, jsonPtr);
-        //where the expression has an tag we only execute it if the tags__ is in the list we should run
+
         if (expr__ !== undefined) {
-            if(this.allTagsPresent(tags__)){
+            if(this.allTagsPresent(tags__)) {
                 data = await this._evaluateExprNode(jsonPtr); //run the jsonata expression
-            }else{
+            } else {
                 this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${Array.from(tags__)}) were set with --tags`);
                 return false;
             }
-
         } else {
             try {
                 data = jp.get(output, jsonPtr);
@@ -561,8 +574,13 @@ export default class TemplateProcessor {
                 data = undefined;
             }
         }
+
         jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
         jp.set(templateMeta, jsonPtr + "/materialized__", true);
+
+        const endTime = Date.now(); // Capture end time
+        this.logger.verbose(`_evaluateExpression at ${jsonPtr} completed in ${endTime - startTime} ms.`);  // Log the time taken
+
         return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 

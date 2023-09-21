@@ -1,30 +1,50 @@
 export default class ConsoleLogger {
+    constructor(initialLevel = 'verbose') {
+        this.level = initialLevel;
+        this.levels = {
+            error: 1,
+            warn: 2,
+            info: 3,
+            verbose: 4,
+            debug: 5
+        };
+    }
 
     debug(...args) {
-        console.debug(...args);
+        if (this.levels[this.level] >= this.levels.debug) {
+            console.debug(...args);
+        }
     }
 
     error(...args) {
-        console.error(...args);
+        if (this.levels[this.level] >= this.levels.error) {
+            console.error(...args);
+        }
     }
 
     warn(...args) {
-        console.warn(...args);
+        if (this.levels[this.level] >= this.levels.warn) {
+            console.warn(...args);
+        }
     }
 
     verbose(...args) {
-        // Console does not have a verbose method, so you can use log instead
-        console.log(...args);
+        if (this.levels[this.level] >= this.levels.verbose) {
+            console.log(...args);
+        }
     }
 
     log(level, ...args) {
-        // Map Winston log levels to console methods
         switch (level) {
             case 'info':
-                console.info(...args);
+                if (this.levels[this.level] >= this.levels.info) {
+                    console.info(...args);
+                }
                 break;
             default:
-                console.log(...args);
+                if (this.levels[this.level] >= this.levels.verbose) {
+                    console.log(...args);
+                }
                 break;
         }
     }
