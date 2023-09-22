@@ -661,6 +661,7 @@ export default class TemplateProcessor {
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             callback && callback(data, jsonPtr);
+            this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
         } else {
             this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
@@ -749,7 +750,9 @@ export default class TemplateProcessor {
     }
 
     setDataChangeCallback(jsonPtr, cbFn) {
-        if (jp.has(this.templateMeta, jsonPtr)) {
+        if(jsonPtr === "/"){
+            this.commonCallback = cbFn;
+        }else if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr);
             node.callback__ = cbFn;
         }
