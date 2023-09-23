@@ -1,0 +1,92 @@
+# Helper functions for resource mapping.
+fn: ${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/experimental/rmFuncs.yaml')}
+
+#### input of plugin ####
+input:
+  resource:
+    attributes:
+      - key: container.name
+        value:
+          string_value: ot-resource-mapper
+      - key: container.id
+        value:
+          string_value: 546gerdf3d
+      - key: container.image.name
+        value:
+          string_value: ot-resource-mapper-image
+      - key: container.image.digest
+        value:
+          string_value: rm-image-digest
+  scopes:
+    - metrics:
+        - description: Current CPU usage
+          gauge:
+            data_points:
+              - as_double: 90.3
+                time_unix_nano: '1672832772000000000'
+          name: cpu_utilization
+        - description: Current Memory usage
+          gauge:
+            data_points:
+              - as_double: 1025
+                time_unix_nano: '1672832772000000000'
+          name: memory_utilization
+      scope:
+        name: opentelemetry
+
+
+#### plugin logic ####
+resource: ${ input.resource }
+inputScopes: ${ input.scopes }
+
+# map infra entities
+containerAdvMapFn: |
+  ${
+    function($resourceAttributes, $fmmAttributes) {
+      $resourceAttributes[key = 'os.type'] != null ? $fmmAttributes : $merge([ $fmmAttributes, {'os.type': 'linux'} ])
+    }
+  }
+containerEntity: |
+  ${ 
+    fn.containsAllFn($$.resource.attributes.key, [ 'container.id', 'container.name' ]) ?
+    fn.mapResourceFn($$.resource.attributes, 'infra:container', [ 'container.id', 'container.name' ], [], $$.containerAdvMapFn, null) 
+  }
+
+containerImageEntity: |
+  ${ 
+    fn.containsAllFn($$.resource.attributes.key, ['container.image.name', 'container.image.digest' ]) ?
+    fn.mapResourceFn($$.resource.attributes, 'infra:container_image', ['container.image.name', 'container.image.digest' ], [], null, null) 
+  }
+diskEntity: |
+  ${
+     fn.containsAllFn($$.input.attributes.key, ['host.id', 'disk.device']) ?
+     fn.mapResourceFn($$.resource.attributes, 'infra:disk', $$.resource.attributes.key , [], null, null) 
+   }
+networkInterfaceEntity: |
+  ${ 
+    fn.containsAllFn($$.resource.attributes.key, ['host.id', 'network_interface.name']) ?
+    fn.mapResourceFn($$.resource.attributes, 'infra:network_interface', $$.resource.attributes.key , [], null, null) 
+  }
+fileSystemEntity: |
+  ${ 
+    fn.containsAllFn($$.resource.attributes.key, ['host.id', 'filesystem.mount_point']) ?
+    fn.mapResourceFn($$.resource.attributes, 'infra:file_system', $$.resource.attributes.key , [], null, null) 
+  }
+allEntities: ${ [ containerEntity, containerImageEntity, diskEntity, networkInterfaceEntity, fileSystemEntity ] }
+
+
+# map infra associations
+allEntityRefs: ${ fn.createEntityReferencesFn($$.allEntities) ~> $append($$.inputScopes.*.entities) }
+containerToContainerImageAssociation: ${ fn.mapAssociationFn($$.allEntityRefs[type = 'infra:container'], $$.allEntityRefs[type = 'infra:container_image'], 'common:uses') }
+databaseClusterToInstanceAssociation: ${ fn.mapAssociationFn($$.allEntityRefs[type = 'infra:database_cluster'], $$.allEntityRefs[type = 'infra:database_instance'], 'common:consists_of') }
+allAssociations: ${ $append([ containerToContainerImageAssociation, databaseClusterToInstanceAssociation ], []) }
+
+# associate scopes with entities
+scopes: ${ fn.createScopesFn($$.inputScopes, $$.allEntities) }
+
+
+#### output of plugin ####
+output:
+  entities: /${allEntities}
+  associations: /${allAssociations}
+  scopes: /${scopes}

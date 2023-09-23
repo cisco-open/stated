@@ -1,0 +1,17 @@
+{
+  "send$": "$setInterval(function(){$publish(pubParams)}, 100)",
+  "pubParams": {
+    "type": "/${ subscribeParams.type}",
+    "data": "${ function(){  {'name': 'nozzleTime', 'rando': $random()}}  }"
+  },
+  "recv$": "$subscribe(subscribeParams)",
+  "subscribeParams": {
+    "source": "cloudEvent",
+    "type": "my-topic",
+    "to": "/${ function($e){( $console.log('received - ' & $string($e) ); $set('/rxLog', rxLog~>$append($e)); )}  }",
+    "subscriberId": "dingus",
+    "initialPosition": "latest"
+  },
+  "rxLog": [],
+  "stop$": "$count(rxLog)=20?$clearInterval(send$):'still going'"
+}

@@ -1,0 +1,39 @@
+# to run this locally you need to have pulsar running in standalone mode
+
+# client configuration. type can be pulsar or kafka
+PulsarClientParams:
+  type: 'pulsar'
+  params:
+    serviceUrl: 'pulsar://localhost:6650'
+
+KafkaClientParams:
+  type: 'kafka'
+  params:
+    serviceUrl: 'pulsar://localhost:6650'
+
+# starts producer function
+send$: $setInterval(function(){$publish(produceParams, clientParams)}, 100)
+
+# producer will be sending data function output to the "type" topic
+produceParams:
+  type: "my-topic"
+  data: "${ function(){  {'name': 'nozzleTime', 'rando': $random()}}  }"
+
+# starts consumer function
+recv$: $subscribe(subscribeParams, clientParams)
+# producer will be invoking "to" function for each consumed event
+subscribeParams: #parameters for subscribing to a cloud event
+  source: cloudEvent
+  type: /${ produceParams.type} # subscribe to the same topic as we are publishing to test events
+  to: /${ function($e){(
+    $console.log('received - ' & $string($e) );
+    $set('/rxLog', rxLog~>$append($e));
+    )}  }
+  subscriberId: dingus
+  initialPosition: latest
+
+# this is a log for results of the consumer function
+rxLog: []
+
+# this is a function that will stop the producer after 20 events have been received
+stop$: $count(rxLog)=20?$clearInterval(send$):'still going'

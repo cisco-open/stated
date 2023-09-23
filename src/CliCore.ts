@@ -63,6 +63,8 @@ export default class CliCore {
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
+        } else if (fileExtension === 'js' || fileExtension === 'mjs') {
+            return await import(CliCore.resolveImportPath(filepath, importPath));
         } else {
             return JSON.parse(fileContent);
         }
@@ -98,7 +100,7 @@ export default class CliCore {
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
     async init(replCmdInputStr) {
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath} = parsed;
+        const {filepath, tags, oneshot, options, xf:contextFilePath, importPath} = parsed;
         if(filepath===undefined){
             return undefined;
         }
