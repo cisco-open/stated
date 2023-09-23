@@ -884,10 +884,10 @@ test("remove all DEFAULT_FUNCTIONS", async () => {
         "fetchFunctionShouldNotExists": {
             "error": {
                 "message": "Attempted to invoke a non-function",
-                "name" : undefined
+                "name": "JSONata evaluation exception"
             }
         }
-    })
+    });
 });
 
 test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
@@ -913,10 +913,37 @@ test("strict.refs", async () => {
     let template = {
         "a":42,
         "b":"${a}",
-        "c": "${z}"
+        "c": "${z}",
+        "d$":"c + a"
     };
     const tp = new TemplateProcessor(template, {}, {strict:{refs:true}});
-    await expect(tp.initialize()).rejects.toThrow("/z does not exist (strict.refs option enabled)");
+    await tp.initialize();
+    expect(tp.errorReport).toEqual({
+        "/c": {
+            "message": "/z does not exist, referenced from /c (strict.refs option enabled)",
+            "name": "strict.refs"
+        },
+        "/d$": {
+            "message": "The left side of the \"+\" operator must evaluate to a number",
+            "name": "JSONata evaluation exception"
+        }
+    });
+    expect(tp.output).toEqual({
+        "a": 42,
+        "b": 42,
+        "c": {
+            "error": {
+                "message": "/z does not exist, referenced from /c (strict.refs option enabled)",
+                "name": "strict.refs"
+            }
+        },
+        "d$": {
+            "error": {
+                "message": "The left side of the \"+\" operator must evaluate to a number",
+                "name": "JSONata evaluation exception"
+            }
+        }
+    });
 });
 
 test("remove temp vars 1", async () => {

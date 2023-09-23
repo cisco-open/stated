@@ -36,7 +36,6 @@ export default class TemplateProcessor {
     }
 
     constructor(template={}, context = {}, options={}) {
-
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
@@ -56,6 +55,7 @@ export default class TemplateProcessor {
         this.tagSet = new Set();
         this.options = options;
         this.debugger = new Debugger(this.templateMeta, this.logger);
+        this.errorReport = {}
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
@@ -91,6 +91,9 @@ export default class TemplateProcessor {
     };
 
     async initialize(template = this.input, jsonPtr = "/") {
+        if(jsonPtr === "/"){
+            this.errorReport = {}; //clear the error report when we initialize a root template
+        }
         if(typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web'){
             const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
             this.logger = await FancyLogger.getLogger();
@@ -267,10 +270,6 @@ export default class TemplateProcessor {
     }
 
     async createMetaInfos(template, rootJsonPtr = []) {
-        /*
-        const metaInfProcessor = jsonata(metaInfoProducer);
-        let metaInfos = await metaInfProcessor.evaluate(template, {"console":console});
-         */
         let metaInfos = await MetaInfoProducer.getMetaInfos(template);
 
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
@@ -339,13 +338,6 @@ export default class TemplateProcessor {
         metaInfos.forEach(i => {
             i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
-                    if(this.options.strict?.refs){
-                        const msg = `${ptr} does not exist (strict.refs option enabled)`
-                        this.logger.error(msg);
-                        const error = new Error(msg);
-                        error.name = "strict.refs"
-                        throw error;
-                    }
                     jp.set(this.templateMeta, ptr, {
                         "materialized__": false,
                         "jsonPointer__": ptr,
@@ -496,6 +488,7 @@ export default class TemplateProcessor {
         return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
     }
 
+
     async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP) {
         const resp = [];
         let first;
@@ -519,13 +512,8 @@ export default class TemplateProcessor {
             }
         }
         for (const jsonPtr of jsonPtrList) {
-            try {
-                const didUpdate = await this.evaluateNode(jsonPtr);
-                jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
-            } catch (e) {
-                this.logger.error(`An error occurred while evaluating dependencies for ${jsonPtr}`);
-                this.logger.error(e);
-            }
+            const didUpdate = await this.evaluateNode(jsonPtr);
+            jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
         }
         first && jsonPtrList.unshift(first);
         return jsonPtrList.filter(jptr => {
@@ -538,13 +526,13 @@ export default class TemplateProcessor {
         const {output, templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
-        //set /foo when /foo does not exist yey
+        //set /foo when /foo does not exist yet
         const isUntracked = !jp.has(templateMeta, jsonPtr);
         if (isUntracked) {
             return this.setUntrackedLocation(output, jsonPtr, data);
         }
 
-        const hasDataToSet = data !== undefined;
+        const hasDataToSet = data !== undefined && data !== TemplateProcessor.NOOP;
         if (hasDataToSet) {
             return this.setDataIntoTrackedLocation(templateMeta, jsonPtr, data);
         }
@@ -558,11 +546,21 @@ export default class TemplateProcessor {
 
         const {templateMeta, output} = this;
         let data;
-        const {expr__, tags__} = jp.get(templateMeta, jsonPtr);
-
+        const metaInfo = jp.get(templateMeta, jsonPtr);
+        const {expr__, tags__, callback__} = metaInfo;
+        let success = false;
         if (expr__ !== undefined) {
             if(this.allTagsPresent(tags__)) {
-                data = await this._evaluateExprNode(jsonPtr); //run the jsonata expression
+                try {
+                    this._strictChecks(metaInfo);
+                    data = await this._evaluateExprNode(jsonPtr); //run the jsonata expression
+                    success = true;
+                }catch(error){
+                    const errorObject = {name:error.name, message: error.message}
+                    data = {error:errorObject}; //errors get placed into the template output
+                    this.errorReport[jsonPtr] = errorObject;
+                }
+                this._setData(jsonPtr, data, callback__);
             } else {
                 this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${Array.from(tags__)}) were set with --tags`);
                 return false;
@@ -582,7 +580,22 @@ export default class TemplateProcessor {
         const endTime = Date.now(); // Capture end time
         this.logger.verbose(`_evaluateExpression at ${jsonPtr} completed in ${endTime - startTime} ms.`);  // Log the time taken
 
-        return true; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
+        return success; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
+    }
+
+    _strictChecks(metaInfo) {
+        const {strict} = this.options;
+        if (strict?.refs) {
+            metaInfo.absoluteDependencies__?.forEach(ptr => {
+                if (jp.get(this.templateMeta, ptr).materialized__ === false) {
+                    const msg = `${ptr} does not exist, referenced from ${metaInfo.jsonPointer__} (strict.refs option enabled)`;
+                    this.logger.error(msg);
+                    const error = new Error(msg);
+                    error.name = "strict.refs"
+                    throw error;
+                }
+            });
+        }
     }
 
     setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
@@ -630,15 +643,10 @@ export default class TemplateProcessor {
             this.logger.debug(`Expression: ${expr__}`);
             this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
             this.logger.debug(`Result: ${StatedREPL.stringify(evaluated)}`);
-            evaluated = {
-                "error":
-                    {
-                        name: error.name,
-                        message: error.message
-                    }
-            };
+            const _error = new Error(error.message);
+            _error.name = "JSONata evaluation exception";
+            throw _error;
         }
-        this._setData(jsonPtr, evaluated, callback__);
         return evaluated;
     }
 

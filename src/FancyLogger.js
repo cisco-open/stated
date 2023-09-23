@@ -1,9 +1,12 @@
+import ConsoleLogger from "./ConsoleLogger.js";
+
 export default class FancyLogger {
     static async getLogger() {
         if (typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web') {
             const winston = await import('winston');
             const formats = [winston.format.colorize(), winston.format.simple()];
             const logger = winston.createLogger({
+                levels: ConsoleLogger.levels,
                 format: winston.format.json(),
                 transports: [
                     new winston.transports.Console({

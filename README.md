@@ -166,17 +166,18 @@ const stated = require('stated-js');
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command  | Description                                       | flags                                                                                                                                    | Example                                                                                                                                      |
-|----------|---------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `.init`  | Initialize the template from a JSON file.         | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates` |
-| `.set`   | Set data to a JSON pointer path.                  | `<path> <data>`                                                                                                                          | `.set /to "jsonata"`                                                                                                                         |
-| `.from`  | Show the dependents of a given JSON pointer.      | `<path>`                                                                                                                                 | `.from /a`                                                                                                                                   |
-| `.to`    | Show the dependencies of a given JSON pointer.    | `<path>`                                                                                                                                 | `.to /b`                                                                                                                                     |
-| `.in`    | Show the input template.                          | `None`                                                                                                                                   | `.in`                                                                                                                                        |
-| `.out`   | Show the current state of the template.           | `[<jsonPtr>]`                                                                                                                            | `.out` <br>`.out /data/accounts`                                                                                                             |
-| `.state` | Show the current state of the template metadata.  | `None`                                                                                                                                   | `.state`                                                                                                                                     |
-| `.plan`  | Show the execution plan for rendering the template.  | `None`                                                                                                                                   | `.plan`                                                                                                                                      |
+| Command  | Description                                              | flags & args                                                                                                                             | Example                                                                                                                                      |
+|----------|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.                | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates` |
+| `.set`   | Set data to a JSON pointer path.                         | `<path> <data>`                                                                                                                          | `.set /to "jsonata"`                                                                                                                         |
+| `.from`  | Show the dependents of a given JSON pointer.             | `<path>`                                                                                                                                 | `.from /a`                                                                                                                                   |
+| `.to`    | Show the dependencies of a given JSON pointer.           | `<path>`                                                                                                                                 | `.to /b`                                                                                                                                     |
+| `.in`    | Show the input template.                                 | `None`                                                                                                                                   | `.in`                                                                                                                                        |
+| `.out`   | Show the current state of the template.                  | `[<jsonPtr>]`                                                                                                                            | `.out` <br>`.out /data/accounts`                                                                                                             |
+| `.state` | Show the current state of the template metadata.         | `None`                                                                                                                                   | `.state`                                                                                                                                     |
+| `.plan`  | Show the execution plan for rendering the template.      | `None`                                                                                                                                   | `.plan`                                                                                                                                      |
 | `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                                                              | `.note "Example 8"`                                                                                                                          |
+| `.log`   | Set the logging level                                    | `[silent, error, warn, info, verbose, debug]`                                                                                            | `.log silent`                                                                                                                                |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -197,6 +198,81 @@ parses the input, builds an execution plan, and executes the result. To see the 
     1,
     1
   ]
+}
+```
+## Error Handling
+if a JSONata expression evaluation throws an exception, the exception is converted to an error and placed
+into the template output.
+```json
+> .log silent
+{
+  "log level": "silent"
+}
+> .init -f "example/errors.json"
+{
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+> .out
+{
+  "a": 42,
+  "b": {
+    "error": {
+      "name": "JSONata evaluation exception",
+      "message": "The right side of the \"+\" operator must evaluate to a number"
+    }
+  }
+}
+```
+## Logging
+the `.log` command can set the log level to `[silent, error, warn, info, verbose, debug]`. Enabling high 
+log levels like debug can help you track down problems with expressions.
+```json
+> .log debug
+{
+  "log level": "debug"
+}
+```
+```shell
+ .init -f "example/errors.json"
+arguments: {"_":[],"f":"example/errors.json","filepath":"example/errors.json","tags":[],"oneshot":false,"options":{}}
+verbose: initializing...
+debug: tags: {}
+verbose: evaluating template...
+error: Error evaluating expression at /b
+error: The right side of the "+" operator must evaluate to a number {"code":"T2002","position":3,"stack":"Error\n    at evaluateNumericExpression (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:4122:25)\n    at evaluateBinary (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3900:30)\n    at async evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3490:26)\n    at async Object.evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:5558:26)\n    at async TemplateProcessor._evaluateExprNode (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:637:25)\n    at async TemplateProcessor._evaluateExpression (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:556:28)\n    at async TemplateProcessor.evaluateJsonPointersInOrder (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:515:31)\n    at async TemplateProcessor.evaluateDependencies (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:358:16)\n    at async TemplateProcessor.evaluate (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:123:9)\n    at async TemplateProcessor.initialize (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:113:9)","token":"+","value":" is not a string"}
+debug: Expression: a + ' is not a string'
+debug: Target: {
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+debug: Result: null
+verbose: _evaluateExpression at /b completed in 13 ms.
+verbose: evaluation complete in 13 ms...
+verbose: initialization complete...
+{
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+```
+## Error Reporting
+The `.errors` command will produce a report of all errors in the template
+```json
+> .log silent
+{
+  "log level": "silent"
+}
+> .init -f "example/errors.json"
+{
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+> .errors
+{
+  "/b": {
+    "name": "JSONata evaluation exception",
+    "message": "The right side of the \"+\" operator must evaluate to a number"
+  }
 }
 ```
 ## Expressions and Variables
@@ -1246,32 +1322,42 @@ to throw an Exception when references in the template cannot be resolved. Refere
 the template itself; it is not performed agains variables that are injected into the execution context by the TemplateProcessor
 library.
 ```json
-> .log fatal
-null
+> .log silent
+{
+  "log level": "silent"
+}
 > .init -f "example/strictref.json" --options={"strict":{"refs":true}}
 {
-  "name": "strict.refs",
-  "message": "/z does not exist (strict.refs option enabled)"
+  "a": 42,
+  "b": "${a}",
+  "c": "${z}"
+}
+> .out
+{
+  "a": 42,
+  "b": 42,
+  "c": {
+    "error": {
+      "name": "strict.refs",
+      "message": "/z does not exist, referenced from /c (strict.refs option enabled)"
+    }
+  }
 }
 ```
 Options can also be used in oneshot mode. Note the use of backslashes to escape quotes in the JSON on the CLI
 ```shell
 falken$ stated --options={\"strict\":{\"refs\":true}} example/strictref.json
-error: /z does not exist (strict.refs option enabled)
-/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:325
-const error = new Error(msg);
-^
-
-strict.refs: /z does not exist (strict.refs option enabled)
-at /Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:325:39
-at Array.forEach (<anonymous>)
-at /Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:320:39
-at Array.forEach (<anonymous>)
-at TemplateProcessor.setupDependees (/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:319:19)
-at TemplateProcessor.initialize (/Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.js:112:14)
-at async CliCore.init (/Users/ghendrey/proj/jsonataexperiments/src/CliCore.js:74:13)
-at async Stated.initialize (/Users/ghendrey/proj/jsonataexperiments/stated.js:27:22)
-at async /Users/ghendrey/proj/jsonataexperiments/stated.js:125:9
+error: /z does not exist, referenced from /c (strict.refs option enabled)
+{
+  a: 42,
+  b: 42,
+  c: {
+    error: {
+      name: 'strict.refs',
+      message: '/z does not exist, referenced from /c (strict.refs option enabled)'
+    }
+  }
+}
 ```
 ## Setting the context with --xf
 The `--xf` argument can be used to provide a context file. Context is used

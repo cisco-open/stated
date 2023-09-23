@@ -181,7 +181,7 @@ export default class CliCore {
         if(this.templateProcessor){
             this.templateProcessor.logger.level = level;
         }
-        return undefined;
+        return {"log level":level};
     }
 
     note(note){
@@ -194,6 +194,13 @@ export default class CliCore {
         }
         const parsed = CliCore.minimistArgs(replCmdInputStr)
         return this.templateProcessor.debugger.processCommands(parsed);
+    }
+
+    async errors(replCmdInputStr) {
+        if (!this.templateProcessor) {
+            throw new Error('Initialize the template first.');
+        }
+        return this.templateProcessor.errorReport;
     }
 }
 

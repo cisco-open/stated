@@ -47,7 +47,8 @@ export default class StatedREPL {
             ["plan", 'Show the evaluation plan'],
             ["note", "returns ═══ ... for creating documentation"],
             ["log", "set the log level [debug, info, warn, error]"],
-            ["debug", "set debug commands"]
+            ["debug", "set debug commands (WIP)"],
+            ["errors", "return an error report"],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
