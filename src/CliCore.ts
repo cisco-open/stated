@@ -59,9 +59,17 @@ export default class CliCore {
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
+        } else if (fileExtension === 'js' || fileExtension === 'mjs') {
+            const imported = await import(this.adjustPath(filepath));
+            return imported;
         } else {
             return JSON.parse(fileContent);
         }
+    }
+
+    // adjust path to the project root directory
+    adjustPath(path){
+        return "../" + path;
     }
 
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
