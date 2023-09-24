@@ -17,7 +17,7 @@
         // Initialize the TemplateProcessor
         const tp = new TemplateProcessor({
             data: ["foo", "bar", "baz"],
-            view: [["div", {}, "/${ ($XXconsole.log($string($$.data));$joiwn(data, ','))}"]]
+            view: [["div", {}, "/${ ($console.log($string($$.data));$join(data, ','))}"]]
         }, {},{});
         tp.logger.level = "debug"
         await tp.initialize();

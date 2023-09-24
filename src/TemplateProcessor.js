@@ -35,6 +35,8 @@ export default class TemplateProcessor {
         "console": console
     }
 
+    static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
+
     constructor(template={}, context = {}, options={}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
@@ -94,7 +96,7 @@ export default class TemplateProcessor {
         if(jsonPtr === "/"){
             this.errorReport = {}; //clear the error report when we initialize a root template
         }
-        if(typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web'){
+        if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' &&  BUILD_TARGET !== 'web')){
             const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
             this.logger = await FancyLogger.getLogger();
             this.logger.level = _level;
@@ -172,7 +174,7 @@ export default class TemplateProcessor {
             } else {
                 this.logger.debug(`Attempting local file import of '${importMe}'`);
                 const mightBeAFilename= importMe;
-                if (typeof BUILD_TARGET === 'undefined' || BUILD_TARGET !== 'web') {
+                if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' &&  BUILD_TARGET !== 'web')) {
                     resp = await this.localImport(mightBeAFilename);
                 }
                 if(resp === undefined){
