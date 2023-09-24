@@ -1,9 +1,10 @@
 {
   "name": "stated-js",
-  "version": "0.0.56",
+  "version": "0.0.55",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "stated.js",
+  "types": "src/types/TemplateProcessor.d.ts",
   "exports": {
     ".": {
       "import": "./dist/bundle.mjs"
