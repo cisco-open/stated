@@ -12,9 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import CliCore from './src/CliCore';
+import CliCore from './dist/src/CliCore.js';
 import fs from 'fs';
-import StatedREPL  from './src/StatedREPL.js';
+import StatedREPL  from './dist/src/StatedREPL.js';
 
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks

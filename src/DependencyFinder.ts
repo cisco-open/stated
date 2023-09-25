@@ -12,21 +12,47 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import {default as last} from 'lodash-es/last.js';
-import jsonata from "jsonata";
+import last from 'lodash/last.js';
+import {default as jsonata} from "jsonata";
 
+/*
+  There are cases where we need to generate some AST nodes the JSONata does not generate. Instead of referring to
+  their ExprNode 'type' we say the generated node has a pseudoType
+ */
+interface GeneratedExprNode extends jsonata.ExprNode {
+    pseudoType?: string;
+}
+
+/*
+    Used to record a Step like 'b' in 'a.b.c'
+ */
+interface StepRecord{
+    type:string;
+    value: string;
+    emit:boolean;  //not every step gets emitted as a dependency
+}
 
 
 export default class DependencyFinder {
-    constructor(program) {
+    compiledExpression: jsonata.Expression;
+    private ast: jsonata.ExprNode;
+    private readonly currentSteps: StepRecord[][]; //logically, [[a,b,c],[d,e,f]]
+    private nodeStack: GeneratedExprNode[];
+    private readonly dependencies: string[][]; //during tree walking we collect these dependencies like [["a", "b", "c"], ["foo", "bar"]] which means the dependencies are a.b.c and foo.bar
+
+
+    constructor(program: string) {
         this.compiledExpression = jsonata(program);
         this.ast = this.compiledExpression.ast();
         this.currentSteps = [];
-        this.paths = [];
+        this.dependencies = [];
         this.nodeStack = [];
     }
 
-    findDependencies(node = this.ast) {
+    /*
+        Walk the AST of the JSONata program
+     */
+    findDependencies(node:GeneratedExprNode = this.ast):string[][] {
         if (this.currentSteps.length === 0) {
             this.currentSteps.push([]); //initialize a container for steps
         }
@@ -50,10 +76,10 @@ export default class DependencyFinder {
             switch (type) {
                 case "bind":  // :=
                 case "path": //a.b.c
-                    //paths can happen inside paths. a.b[something].[zz] contains paths within paths
-                    //so each time the path is broken we push the current paths and reset it.
+                    //dependencies can happen inside dependencies. a.b[something].[zz] contains dependencies within dependencies
+                    //so each time the path is broken we push the current dependencies and reset it.
                     const {pseudoType} = node;
-                    if(pseudoType !== "procedure") { //this means we are entering a function call and we want to collect the function name as part of the path we are currently traversing, not as a new path
+                    if(pseudoType !== "procedure") { //this means we are entering a function call, and we want to collect the function name as part of the path we are currently traversing, not as a new path
                         this.currentSteps.push([]);
                     }
                     break;
@@ -71,7 +97,7 @@ export default class DependencyFinder {
             switch (type) {
                 case "variable":
                     if (!this.hasAncestor(n => n.type === "path")) {
-                        this.emitPaths(); //every independent variable should be separately emitted. But if it is under a path then don't emit it since it should be glommed onto the path
+                        this.emitPaths(); //every independent variable should be separately emitted. But if it is under a path then don't emit it since it should be glimmered onto the path
                     }
                     break;
                 case "path":
@@ -80,16 +106,12 @@ export default class DependencyFinder {
             }
             this.nodeStack.pop();
         }
-        return this.paths;
-    }
-
-    findTargetsOfSet(node = this.ast){
-        console.log(node);
+        return this.dependencies;
     }
 
 
-    collectChildren(node) {
-        function ensureProcedureBeforeArguments(arr) {
+    collectChildren(node: GeneratedExprNode):GeneratedExprNode[] {
+        function ensureProcedureBeforeArguments(arr):string[] {
             const procedureIndex = arr.indexOf("procedure");
             const argumentsIndex = arr.indexOf("arguments");
 
@@ -101,8 +123,8 @@ export default class DependencyFinder {
 
             return arr;
         }
-        function introducePseudoTypes(node, key) {
-            const value = node[key];
+        function introducePseudoTypes(node, key):GeneratedExprNode {
+            const value:jsonata.ExprNode = node[key];
             if (!value) return null;
 
             if (Array.isArray(value)) {
@@ -110,16 +132,16 @@ export default class DependencyFinder {
                     return { ...value, "pseudoType": key };
                 }
                 return value;
-            } else if (typeof value === 'object' && value !== null) {
+            } else if (typeof value === 'object') {
                 return { ...value, "pseudoType": key };
             }
             return null;
         }
 
         //any property of node that is not type, value, or position is a child of the node
-        const keysToIgnore = ["type", "value", "position", "pseudoType"];
-        const filteredKeys = Object.keys(node).filter(key => !keysToIgnore.includes(key));
-        const orderedKeys = ensureProcedureBeforeArguments(filteredKeys);
+        const keysToIgnore: string[] = ["type", "value", "position", "pseudoType"];
+        const filteredKeys: string[] = Object.keys(node).filter(key => !keysToIgnore.includes(key));
+        const orderedKeys: string[] = ensureProcedureBeforeArguments(filteredKeys);
 
         const result = [];
         for (const key of orderedKeys) {
@@ -131,7 +153,7 @@ export default class DependencyFinder {
         return result;
     }
 
-    captureArrayIndexes(node) {
+    captureArrayIndexes(node):void {
         const {type, expr} = node;
         if (type === "filter" && expr?.type === "number") {
             last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
@@ -177,7 +199,8 @@ export default class DependencyFinder {
         }
 
          */
-        last(this.currentSteps).push({type, value, "emit": true});
+        const stepRecord: StepRecord = {type, value, "emit": true};
+        last(this.currentSteps).push(stepRecord);
 
     }
 
@@ -195,15 +218,6 @@ export default class DependencyFinder {
         return this.nodeStack.filter(matcher);
     }
 
-    isUnderTreeShape(pathTypes) {
-        return this.nodeStack.reduce((_pathTypes, curr) => {
-            if (_pathTypes[0] === curr.type || _pathTypes[0] === curr.pseudoType) {
-                _pathTypes.shift(); //if the curr path item is the first element of the _pathTypes we remove it from _path
-            }
-            return _pathTypes;
-        }, [...pathTypes]).length === 0; //if 0 then the desired shape existed
-    }
-
     isSingle$Var(type, value) {
         return type === "variable" && value === ""; // $ or $.<whatever> means the variable whose name is empty/"".
     }
@@ -215,7 +229,7 @@ export default class DependencyFinder {
     }
 
 
-    isInsideAScopeWhere$IsLocal(node) {
+    isInsideAScopeWhere$IsLocal(node): boolean {
         let matches = this.ancestors(n => {
             const {type:t, pseudoType:p, value:v} = n;
             return (t === "unary" && ["(", "{", "[", "^"].includes(v)) //(map, {reduce, [filter, ^sort
@@ -223,7 +237,7 @@ export default class DependencyFinder {
                 || p === "predicate";
         });
         //the local scope is equal to the input scope to the expression the first time we enter one of these blocks
-        //However the second time the scope is the output from a prior expression, not the input. Therefore the scope
+        //However the second time the scope is the output from a prior expression, not the input. Therefore, the scope
         //is local to the expression when there is more than one match in the ancestors
         if (matches.length > 1){
             return true;
@@ -233,7 +247,7 @@ export default class DependencyFinder {
         //sure we are not IN a consarray as count is in and then if we are not in a consarray, are we following
         //a consarray (immediately or later)
         matches = !this.hasAncestor(n=>n.consarray !== undefined) && this.ancestors(n => {
-            const {type:t,  position, steps} = n;
+            const {type:t,  steps} = n;
             //iterate the steps array and determine if there is a consarray that comes before this node's position in the steps
             return t==="path" && steps.find(nn=>nn.consarray && nn.position < node.position);
         });
@@ -242,7 +256,7 @@ export default class DependencyFinder {
         }
 
 
-        //If we are in a transfor, scope is local
+        //If we are in a transform, scope is local
         matches = this.ancestors(n => {
             const {type:t} = n;
             return t === "transform";
@@ -252,8 +266,8 @@ export default class DependencyFinder {
 
     emitPaths() {
 
-        const emitted = [];
-        const steps = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
+        const emitted: string[] = [];
+        const steps: StepRecord[] = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
         const lastStepsArray = last(this.currentSteps);
         if (lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit)) {
             if (lastStepsArray[0].value === "$") { //corresponding to '$$' variable
@@ -271,14 +285,11 @@ export default class DependencyFinder {
             return; // a solo dependency of "$" gets scrapped. We don't track dependencies on the root of the template itself
         }
         if (emitted.length > 0) {
-            this.paths.push(emitted);
+            this.dependencies.push(emitted);
         }
 
     }
 
-    isRootLevelFunctionDecalaration(node){
-        return this.nodeStack.length===0 && node.type === "lambda"
-    }
 
 }
 

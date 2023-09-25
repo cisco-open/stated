@@ -17,9 +17,12 @@ import TemplateProcessor from './TemplateProcessor.js';
 import yaml from 'js-yaml';
 import minimist from 'minimist';
 import {parseArgsStringToArgv} from 'string-argv';
+import {logLevels} from "./ConsoleLogger.js";
 
 
 export default class CliCore {
+    private templateProcessor: TemplateProcessor;
+    private logLevel: keyof typeof logLevels;
     constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";
@@ -184,7 +187,7 @@ export default class CliCore {
         return {"log level":level};
     }
 
-    note(note){
+    note(){
         return "=============================================================";
     }
 
@@ -196,7 +199,7 @@ export default class CliCore {
         return this.templateProcessor.debugger.processCommands(parsed);
     }
 
-    async errors(replCmdInputStr) {
+    async errors() {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }

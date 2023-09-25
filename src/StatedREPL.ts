@@ -16,6 +16,8 @@ import CliCore from './CliCore.js';
 
 
 export default class StatedREPL {
+    private readonly cliCore: CliCore;
+    r: repl.REPLServer;
     constructor() {
         this.cliCore = new CliCore();
     }

@@ -1,14 +1,19 @@
 {
   "compilerOptions": {
-    "module": "commonjs",
-    "target": "es5",
+    "module": "NodeNext",
+    "target": "esnext",
     "sourceMap": true,
-    "esModuleInterop": true
+    "esModuleInterop": true,
+    "moduleResolution": "NodeNext",
+    "outDir": "./dist"
   },
   "include": [
-    "src/**/*"
+    "src/**/*",
+    "stated.ts"
   ],
   "exclude": [
     "node_modules"
   ]
+
+
 }

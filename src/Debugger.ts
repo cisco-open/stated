@@ -4,6 +4,9 @@ import {default as jp} from './JsonPointer.js';
  * Debugger class that manages breakpoints.
  */
 export default class Debugger {
+    private _breakpoints: Map<any, any>;
+    private _templateMeta: any;
+    logger: any;
     constructor(metaInfosByJsonPointer, logger) {
         /**
          * Stores the breakpoints set by the user.
@@ -81,7 +84,7 @@ export default class Debugger {
     enableBreakpoint(metaInfo, enabled) {
         this._breakpoints.get(metaInfo.jsonPointer__).enabled = enabled;
         if(enabled===true) {
-            metaInfo.break__ = handler;
+            metaInfo.break__ = {}//handler;
         }else{
             delete metaInfo.break__;
         }

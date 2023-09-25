@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import TemplateProcessor from '../TemplateProcessor.js';
+import TemplateProcessor from '../../dist/src/TemplateProcessor.js';
 import cloneDeep from 'lodash-es/cloneDeep.js';
 import largeResources from './large.js';
 import path from 'path';

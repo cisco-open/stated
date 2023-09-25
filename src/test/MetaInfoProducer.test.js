@@ -1,5 +1,5 @@
-import MetaInfoProducer from '../MetaInfoProducer.js';
-import StatedREPL from '../StatedREPL.js';
+import MetaInfoProducer from '../../dist/src/MetaInfoProducer.js';
+import StatedREPL from '../../dist/src/StatedREPL.js';
 
 
 test("tt1", async () => {

@@ -1,4 +1,4 @@
-import TemplateProcessor from "../TemplateProcessor";
+import TemplateProcessor from "../../dist/src/TemplateProcessor.js";
 
 (async () => {
     // Instantiate the class

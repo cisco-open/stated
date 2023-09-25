@@ -1,5 +1,3 @@
-// jp.mjs
-
 export default class JSONPointer {
     /**
      * Convenience wrapper around jp.

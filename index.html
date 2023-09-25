@@ -7,10 +7,17 @@
 </head>
 <body>
 <h1>Template Processor Test</h1>
+<h2>You should serve this file. It will CORS error if you just try to open the file.</h2>
 <div id="output"></div>
+<!--
+ serve this HTML file with http-server.
+  >  npm install -g http-server
+  >  http-server
 
+  Then point browser at http://127.0.0.1:8080/
+ -->
 <script type="module">
-    import TemplateProcessor from "/dist/bundle.mjs"
+    import TemplateProcessor from "http://127.0.0.1:8080/dist/bundle.mjs"
 
     // Wait for the document to load
     document.addEventListener('DOMContentLoaded', async () => {

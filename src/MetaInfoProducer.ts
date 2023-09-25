@@ -1,8 +1,24 @@
-// Create the regex using the RegExp constructor
+import jsonata from "jsonata";
 
+export interface MetaInfo{
+    materialized__:boolean,
+    jsonPointer__: JsonPointerStructureArray|JsonPointerString;
+    dependees__:JsonPointerStructureArray[]|JsonPointerString[];
+    dependencies__:JsonPointerStructureArray[]|JsonPointerString[];
+    treeHasExpressions__: boolean;
+    tags__:Set<string>;
+    exprRootPath__?: string;
+    expr__?: string;
+    compiledExpr__?: jsonata.Expression;
+    temp__?:boolean; //temp field indicates this field is !${...} and will be removed after template is processed
+    parentJsonPointer__?:JsonPointerStructureArray|JsonPointerString
+}
+
+export type JsonPointerStructureArray = string[];
+export type JsonPointerString = string;
 
 export default class MetaInfoProducer {
-    static EMBEDDED_EXPR_REGEX = new RegExp(
+    private static EMBEDDED_EXPR_REGEX = new RegExp(
         '\\s*' +                    // Match optional whitespace
         '(?:(@(?<tag>\\w+))?\\s*)' +   // Match the 'tag' like @DEV or @TPC on an expression
         '(?:(?<tempVariable>!)?\\s*)' +    // Match the ! symbol which means 'temp variable'
@@ -14,20 +30,20 @@ export default class MetaInfoProducer {
     );
 
 
-    static async getMetaInfos(template) {
+    static async getMetaInfos(template):Promise<MetaInfo[]> {
 
-        const stack = [];
-        const emit = [];
+        const stack:MetaInfo[] = [];
+        const emit:MetaInfo[] = [];
 
         async function getPaths(o, path = []) {
             const type = typeof o;
-            const metaInfo = {
+            const metaInfo:MetaInfo = {
                 "materialized__": true,
                 "jsonPointer__": path,
                 "dependees__": [],
                 "dependencies__": [],
                 "treeHasExpressions__": false,
-                "tags__": new Set()
+                "tags__": new Set(),
             };
             stack.push(metaInfo);
             if (Array.isArray(o)) {

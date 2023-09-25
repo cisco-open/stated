@@ -11,7 +11,7 @@
 // WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 // See the License for the specific language governing permissions and
 // limitations under the License.
-import DependencyFinder from "../DependencyFinder.js";
+import DependencyFinder from "../../dist/src/DependencyFinder.js";
 
 test('data warning', () => {
     const df = new DependencyFinder('data.warningStatus.data[0].count ? data.warningStatus.data[0].count : 0');
@@ -33,6 +33,10 @@ test('data warning', () => {
     ]);
 });
 
+test('a', () => {
+    const df = new DependencyFinder('a');
+    expect(df.findDependencies()).toEqual([['a']]);
+});
 test('$$.aaa', () => {
     const df = new DependencyFinder('$$.aaa');
     expect(df.findDependencies()).toEqual([["$", 'aaa']]);

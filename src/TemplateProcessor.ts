@@ -17,13 +17,16 @@ import isEqual from "lodash-es/isEqual.js";
 import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
 import Debugger from './Debugger.js';
-import MetaInfoProducer from './MetaInfoProducer.js';
+import MetaInfoProducer, {JsonPointerString, MetaInfo} from './MetaInfoProducer.js';
 import DependencyFinder from './DependencyFinder.js';
 import path from 'path';
 import fs from 'fs';
-import ConsoleLogger from "./ConsoleLogger.js";
+import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import StatedREPL from "./StatedREPL.js";
+
+
+type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 
 export default class TemplateProcessor {
 
@@ -34,8 +37,21 @@ export default class TemplateProcessor {
         "setTimeout": setTimeout,
         "console": console
     }
-
     static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
+    
+    logger: StatedLogger;
+    context: any;
+    output: {};
+    input: any;
+    templateMeta: any;
+    warnings: any[];
+    metaInfoByJsonPointer: MetaInfoMap;
+    tagSet: Set<unknown>;
+    options: any;
+    debugger: any;
+    errorReport: {};
+    private executionPlans: {};
+    commonCallback: any;
 
     constructor(template={}, context = {}, options={}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
@@ -118,7 +134,7 @@ export default class TemplateProcessor {
     }
 
 
-    async evaluate(jsonPtr) {
+    async evaluate(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
 
         this.logger.verbose("evaluating template...");
@@ -423,7 +439,7 @@ export default class TemplateProcessor {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
                     const child = metaInfoNode[childKey];
                     if (!visited.has(child.jsonPointer__)) {
-                        listDependencies(child, exprsOnly);
+                        listDependencies(child);
                     }
                 }
             }
@@ -447,10 +463,10 @@ export default class TemplateProcessor {
                             //if (ancestor && !visited.has(ancestor.jsonPointer__)) {
                             if (ancestor) {
                                 //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular dependencies as it would in ex10
-                                listDependencies(ancestor, exprsOnly);
+                                listDependencies(ancestor);
                             }
                         }
-                        listDependencies(dependencyNode, exprsOnly);
+                        listDependencies(dependencyNode);
                     }
                 }
             }
@@ -476,7 +492,7 @@ export default class TemplateProcessor {
         // Perform topological sort
         metaInfos.forEach(node => {
             if (!visited.has(node.jsonPointer__)) {
-                listDependencies(node, exprsOnly);
+                listDependencies(node);
             }
         });
 
@@ -524,7 +540,7 @@ export default class TemplateProcessor {
         });
     }
 
-    async evaluateNode(jsonPtr, data) {
+    async evaluateNode(jsonPtr, data?) {
         const {output, templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
