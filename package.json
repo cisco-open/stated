@@ -13,8 +13,8 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc && webpack",
-    "webpack": "webpack",
+    "build": "tsc && npm run webpack",
+    "webpack": "webpack && webpack --config webpack.config.cjs.js",
     "test": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "stated": "node --experimental-vm-modules dist/stated.js"
   },
