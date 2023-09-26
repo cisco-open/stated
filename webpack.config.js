@@ -7,9 +7,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 export default {
+
     devtool: 'source-map',
     entry: {
-        main: './src/TemplateProcessor.js'
+        main: './dist/src/TemplateProcessor.js'
     },
     output: {
         path: `${__dirname}/dist`, // Use __dirname here
@@ -24,7 +25,7 @@ export default {
         rules: [
             {
                 test: /\.js$/,
-                exclude: [/node_modules/, `${__dirname}/src/FancyLogger.js`],
+                exclude: [/node_modules/, `${__dirname}/dist/src/FancyLogger.js`],
                 use: {
                     loader: 'babel-loader', // You can add Babel or other loaders here
                 },

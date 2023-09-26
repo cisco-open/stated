@@ -1,1 +1,1 @@
-declare const BUILD_TARGET: string;
+declare var BUILD_TARGET: string

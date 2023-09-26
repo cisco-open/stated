@@ -3,9 +3,9 @@
   "version": "0.0.58",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
-  "main": "dist/TemplateProcessor.js",
-  "module": "dist/bundle.mjs",
-  "typings": "src/types/TemplateProcessor.d.ts",
+  "main": "./dist/src/TemplateProcessor.js",
+  "module": "./dist/src/TemplateProcessor.js",
+  "typings": "./src/types/TemplateProcessor.d.ts",
   "exports": {
     ".": {
       "import": "./dist/bundle.mjs"
@@ -19,7 +19,7 @@
     "stated": "node --experimental-vm-modules dist/stated.js"
   },
   "bin": {
-    "stated": "stated.js"
+    "stated": "./dist/stated.js"
   },
   "repository": {
     "type": "git",
