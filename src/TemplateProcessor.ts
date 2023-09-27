@@ -51,7 +51,9 @@ export default class TemplateProcessor {
     debugger: any;
     errorReport: {};
     private executionPlans: {};
+    private readonly executionQueue = []
     commonCallback: any;
+
 
     constructor(template={}, context = {}, options={}) {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
@@ -508,7 +510,23 @@ export default class TemplateProcessor {
     async setData(jsonPtr, data) {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
-        return await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data); // Evaluate all affected nodes, in optimal evaluation order
+        const plan = {sortedJsonPtrs, data};
+        this.executionQueue.push(plan);
+        if(this.executionQueue.length>1){
+            return sortedJsonPtrs; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
+        }
+
+        async function drainQueue() {
+            while (this.executionQueue.length > 0) {
+                const {sortedJsonPtrs, data} = this.executionQueue[0];
+                await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data);
+                this.executionQueue.shift(); // Store the plan that has been executed
+            }
+        }
+
+        await drainQueue.call(this);
+        return sortedJsonPtrs;
+
     }
 
 
@@ -704,7 +722,7 @@ export default class TemplateProcessor {
     getDependentsTransitiveExecutionPlan(jsonPtr) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
-            const effectedNodesSet = this.getDependentsBFS(jsonPtr);
+            const effectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
             this.executionPlans[jsonPtr] = [jsonPtr, ...[...effectedNodesSet].map(n => n.jsonPointer__)];
         }
         return this.executionPlans[jsonPtr];
@@ -718,7 +736,7 @@ export default class TemplateProcessor {
         }
     }
 
-    getDependentsBFS(jsonPtr) {
+    getDependentsBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
         if (!jp.has(this.templateMeta, jsonPtr)) {
             this.logger.log('warn', `${jsonPtr} does not exist.`);
             return [];
