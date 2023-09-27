@@ -520,7 +520,7 @@ export default class TemplateProcessor {
             while (this.executionQueue.length > 0) {
                 const {sortedJsonPtrs, data} = this.executionQueue[0];
                 await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data);
-                this.executionQueue.shift(); // Store the plan that has been executed
+                this.executionQueue.shift();
             }
         }
 
@@ -543,7 +543,7 @@ export default class TemplateProcessor {
                 const firstMeta = jp.get(this.templateMeta, first);
                 if (firstMeta.expr__ !== undefined) {
                     this.logger.log('warn', `Attempted to replace expressions with data under ${first}. This operation is ignored.`);
-                    return false;
+                    return false; //fixme - although not used, returning false here is inconsistent. we need to return [firstMeta]
                 }
                 firstMeta.didUpdate__ = await this.evaluateNode(first, data); // Evaluate the node provided with the data provided
                 if (!firstMeta.didUpdate__) {
@@ -557,10 +557,19 @@ export default class TemplateProcessor {
             jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
         }
         first && jsonPtrList.unshift(first);
-        return jsonPtrList.filter(jptr => {
+        let anyUpdates = false;
+        const thoseThatUpdated =  jsonPtrList.filter(jptr => {
             const meta = jp.get(this.templateMeta, jptr);
+            anyUpdates ||= meta.didUpdate__;
             return meta.didUpdate__
         });
+        if(anyUpdates){
+            //admittedly this structure of this common callback is disgusting. Essentially if you are using the
+            //common callback you don't want to get passed any data that changed because you are saying in essence
+            //"I don't care what changed".
+            this.commonCallback && this.commonCallback(null, thoseThatUpdated); //we don't pass
+        }
+        return thoseThatUpdated;
     }
 
     async evaluateNode(jsonPtr, data?) {
@@ -710,7 +719,7 @@ export default class TemplateProcessor {
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             callback && callback(data, jsonPtr);
-            this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
+            //this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
         } else {
             this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);

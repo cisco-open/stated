@@ -28,9 +28,6 @@ test("test 1", async () => {
     });
     await tp.initialize();
     const received = [];
-    tp.setDataChangeCallback("", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
-    });
     tp.setDataChangeCallback("/a", (data, jsonPtr) => {
         received.push({data, jsonPtr})
     });
@@ -42,10 +39,21 @@ test("test 1", async () => {
     });
     await tp.setData("/a", 42);
     expect(received).toEqual([
-        {"data": 42, "jsonPtr": "/a"},
-        {"data": 42, "jsonPtr": "/a"},
-        {"data": 42, "jsonPtr": "/b"},
-        {"data": 42, "jsonPtr": "/b"}
+        {
+            "data": 42,
+            "jsonPtr": "/a"
+        },
+        {
+            "data": 42,
+            "jsonPtr": "/b"
+        },
+        {
+            "data": null,
+            "jsonPtr": [
+                "/a",
+                "/b"
+            ]
+        }
     ]);
 });
 
