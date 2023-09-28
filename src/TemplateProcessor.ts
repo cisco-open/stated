@@ -54,9 +54,11 @@ export default class TemplateProcessor {
     private readonly executionQueue = []
     commonCallback: any;
     private isInitializing: boolean;
+    private uniqueId;
 
 
     constructor(template={}, context = {}, options={}) {
+        this.uniqueId = Math.random()*1e6;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
@@ -68,8 +70,9 @@ export default class TemplateProcessor {
                 this.context[key] = safe(this.context[key]);
             }
         }
-        this.output = template; //initial output is input template
+
         this.input = JSON.parse(JSON.stringify(template));
+        this.output = template; //initial output is input template
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
         this.warnings = [];
         this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
@@ -114,7 +117,7 @@ export default class TemplateProcessor {
 
     async initialize(template = this.input, jsonPtr = "/") {
         if (jsonPtr === "/" && this.isInitializing) {
-            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!!-----");
+            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
         }
 
@@ -131,7 +134,7 @@ export default class TemplateProcessor {
                 this.logger.level = _level;
             }
 
-            this.logger.verbose("initializing...");
+            this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
             this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
@@ -154,7 +157,7 @@ export default class TemplateProcessor {
     async evaluate(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
 
-        this.logger.verbose("evaluating template...");
+        this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
         await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
 
         const endTime = Date.now(); // Capture end time
@@ -521,11 +524,15 @@ export default class TemplateProcessor {
 
 
     async setData(jsonPtr, data) {
+        this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
         const plan = {sortedJsonPtrs, data};
         this.executionQueue.push(plan);
+        this.logger.debug(`execution pla (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
+        this.logger.debug(`execution plan queued (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
         if(this.executionQueue.length>1){
+            console.debug();
             return sortedJsonPtrs; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
         }
 
