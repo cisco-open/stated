@@ -53,15 +53,46 @@ export default class CliCore {
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
 
-    async readFileAndParse(filepath) {
-        const fileContent = await fs.promises.readFile(filepath, 'utf8');
+    async readFileAndParse(filepath, importPath) {
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
+        if (fileExtension === 'js' || fileExtension === 'mjs') {
+            return await import(CliCore.resolveImportPath(filepath, importPath));
+        }
+
+        const fileContent = await fs.promises.readFile(filepath, 'utf8');
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
         } else {
             return JSON.parse(fileContent);
         }
+    }
+
+    static isNodeEnvironment() {
+        return typeof process !== 'undefined' && process.versions != null && process.versions.node != null;
+    }
+
+
+    static resolveImportPath(filepath: any, importPath: any): string {
+        if (!filepath) throw new Error("filepath is required");
+
+        // can't do any path resolution in browser
+        if (!CliCore.isNodeEnvironment()) return filepath;
+
+        if (importPath) {
+            if (filepath && filepath.startsWith("~")) throw new Error("Cannot use file path starting with '~' with importPath");
+            if (filepath && filepath.startsWith("/")) throw new Error("Cannot use file path starting with '/' with importPath");
+            if (importPath.startsWith("/")) return path.resolve(path.join(importPath, filepath))
+
+            if (importPath.startsWith("~")) return path.resolve(path.join(importPath.replace("~", process.env.HOME), filepath));
+
+            //relative path
+            return path.resolve(path.join(process.cwd(), importPath, filepath));
+        }
+
+        if (filepath && filepath.includes("~")) return path.resolve(filepath.replace("~", process.env.HOME));
+        if (filepath && filepath.startsWith("/")) return filepath;
+        return path.join(process.cwd(), filepath);
     }
 
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
@@ -71,8 +102,8 @@ export default class CliCore {
         if(filepath===undefined){
             return undefined;
         }
-        const input = await this.readFileAndParse(filepath);
-        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath) : {};
+        const input = await this.readFileAndParse(filepath, importPath);
+        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
         tags.forEach(a => this.templateProcessor.tagSet.add(a));

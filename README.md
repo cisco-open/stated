@@ -1424,3 +1424,39 @@ You can import local files by specifying a folder where stated will look for the
 }
 
 ```
+## Import JS functions
+Repl and cli support importing javascript functions. If provided file to --xf has a .js or .mjs extension, it will be 
+loaded and all exported functions will be added to TemplateProcessor's execution context.
+
+An example "src/test/test-export.js" exports 2 functions
+```js
+const barFunc = (input) => `bar: ${input}`;
+
+// explicitly define exported functions and their names
+export const foo = () => "foo";
+export const bar = barFunc;
+```
+
+Which can be used in the stated tempalate context
+```json
+> .init -f example/importJS.json --xf=src/test/test-export.js
+{
+  "res": "${ $bar($foo()) }"
+}
+> .out
+{
+  "res": "bar: foo"
+}
+```
+
+This can be combined with the `--importPath` option to import files relative to that path
+```json
+> .init -f example/importJS.json --importPath=src/test --xf=test-export.js
+{
+  "res": "${ $bar($foo()) }"
+}
+> .out
+{
+  "res": "bar: foo"
+}
+```
