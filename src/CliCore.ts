@@ -54,14 +54,15 @@ export default class CliCore {
     }
 
     async readFileAndParse(filepath, importPath) {
-        const fileContent = await fs.promises.readFile(filepath, 'utf8');
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
+        if (fileExtension === 'js' || fileExtension === 'mjs') {
+            return await import(CliCore.resolveImportPath(filepath, importPath));
+        }
+
+        const fileContent = await fs.promises.readFile(filepath, 'utf8');
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
-        } else if (fileExtension === 'js' || fileExtension === 'mjs') {
-            const imported = await import(CliCore.resolveImportPath(filepath, importPath));
-            return imported;
         } else {
             return JSON.parse(fileContent);
         }
