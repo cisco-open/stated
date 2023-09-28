@@ -53,6 +53,7 @@ export default class TemplateProcessor {
     private executionPlans: {};
     private readonly executionQueue = []
     commonCallback: any;
+    private isInitializing: boolean;
 
 
     constructor(template={}, context = {}, options={}) {
@@ -76,6 +77,7 @@ export default class TemplateProcessor {
         this.options = options;
         this.debugger = new Debugger(this.templateMeta, this.logger);
         this.errorReport = {}
+        this.isInitializing = false;
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
@@ -111,30 +113,41 @@ export default class TemplateProcessor {
     };
 
     async initialize(template = this.input, jsonPtr = "/") {
-        if(jsonPtr === "/"){
-            this.errorReport = {}; //clear the error report when we initialize a root template
+        if (jsonPtr === "/" && this.isInitializing) {
+            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!!-----");
+            return;
         }
 
-        if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' &&  BUILD_TARGET !== 'web')){
-            const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
-            this.logger = await FancyLogger.getLogger();
-            this.logger.level = _level;
-        }
+        // Set the lock
+        this.isInitializing = true;
+        try {
+            if (jsonPtr === "/") {
+                this.errorReport = {}; //clear the error report when we initialize a root template
+            }
 
-        this.logger.verbose("initializing...");
-        this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
-        this.executionPlans = {}; //clear execution plans
-        let parsedJsonPtr = jp.parse(jsonPtr);
-        parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-        let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
-        this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
-        this.sortMetaInfos(metaInfos);
-        this.populateTemplateMeta(metaInfos);
-        this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
-        this.propagateTags(metaInfos);
-        await this.evaluate(jsonPtr);
-        this.removeTemporaryVariables(metaInfos);
-        this.logger.verbose("initialization complete...");
+            if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
+                const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
+                this.logger = await FancyLogger.getLogger();
+                this.logger.level = _level;
+            }
+
+            this.logger.verbose("initializing...");
+            this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
+            this.executionPlans = {}; //clear execution plans
+            let parsedJsonPtr = jp.parse(jsonPtr);
+            parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
+            let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
+            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
+            this.sortMetaInfos(metaInfos);
+            this.populateTemplateMeta(metaInfos);
+            this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+            this.propagateTags(metaInfos);
+            await this.evaluate(jsonPtr);
+            this.removeTemporaryVariables(metaInfos);
+            this.logger.verbose("initialization complete...");
+        }finally {
+            this.isInitializing = false;
+        }
     }
 
 
