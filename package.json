@@ -69,7 +69,6 @@
     "example/**/*",
     "!**/.idea",
     "!**/.github",
-    "!src/experimental",
     "!flatbuffers"
   ],
   "jest": {
