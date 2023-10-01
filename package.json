@@ -68,7 +68,9 @@
     "dist/",
     "example/**/*",
     "!**/.idea",
-    "!**/.github"
+    "!**/.github",
+    "!src/experimental",
+    "!flatbuffers"
   ],
   "jest": {
     "transform": {}
