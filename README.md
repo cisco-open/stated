@@ -1452,7 +1452,7 @@ export const bar = barFunc;
 
 Which can be used in the stated tempalate context
 ```json
-> .init -f example/importJS.json --xf=src/test/test-export.js
+> .init -f example/importJS.json --xf=example/test-export.js
 {
   "res": "${ $bar($foo()) }"
 }
@@ -1464,7 +1464,7 @@ Which can be used in the stated tempalate context
 
 This can be combined with the `--importPath` option to import files relative to that path
 ```json
-> .init -f example/importJS.json --importPath=src/test --xf=test-export.js
+> .init -f example/importJS.json --importPath=example --xf=test-export.js
 {
   "res": "${ $bar($foo()) }"
 }
