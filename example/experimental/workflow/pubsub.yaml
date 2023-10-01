@@ -12,7 +12,7 @@ KafkaClientParams:
     serviceUrl: 'pulsar://localhost:6650'
 
 # starts producer function
-send$: $setInterval(function(){$publish(produceParams, clientParams)}, 100)
+send$: $setInterval(function(){$publish(produceParams, PulsarClientParams)}, 100)
 
 # producer will be sending data function output to the "type" topic
 produceParams:
@@ -20,7 +20,7 @@ produceParams:
   data: "${ function(){  {'name': 'nozzleTime', 'rando': $random()}}  }"
 
 # starts consumer function
-recv$: $subscribe(subscribeParams, clientParams)
+recv$: $subscribe(subscribeParams, KafkaClientParams)
 # producer will be invoking "to" function for each consumed event
 subscribeParams: #parameters for subscribing to a cloud event
   source: cloudEvent

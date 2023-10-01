@@ -42,6 +42,7 @@
     "flatbuffers": "^23.5.26",
     "js-yaml": "^4.1.0",
     "jsonata": "^2.0.3",
+    "kafkajs": "^2.2.4",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",
     "minimist": "^1.2.8",

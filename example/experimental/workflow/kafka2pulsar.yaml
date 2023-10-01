@@ -13,6 +13,18 @@ KafkaClientParams:
 send$: $setInterval(function(){$publish(produceParams, KafkaClientParams)}, 100)
 dispatch$: $subscribe(subscribeDispatcherParams, KafkaClientParams)
 
+subscribeDispatcherParams: 
+  source: cloudEvent
+  type: /${ produceParams.type}
+  to: | 
+    /${ function($e){(
+      $console.log('received - ' & $string($e) );
+      $publish({'type': e.type, 'data': e.data}, PulsarClientParams);
+    )}  }
+  subscriberId: dingus
+  initialPosition: latest
+
+
 # producer will be sending data function output to the "type" topic
 produceParams:
   type: "my-topic"
@@ -24,24 +36,23 @@ subscribeKafkaParams: #read from kafka and dispatch to per-topic pulsar
   to: | 
     /${ function($e){(
       $console.log('received - ' & $string($e) );
-      $publish({'type': e.type, 'data': e.data}, PulsarClientParams);
     )}  }
   subscriberId: dingus
   initialPosition: latest
 
 
 # starts consumer function
-recv$: $subscribe(subscribeParams, KafkaClientParams)
+# recv$: $subscribe(subscribeParams, KafkaClientParams)
 # producer will be invoking "to" function for each consumed event
-subscribeParams: #parameters for subscribing to a cloud event from kafka
-  source: cloudEvent
-  type: /${ produceParams.type} # subscribe to the same topic as we are publishing to test events
-  to: /${ function($e){(
-    $console.log('received - ' & $string($e) );
-    $set('/rxLog', rxLog~>$append($e));
-    )}  }
-  subscriberId: dingus
-  initialPosition: latest
+# subscribeParams: #parameters for subscribing to a cloud event from kafka
+#   source: cloudEvent
+#   type: /${ produceParams.type} # subscribe to the same topic as we are publishing to test events
+#   to: /${ function($e){(
+#     $console.log('received - ' & $string($e) );
+#     $set('/rxLog', rxLog~>$append($e));
+#     )}  }
+#   subscriberId: dingus
+#   initialPosition: latest
 
 # this is a log for results of the consumer function
 rxLog: []

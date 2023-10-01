@@ -15,6 +15,7 @@ import TemplateProcessor from "../../dist/src/TemplateProcessor.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import express from 'express';
 import Pulsar from 'pulsar-client';
+import {Kafka} from 'kafkajs';
 import winston from "winston";
 import {WorkflowDispatcher} from "./WorkflowDispatcher.js";
 
@@ -78,13 +79,14 @@ export class StatedWorkflow {
         }
     }
 
-    static async subscribe(subscribeOptions) {
+    static async subscribe(subscribeOptions, clientParams) {
         const {source} = subscribeOptions;
         StatedWorkflow.logger.debug(`subscribing ${StatedREPL.stringify(source)}`);
         if (source === 'http') {
             return StatedWorkflow.onHttp(subscribeOptions);
         }
         if (source === 'cloudEvent' || source === 'data') {
+            StatedWorkflow.ensureClient(clientParams);
             return StatedWorkflow.nextCloudEvent(subscribeOptions);
         }
         if (!source) {
@@ -93,13 +95,43 @@ export class StatedWorkflow {
         throw new Error(`Unknown subscribe source ${source}`);
     }
 
+    static ensureClient(params) {
+        if (!params || params.type == 'pulsar') {
+            StatedWorkflow.createPulsarClient(params);
+        } else if (params.type == 'kafka') {
+            StatedWorkflow.createKafkaClient(params);
+        }
+    }
+
     static pulsarClient = new Pulsar.Client({
         serviceUrl: 'pulsar://localhost:6650',
     });
+
+    static kafkaClient = new Kafka({
+        clientId: 'my-app',  // Optional: you can specify a client ID
+        brokers: ['localhost:9092'],  // Replace with the address of your Kafka broker(s)
+    });
+
     static consumers = new Map(); //key is type, value is pulsar consumer
     static dispatchers = new Map(); //key is type, value Set of WorkflowDispatcher
 
-    static publish(params) {
+    static createPulsarClient(params) {
+        if (StatedWorkflow.pulsarClient) return;
+    
+        StatedWorkflow.pulsarClient = new Pulsar.Client({
+            serviceUrl: 'pulsar://localhost:6650',
+        });
+    }
+    static createKafkaClient(params) {
+        if (StatedWorkflow.kafkaClient) return;
+    
+        StatedWorkflow.kafkaClient = new Kafka({
+            clientId: 'my-app',  // Optional: you can specify a client ID
+            brokers: ['localhost:9092'],  // Replace with the address of your Kafka broker(s)
+        });
+    }
+
+    static publish(params, clientParams) {
         StatedWorkflow.logger.debug(`pulsar publish params ${StatedREPL.stringify(params)}`);
         const {type, data} = params;
         (async () => {
@@ -128,7 +160,7 @@ export class StatedWorkflow {
 
     }
 
-    static pulsarSubscribe(subscriptionParams) {
+    static subscribePulsar(subscriptionParams) {
         const {type, initialPosition = 'earliest', maxConsume = -1} = subscriptionParams;
         StatedWorkflow.logger.debug(`pulsar subscribe params ${StatedREPL.stringify(subscriptionParams)}`);
         let consumer, dispatcher;
@@ -177,6 +209,48 @@ export class StatedWorkflow {
         })();
     }
 
+    static async subscribeKafka(subscriptionParams) {
+        const { type, initialOffset = 'earliest', maxConsume = -1 } = subscriptionParams;
+        StatedWorkflow.logger.debug(`Kafka subscribe params ${StatedREPL.stringify(subscriptionParams)}`);
+
+        // Make sure a dispatcher exists for the combination of type and subscriberId
+        WorkflowDispatcher.getDispatcher(subscriptionParams);
+    
+        // Check if a consumer already exists for the given subscription
+        if (StatedWorkflow.consumers.has(type)) {
+            StatedWorkflow.logger.debug(`Kafka subscriber already started. Bail.`);
+            return; // Bail, we are already consuming and dispatching this type
+        }
+    
+        // Assuming kafkaClient is an instance of a Kafka client
+        const consumer = StatedWorkflow.kafkaClient.consumer({ groupId: type });
+    
+        await consumer.connect();
+        await consumer.subscribe({ topic: type, fromBeginning: initialOffset === 'earliest' });
+    
+        // Store the consumer in the map
+        StatedWorkflow.consumers.set(type, consumer);
+        let countdown = maxConsume;
+    
+        await consumer.run({
+            eachMessage: async ({ topic, partition, message }) => {
+                let data;
+                try {
+                    const str = message.value.toString();
+                    data = JSON.parse(str);
+                } catch (error) {
+                    console.error("Unable to parse data to JSON:", error);
+                }
+    
+                WorkflowDispatcher.dispatchToAllSubscribers(type, data);
+    
+                if (countdown && --countdown === 0) {
+                    // Disconnect the consumer if maxConsume messages have been processed
+                    await consumer.disconnect();
+                }
+            }
+        });
+    }
 
     static async nextCloudEvent(subscriptionParams) {
 
@@ -188,7 +262,7 @@ export class StatedWorkflow {
             return;
         }
         //in real-life we take messages off pulsar
-        this.pulsarSubscribe(subscriptionParams);
+        this.subscribePulsar(subscriptionParams);
 
     }
 
