@@ -3,6 +3,7 @@ import { dirname } from 'path';
 import webpack from 'webpack';
 import nodeExternals from 'webpack-node-externals';
 
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
@@ -46,8 +47,7 @@ export default {
         // Define global constants
         new webpack.DefinePlugin({
             BUILD_TARGET: JSON.stringify('web'),
-        }),
-        // Other plugins...
+        })
     ],
 
 

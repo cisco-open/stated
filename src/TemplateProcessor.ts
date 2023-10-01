@@ -40,7 +40,7 @@ export default class TemplateProcessor {
         "setTimeout": setTimeout,
         "console": console
     }
-    static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
+    private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
     
     logger: StatedLogger;
     context: any;
@@ -88,7 +88,7 @@ export default class TemplateProcessor {
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
     //they do not throw exceptions, but instead return {"error":{...the error...}}
-    withErrorHandling(fn) {
+    private withErrorHandling(fn) {
         return (...args) => {
             try {
                 const result = fn(...args);
@@ -118,7 +118,7 @@ export default class TemplateProcessor {
         };
     };
 
-    async initialize(template = this.input, jsonPtr = "/") {
+    public async initialize(template = this.input, jsonPtr = "/") {
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
@@ -158,7 +158,7 @@ export default class TemplateProcessor {
     }
 
 
-    async evaluate(jsonPtr:JsonPointerString) {
+    private async evaluate(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
 
         this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
@@ -199,9 +199,9 @@ export default class TemplateProcessor {
         await this.initialize(template, jsonPtrImportPath);
     }
 
-    static NOOP = Symbol('NOOP');
+    private static NOOP = Symbol('NOOP');
 
-    getImport(jsonPtrIntoTemplate) { //we provide the JSON Pointer that targets where the imported content will go
+    private getImport(jsonPtrIntoTemplate) { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
         return async (importMe) => {
             let resp;
@@ -232,7 +232,7 @@ export default class TemplateProcessor {
             return TemplateProcessor.NOOP;
         }
     }
-    parseURL(input) {
+    private parseURL(input) {
         try {
             return new URL(input);
         } catch (e) {
@@ -240,7 +240,7 @@ export default class TemplateProcessor {
         }
     }
 
-    async fetchFromURL(url) {
+    private async fetchFromURL(url) {
         try {
             this.logger.debug(`fetching ${url}`);
             const resp = await fetch(url);
@@ -284,7 +284,7 @@ export default class TemplateProcessor {
         }
     }
 
-    extractFragmentIfNeeded(response, url) {
+    private extractFragmentIfNeeded(response, url) {
         const jsonPointer = url.hash && url.hash.substring(1);
         if (jsonPointer && jp.has(response, jsonPointer)) {
             this.logger.debug(`Extracting fragment at ${jsonPointer}`);
@@ -295,7 +295,7 @@ export default class TemplateProcessor {
         return response;
     }
 
-    validateAsJSON(obj) {
+    private validateAsJSON(obj) {
         try {
             const jsonString = JSON.stringify(obj);
             const parsedObject = JSON.parse(jsonString);
@@ -309,12 +309,12 @@ export default class TemplateProcessor {
         }
     }
 
-    async setContentInTemplate(response, jsonPtrIntoTemplate) {
+    private async setContentInTemplate(response, jsonPtrIntoTemplate) {
         jp.set(this.output, jsonPtrIntoTemplate, response);
         await this.initialize(response, jsonPtrIntoTemplate);
     }
 
-    async createMetaInfos(template, rootJsonPtr = []) {
+    private async createMetaInfos(template, rootJsonPtr = []) {
         let metaInfos = await MetaInfoProducer.getMetaInfos(template);
 
         metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
@@ -348,16 +348,16 @@ export default class TemplateProcessor {
     }
 
     //for deps [[a,b,c], [d,e,f]] we convert to [[a,b,c], [a,b], [a],[d,e,f], [d,e], [d]] thus producing all ancestors of a.b.c as well as a.b.c
-    static getAncestors(deps) {  //
+    private static getAncestors(deps) {  //
         return deps.map(d => d.map((_, index, self) => self.slice(0, index + 1))).flat(1).filter(d => d.length > 1 || !["", "$"].includes(d[0])); //the final filter is to remove dependencies on "" or $ (root)
     }
 
 
-    sortMetaInfos(metaInfos) {
+    private sortMetaInfos(metaInfos) {
         metaInfos.sort((a, b) => a.jsonPointer__ < b.jsonPointer__ ? -1 : (a.jsonPointer__ > b.jsonPointer__ ? 1 : 0));
     }
 
-    populateTemplateMeta(metaInfos) {
+    private populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
             const initialDependenciesPathParts = this.removeLeadingDollarsFromDependencies(meta);
             meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.parentJsonPointer__, initialDependenciesPathParts);
@@ -372,14 +372,14 @@ export default class TemplateProcessor {
     }
 
     //mutates all the pieces of metaInf that are path parts and turns them into JSON Pointer syntax
-    static compileToJsonPointer(meta) {
+    private static compileToJsonPointer(meta) {
         meta.absoluteDependencies__ = [...new Set(meta.absoluteDependencies__.map(jp.compile))];
         meta.dependencies__ = meta.dependencies__.map(jp.compile);
         meta.parentJsonPointer__ = jp.compile(meta.parentJsonPointer__);
         meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
     }
 
-    setupDependees(metaInfos) {
+    private setupDependees(metaInfos) {
         metaInfos.forEach(i => {
             i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
@@ -398,18 +398,18 @@ export default class TemplateProcessor {
         });
     }
 
-    async evaluateDependencies(metaInfos) {
+    private async evaluateDependencies(metaInfos) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.evaluateJsonPointersInOrder(evaluationPlan);
     }
 
-    makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
+    private makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
         return localJsonPtrs.map(localJsonPtr => { //both parentJsonPtr and localJsonPtr are like ["a", "b", "c"] (array of parts)
             return [...parentJsonPtr, ...localJsonPtr]
         })
     }
 
-    removeLeadingDollarsFromDependencies(metaInfo) {
+    private removeLeadingDollarsFromDependencies(metaInfo) {
         // Extract dependencies__ and jsonPointer__ from metaInfo
         const {dependencies__,} = metaInfo;
         // Iterate through each depsArray in dependencies__ using reduce function
@@ -422,7 +422,7 @@ export default class TemplateProcessor {
         return dependencies__;
     }
 
-    propagateTags(metaInfos) {
+    private propagateTags(metaInfos) {
         // Set of visited nodes to avoid infinite loops
         const visited = new Set();
 
@@ -453,7 +453,7 @@ export default class TemplateProcessor {
     }
 
 
-    topologicalSort(metaInfos, exprsOnly = true) {
+    private topologicalSort(metaInfos, exprsOnly = true) {
         const visited = new Set();
         const recursionStack = new Set(); //for circular dependency detection
         const orderedJsonPointers = new Set();
@@ -567,7 +567,7 @@ export default class TemplateProcessor {
         }
     }
 
-    async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP) {
+    private async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP) {
         const resp = [];
         let first;
         if (data !== TemplateProcessor.NOOP) {
@@ -609,7 +609,7 @@ export default class TemplateProcessor {
         return thoseThatUpdated;
     }
 
-    async evaluateNode(jsonPtr, data?) {
+    private async evaluateNode(jsonPtr, data?) {
         const {output, templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
@@ -628,7 +628,7 @@ export default class TemplateProcessor {
 
     }
 
-    async _evaluateExpression(jsonPtr) {
+    private async _evaluateExpression(jsonPtr) {
         const startTime = Date.now(); // Capture start time
 
         const {templateMeta, output} = this;
@@ -670,7 +670,7 @@ export default class TemplateProcessor {
         return success; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    _strictChecks(metaInfo) {
+    private _strictChecks(metaInfo) {
         const {strict} = this.options;
         if (strict?.refs) {
             metaInfo.absoluteDependencies__?.forEach(ptr => {
@@ -685,7 +685,7 @@ export default class TemplateProcessor {
         }
     }
 
-    setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
+    private setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
         const {treeHasExpressions__, callback__} = jp.get(templateMeta, jsonPtr);
         if (treeHasExpressions__) {
             this.logger.log('warn', `nodes containing expressions cannot be overwritten: ${jsonPtr}`);
@@ -699,7 +699,7 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    setUntrackedLocation(output, jsonPtr, data) {
+    private setUntrackedLocation(output, jsonPtr, data) {
         jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         jp.set(this.templateMeta, jsonPtr, {
                 "materialized__": true,
@@ -714,7 +714,7 @@ export default class TemplateProcessor {
         return true;
     }
 
-    async _evaluateExprNode(jsonPtr) {
+    private async _evaluateExprNode(jsonPtr) {
         let evaluated;
         const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
         let target;
@@ -737,14 +737,14 @@ export default class TemplateProcessor {
         return evaluated;
     }
 
-    allTagsPresent(tagSetOnTheExpression) {
+    private allTagsPresent(tagSetOnTheExpression) {
         if(tagSetOnTheExpression.size === 0 && this.tagSet.size > 0){
             return false;
         }
         return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
     }
 
-    _setData(jsonPtr, data, callback) {
+    private _setData(jsonPtr, data, callback) {
         if (data === TemplateProcessor.NOOP) { //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
             return false;
         }
@@ -782,7 +782,7 @@ export default class TemplateProcessor {
         }
     }
 
-    getDependentsBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
+    private getDependentsBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
         if (!jp.has(this.templateMeta, jsonPtr)) {
             this.logger.log('warn', `${jsonPtr} does not exist.`);
             return [];
@@ -858,7 +858,7 @@ export default class TemplateProcessor {
         return this.topologicalSort(this.metaInfoByJsonPointer["/"], true);
     }
 
-    searchUpForExpression(childNode) {
+    private searchUpForExpression(childNode) {
         let pathParts = jp.parse(childNode.jsonPointer__);
         while (pathParts.length > 1) {
             pathParts = pathParts.slice(0, -1); //get the parent expression
@@ -877,7 +877,7 @@ export default class TemplateProcessor {
     //that have dependencies to something inside the target template. Otherwise we will get looping
     //where the expression in the enclosing root template that performs the import gets re-evaluated
     //upon import
-    static dependsOnImportedTemplate(metaInfos, importPathJsonPtr) {
+    private static dependsOnImportedTemplate(metaInfos, importPathJsonPtr) {
         return metaInfos.filter(metaInof => metaInof.absoluteDependencies__.some(dep => dep.startsWith(importPathJsonPtr)));
     }
 
@@ -888,7 +888,7 @@ export default class TemplateProcessor {
         return null;
     }
 
-    async localImport(filePathInPackage) {
+    private async localImport(filePathInPackage) {
         // Resolve the package path
         const {importPath} = this.options;
         let fullPath = filePathInPackage;
