@@ -1,7 +1,7 @@
 // Importing the required classes from the generated code
 'use strict';
 const flatbuffers = require('flatbuffers');
-const MyGame = require('../../flatbuffers/dist/my-game/sample');
+const MyGame = require('../dist/my-game/sample.js');
 const jsonata = require('jsonata');
 const profiler = require('v8-profiler-next');
 // set generateType 1 to generate new format for cpuprofile
