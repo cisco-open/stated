@@ -33,7 +33,6 @@
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "dependencies": {
-    "flatbuffers": "^23.5.26",
     "js-yaml": "^4.1.0",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21",
