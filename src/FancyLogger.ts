@@ -1,4 +1,4 @@
-import ConsoleLogger, {logLevels} from "./ConsoleLogger.js";
+import ConsoleLogger, {LOG_LEVELS} from "./ConsoleLogger.js";
 
 export default class FancyLogger {
     static async getLogger() {
@@ -6,7 +6,7 @@ export default class FancyLogger {
             const winston = await import('winston');
             const formats = [winston.format.colorize(), winston.format.simple()];
             return winston.createLogger({
-                levels: logLevels,
+                levels: LOG_LEVELS,
                 format: winston.format.json(),
                 transports: [
                     new winston.transports.Console({

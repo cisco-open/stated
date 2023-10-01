@@ -155,10 +155,23 @@ falken$ stated example/ex01.json
 To use the stated-js library in your own projects, you can require it as a dependency.
 Here's an example of how you can import it into your JavaScript file:
 ```js
-const stated = require('stated-js');
+import TemplateProcessor from 'stated-js'
 
-// Start using the 'stated' library
-// ...
+async function tryIt() {
+    const tp = new TemplateProcessor({
+        "a": "aaa",
+        "b": "${a}"
+    });
+    await tp.initialize();
+    await tp.setData("/a", 42);
+    console.log(JSON.stringify(tp.output));
+    // console will print...
+    //    {
+    //        "a": 42,
+    //        "b": 42
+    //    }     
+}
+tryIt().catch(err => console.error(err));
 
 ```
 

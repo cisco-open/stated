@@ -17,12 +17,12 @@ import TemplateProcessor from './TemplateProcessor.js';
 import yaml from 'js-yaml';
 import minimist from 'minimist';
 import {parseArgsStringToArgv} from 'string-argv';
-import {logLevels} from "./ConsoleLogger.js";
+import {LOG_LEVELS} from "./ConsoleLogger.js";
 
 
 export default class CliCore {
     private templateProcessor: TemplateProcessor;
-    private logLevel: keyof typeof logLevels;
+    private logLevel: keyof typeof LOG_LEVELS;
     constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";

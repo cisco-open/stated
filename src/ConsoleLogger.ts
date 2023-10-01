@@ -7,7 +7,7 @@ export interface StatedLogger{
     log(level, ...args): void;
     level:string;
 }
-export const logLevels = {
+export const LOG_LEVELS = {
     silent: 0,
     error: 1,
     warn: 2,
@@ -23,31 +23,31 @@ export default class ConsoleLogger implements StatedLogger{
     }
 
     debug(...args) {
-        if (logLevels[this.level] >= logLevels.debug) {
+        if (LOG_LEVELS[this.level] >= LOG_LEVELS.debug) {
             console.debug(...args);
         }
     }
 
     error(...args) {
-        if (logLevels[this.level] >= logLevels.error) {
+        if (LOG_LEVELS[this.level] >= LOG_LEVELS.error) {
             console.error(...args);
         }
     }
 
     warn(...args) {
-        if (logLevels[this.level] >= logLevels.warn) {
+        if (LOG_LEVELS[this.level] >= LOG_LEVELS.warn) {
             console.warn(...args);
         }
     }
 
     info(...args) {
-        if (logLevels[this.level] >= logLevels.info) {
+        if (LOG_LEVELS[this.level] >= LOG_LEVELS.info) {
             console.info(...args);
         }
     }
 
     verbose(...args) {
-        if (logLevels[this.level] >= logLevels.verbose) {
+        if (LOG_LEVELS[this.level] >= LOG_LEVELS.verbose) {
             console.log(...args);
         }
     }

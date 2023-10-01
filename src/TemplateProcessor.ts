@@ -23,7 +23,10 @@ import path from 'path';
 import fs from 'fs';
 import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
+import {LOG_LEVELS} from "./ConsoleLogger.js";
 import StatedREPL from "./StatedREPL.js";
+import exports from "webpack";
+import isEnabled = exports.optimize.InnerGraph.isEnabled;
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
@@ -148,6 +151,7 @@ export default class TemplateProcessor {
             await this.evaluate(jsonPtr);
             this.removeTemporaryVariables(metaInfos);
             this.logger.verbose("initialization complete...");
+            this.logOutput();
         }finally {
             this.isInitializing = false;
         }
@@ -524,13 +528,15 @@ export default class TemplateProcessor {
 
 
     async setData(jsonPtr, data) {
-        this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
+        this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
         const plan = {sortedJsonPtrs, data};
         this.executionQueue.push(plan);
-        this.logger.debug(`execution pla (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
-        this.logger.debug(`execution plan queued (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
+        if(this.isEnabled("debug")) {
+            this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
+            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
+        }
         if(this.executionQueue.length>1){
             console.debug();
             return sortedJsonPtrs; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
@@ -545,10 +551,21 @@ export default class TemplateProcessor {
         }
 
         await drainQueue.call(this);
+        this.logOutput();
         return sortedJsonPtrs;
 
     }
 
+    private isEnabled(logLevel:string):boolean{
+        return LOG_LEVELS[this.logger.level] >= LOG_LEVELS[logLevel];
+    }
+
+    private logOutput() {
+        if (this.isEnabled("debug")) {
+            this.logger.debug(`----------------TEMPLATE OUTPUT (${this.uniqueId})-----------------`)
+            this.logger.debug(StatedREPL.stringify(this.output));
+        }
+    }
 
     async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP) {
         const resp = [];
