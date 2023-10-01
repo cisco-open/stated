@@ -93,23 +93,69 @@ Stated templates are modular and can be imported from a URL:
 
 ## Why Do We Need stated?
 
-JSONata assumes a single input document and provides a powerful complete language for manipulating that input and
-producing an output. However, JSONata programs are a superset of JSON so they are not themselves pure JSON. stated
-provides a way to have a pure JSON document, with many embedded JSONata expressions. The entire syntax of JSONata
-is supported.
+Consider this ordinary program:
+```js
+let a=1;
+let b=a;
+a=42;
+console.log(b); //prints out 1
+```
+In an ordinary sequential program the value of `b` is not affected by changes to the value of `a`
+at any point after the value of `b` has been assigned. But there are many situations where we 
+do NOT want a sequential program execution Instead, we actually want `b` to change when `a` changes. Broadly, these cases fall under the rubric
+of "reactive" or "state driven" applications. When we try to build reactive applications
+upon a sequential execution model we are forced to code the data flow graph ourselves and things become
+very complex quickly. How could we make `b` change any time `a` changes in a sequential world? Perhaps naively like this?
 
-For small examples it may not seem obvious why stated goes to the trouble of computing a DAG and optimizing expression
-evaluation order. But when templates are driven by use cases like data dashboarding, relatively large amounts of data
-(such as database query results) can be set into the template dynamically. In a dashboard containing many panel, each
-with dozens of jsonata expressions, it is critical the processing of the data be optimized and efficient. This
-was one of the motivating use cases for stated: performance critical data rendering applications.
+```js
+let a=1;
+let b=a;
+function setA(val){
+    a=val;
+    b=a;
+}
+```
+...or perhaps more generally like this:
+```js
 
+let data = {
+  a: 1,
+  b: 1 
+};
 
-Applications for stated include
+let handler = {
+  set: function(target, property, value) {
+    if (property === 'a') {
+      target.b = value; // When 'a' changes, also change 'b'
+    }
+    target[property] = value;
+    return true; // The set operation was successful
+  }
+};
+
+let proxy = new Proxy(data, handler);
+
+proxy.a = 2; // Setting a new value for 'a'
+console.log(proxy.a); // Outputs: 2
+console.log(proxy.b); // Outputs: 2
+```
+Every "coding" approach requires us to understand and implement code for propagating data dependencies. Stated solves
+for this by natively parsing and understanding dependencies.
+
+```json
+{
+  "a": 1,
+  "b$": "a"
+}
+```
+`b$` is now declared to be continuously dependent upon `a` and reactive to any changes in `a`. This greatly
+simplifies the development of systems that *are* naturally reactive or dependency heavy, such as:
+
 * dynamic/continuous reactive UI state
-* config file templating
 * lambda-like computations
-* nonblocking, dependency ordered, workflow-like computations
+* workflows
+* configuration file
+
 
 ## Getting Started
 
