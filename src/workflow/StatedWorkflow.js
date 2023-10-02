@@ -87,8 +87,7 @@ export class StatedWorkflow {
             return StatedWorkflow.onHttp(subscribeOptions);
         }
         if (source === 'cloudEvent' || source === 'data') {
-            StatedWorkflow.ensureClient(clientParams);
-            return StatedWorkflow.nextCloudEvent(subscribeOptions);
+            return StatedWorkflow.nextCloudEvent(subscribeOptions, clientParams);
         }
         if (!source) {
             throw new Error("Subscribe source not set");
@@ -110,7 +109,7 @@ export class StatedWorkflow {
 
     static kafkaClient = new Kafka({
         clientId: 'my-app',  // Optional: you can specify a client ID
-        brokers: ['localhost:9092'],  // Replace with the address of your Kafka broker(s)
+        brokers: ['kafka:9092'],  // Replace with the address of your Kafka broker(s)
     });
 
     static consumers = new Map(); //key is type, value is pulsar consumer
@@ -127,12 +126,55 @@ export class StatedWorkflow {
         if (StatedWorkflow.kafkaClient) return;
     
         StatedWorkflow.kafkaClient = new Kafka({
-            clientId: 'my-app',  // Optional: you can specify a client ID
-            brokers: ['localhost:9092'],  // Replace with the address of your Kafka broker(s)
+            clientId: 'my-app',
+            brokers: ['localhost:9092'],
+            logLevel: logLevel.DEBUG,
         });
     }
 
     static publish(params, clientParams) {
+        StatedWorkflow.logger.debug(`publish params ${StatedREPL.stringify(params)} with clientParams ${StatedREPL.stringify(clientParams)}`);
+        const {type, data} = params;
+        if (clientParams.type === 'kafka') {
+            StatedWorkflow.publishKafka(params, clientParams);
+        } else {
+            StatedWorkflow.publishPulsar(params, clientParams);
+        }
+    }
+
+    static publishKafka(params, clientParams) {
+        StatedWorkflow.logger.debug(`kafka publish params ${StatedREPL.stringify(params)}`);
+        const {type, data} = params;
+
+        (async () => {
+            const producer = StatedWorkflow.kafkaClient.producer();
+
+            await producer.connect();
+
+            try {
+                let _data = data;
+                if (data._jsonata_lambda === true) {
+                    _data = await data.apply(this, []); //data is a function, call it
+                }
+                StatedWorkflow.logger.debug(`kafka producer sending ${StatedREPL.stringify(_data)} to ${type}`);
+
+                // Send a message
+                await producer.send({
+                    topic: type,
+                    messages: [
+                        { value: StatedREPL.stringify(_data, null, 2) },
+                    ],
+                });
+            } catch (err) {
+                console.error(`Error publishing to Kafka: ${err}`);
+            } finally {
+                // Close the producer when done
+                await producer.disconnect();
+            }
+        })();
+    }
+
+    static publishPulsar(params, clientParams) {
         StatedWorkflow.logger.debug(`pulsar publish params ${StatedREPL.stringify(params)}`);
         const {type, data} = params;
         (async () => {
@@ -223,11 +265,16 @@ export class StatedWorkflow {
             return; // Bail, we are already consuming and dispatching this type
         }
     
-        // Assuming kafkaClient is an instance of a Kafka client
         const consumer = StatedWorkflow.kafkaClient.consumer({ groupId: type });
     
-        await consumer.connect();
-        await consumer.subscribe({ topic: type, fromBeginning: initialOffset === 'earliest' });
+        try {
+            await consumer.connect();
+            await consumer.subscribe({ topic: type, fromBeginning: true });
+  
+        } catch (e) {
+            StatedWorkflow.logger.debug(`Kafka subscriber - failed, e: ${e}`);
+        }
+        StatedWorkflow.logger.debug(`Kafka subscriber - subscribed.`);
     
         // Store the consumer in the map
         StatedWorkflow.consumers.set(type, consumer);
@@ -236,6 +283,7 @@ export class StatedWorkflow {
         await consumer.run({
             eachMessage: async ({ topic, partition, message }) => {
                 let data;
+                StatedWorkflow.logger.debug(`Kafka subscriber got ${message} from ${topic}:${partition}.`);
                 try {
                     const str = message.value.toString();
                     data = JSON.parse(str);
@@ -253,7 +301,7 @@ export class StatedWorkflow {
         });
     }
 
-    static async nextCloudEvent(subscriptionParams) {
+    static async nextCloudEvent(subscriptionParams, clientParams) {
 
         const {testData} = subscriptionParams;
         if (testData) {
@@ -262,9 +310,14 @@ export class StatedWorkflow {
             await dispatcher.drainBatch(); // in test mode we wanna actually wait for all the test events to process
             return;
         }
-        //in real-life we take messages off pulsar
-        this.subscribePulsar(subscriptionParams);
-
+        //in real-life we take messages off a message bus
+        if (clientParams.type === 'kafka') {
+            StatedWorkflow.createKafkaClient(clientParams);
+            StatedWorkflow.subscribeKafka(subscriptionParams, clientParams);
+        } else {
+            StatedWorkflow.createPulsarClient(clientParams);
+            StatedWorkflow.subscribePulsar(subscriptionParams, clientParams);
+        }
     }
 
     static onHttp(subscriptionParams) {
