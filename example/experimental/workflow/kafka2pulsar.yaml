@@ -21,8 +21,8 @@ subscribeDispatcherParams:
       $console.log('received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
       $publish({'type': $e.dataType & $string($e.rando), 'data': dataToParams($e)}, PulsarClientParams);
       $console.log('publised - ' & $e.dataType & $string($e.rando) & ', message - ' & $string($e));
-      $subscribe({'source': 'cloudEvent', 'type': $e.dataType & $string($e.rando), 'to': toFunc}, KafkaClientParams);
-      $console.log('started subscriber from - ' & $e.dataType & $string($e.rando));
+      $subscribe({'source': 'cloudEvent', 'type': $e.dataType & $string($e.rando), 'to': toFunc}, PulsarClientParams);
+      $console.log('started subscriber from - ' & $e.dataType & $string($e.rando) & ' using ' & $string(PulsarClientParams));
     )}  }
   subscriberId: dingus
   initialPosition: latest
