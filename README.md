@@ -176,7 +176,7 @@ npm install -g stated-js
 ````
 
 ### Running the REPL
-To use the Stated REPL (Read-Eval-Print Loop) it is recommended to have at least version 12 or higher of node.js. The 
+To use the Stated REPL (Read-Eval-Print Loop) it is recommended to have at least version 19.2 or higher of node.js. The 
 Stated REPL is built on [Node REPL](https://nodejs.org/api/repl.html#repl). 
 You can start the REPL by running the `stated` command in your terminal:
 ```shell
