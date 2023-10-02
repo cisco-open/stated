@@ -26,6 +26,45 @@ stop$: $count(rxLog)=20?$clearInterval(send$):'still going'
 Workflows can be run on any nodejs runtime, but suggested production deployment is using contaner-based orchestration 
 such as Kubernetes. This repo provides a helm chart for deploying stated-workflow to Kubernetes.
 TODO: provide the helm chart :) 
+## Scalability
+ ```text
+ 
+                                                                Pulsar Queue
+
+                                                                ┌──────┐
+┌───────────────┐                                               │      │
+│               │                                               │      │
+│  ┌──────────┐ │                                               │      │
+│  │Tenant1WF1├─┼──Initial┼Reconcile───┐    ┌─CDC subscribtions─► T3WF4│
+│  │Tenant2WF1│ │                      │    │                   │ ...  │
+│  │Tenant3WF2│ │            ┌─────────┼────┼────────┐          │T1WF3 │     ┌────────────────────────┐
+│  │Tenant1WF3│ │            │ Node0   │    │        │          │T3WF2 │     │ Node1                  │
+│  │   ...    │ │            │  ┌──────▼────┴────┐   │          │T2WF1 │     │                        │
+│  └──────────┘ │            │  │Consume kafka   │   │          │T1WF1 │     │                        │
+│               │ ┌──────────┼──►Domain Event Bus│   │          └┬───┬─┘     │                        │
+└──────┬────────┘ │          │  │-> Pulsar CDC mq│   │           │   │       │                        │
+       │          │          │  └────────────────┘   │           │   │       │                        │
+       │          │          │                       │           │   │       │                        │
+       │          │          │  ┌────────────────┐   │           │   │       │  ┌─────────────────┐   │
+       │          │          │  │WF Manager      ◄───┼───────────┘   └───────┼──►WF Manager       │   │
+ ┌─────▼──────────┴──┐       │  │                │   │  takes N WF           │  │                 │   │
+ │ Domain            │       │  └────────────────┘   │  subscriptions        │  └─────────────────┘   │
+ │ Event             │       │                       │                       │                        │
+ │ Bus               │       │  ┌─────────────────┐  ├──Autoscale───────────►│ ┌───────────────────┐  │
+ └───────────────────┘       │  │T1WF1            │  │                       │ │T3WF4              │  │
+                             │  └─────────────────┘  │   Auto-scale after    │ └───────────────────┘  │
+                             │                       │   Node0 shows N       │                        │
+                             │  ┌─────────────────┐  │   number of WFs       │         ...            │
+                             │  │T2WF1            │  │   serving             │                        │
+                             │  └─────────────────┘  │                       │                        │
+                             │       ...             │                       │                        │
+                             │       ...             │                       │                        │
+                             │  ┌─────────────────┐  │                       │                        │
+                             │  │T1WF3            │  │                       │                        │
+                             │  └─────────────────┘  │                       │                        │
+                             │                       │                       │                        │
+                             └───────────────────────┘                       └────────────────────────┘
+ ```
 ## Workflow process
 Workflow process is a nodejs process which is responsible for consuming events from an event source and processing them.
 
@@ -34,7 +73,7 @@ The dispatcher is a nodejs workflow process which is responsible for consuming e
 them to per-workflow queues, so it can be processed by the workflow process. This pattern is useful for ensuring that 
 each workflow runs in its own event loop, and is not impacted by other workflows. 
 
-## Building a continaer
+## Building a continer
 
 Build a container
 ```yaml
