@@ -107,9 +107,12 @@ export class StatedWorkflow {
         serviceUrl: 'pulsar://localhost:6650',
     });
 
+    static host = process.env.HOST_IP || ip.address()
+
     static kafkaClient = new Kafka({
-        clientId: 'my-app',  // Optional: you can specify a client ID
-        brokers: ['kafka:9092'],  // Replace with the address of your Kafka broker(s)
+        clientId: 'workflow-kafka-client',
+        brokers: [`${StatedWorkflow.host}:9092`],
+        logLevel: logLevel.DEBUG,
     });
 
     static consumers = new Map(); //key is type, value is pulsar consumer
@@ -124,12 +127,12 @@ export class StatedWorkflow {
     }
     static createKafkaClient(params) {
         if (StatedWorkflow.kafkaClient) return;
-    
+
         StatedWorkflow.kafkaClient = new Kafka({
-            clientId: 'my-app',
-            brokers: ['localhost:9092'],
+            clientId: 'workflow-kafka-client',
+            brokers: [`${StatedWorkflow.host}:9092`],
             logLevel: logLevel.DEBUG,
-        });
+        });/**/
     }
 
     static publish(params, clientParams) {
@@ -252,9 +255,9 @@ export class StatedWorkflow {
         })();
     }
 
-    static async subscribeKafka(subscriptionParams) {
+    static async subscribeKafka(subscriptionParams, clientParams) {
         const { type, initialOffset = 'earliest', maxConsume = -1 } = subscriptionParams;
-        StatedWorkflow.logger.debug(`Kafka subscribe params ${StatedREPL.stringify(subscriptionParams)}`);
+        StatedWorkflow.logger.debug(`Kafka subscribe params ${StatedREPL.stringify(subscriptionParams)} with clientParams ${StatedREPL.stringify(clientParams)}`);
 
         // Make sure a dispatcher exists for the combination of type and subscriberId
         WorkflowDispatcher.getDispatcher(subscriptionParams);
