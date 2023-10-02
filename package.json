@@ -7,7 +7,8 @@
   "module": "./dist/src/TemplateProcessor.js",
   "exports": {
     ".": {
-      "import": "./dist/bundle.mjs"
+      "import": "./dist/bundle.mjs",
+      "require": "./dist/bundle-common-js.cjs"
     }
   },
   "scripts": {
