@@ -3,7 +3,7 @@ Stated Workflow is a collection of functions for a lightweight and scalable even
 
 ## Example Workflow
 Example workflow demonstrating of producing events to and consuming events from an Apache Pulsar. 
-```json
+```yaml
 # to run this locally you need to have pulsar running in standalone mode
 send$: $setInterval(function(){$publish(pubParams)}, 100)
 pubParams:
@@ -27,43 +27,62 @@ Workflows can be run on any nodejs runtime, but suggested production deployment 
 such as Kubernetes. This repo provides a helm chart for deploying stated-workflow to Kubernetes.
 TODO: provide the helm chart :) 
 ## Scalability
- ```text
- 
-                                                                Pulsar Queue
+Stated workflow is designed to focus on IO-bound operations, and should scale fairly well within a single-process 
+leveraging nodejs event loop. Each customer facing workflow will be consuming a single per-tenant per-type pulsar queue, 
+and run serve a number of events with predefined parallelism for this workflow.
 
-                                                                ┌──────┐
-┌───────────────┐                                               │      │
-│               │                                               │      │
-│  ┌──────────┐ │                                               │      │
-│  │Tenant1WF1├─┼──Initial┼Reconcile───┐    ┌─CDC subscribtions─► T3WF4│
-│  │Tenant2WF1│ │                      │    │                   │ ...  │
-│  │Tenant3WF2│ │            ┌─────────┼────┼────────┐          │T1WF3 │     ┌────────────────────────┐
-│  │Tenant1WF3│ │            │ Node0   │    │        │          │T3WF2 │     │ Node1                  │
-│  │   ...    │ │            │  ┌──────▼────┴────┐   │          │T2WF1 │     │                        │
-│  └──────────┘ │            │  │Consume kafka   │   │          │T1WF1 │     │                        │
-│               │ ┌──────────┼──►Domain Event Bus│   │          └┬───┬─┘     │                        │
-└──────┬────────┘ │          │  │-> Pulsar CDC mq│   │           │   │       │                        │
-        │          │          │  └────────────────┘   │           │   │       │                        │
-        │          │          │                       │           │   │       │                        │
-        │          │          │  ┌────────────────┐   │           │   │       │  ┌─────────────────┐   │
-        │          │          │  │WF Manager      ◄───┼───────────┘   └───────┼─►│WF Manager       │   │
-  ┌─────▼──────────┴──┐       │  │                │   │  takes N WF           │  │                 │   │
-  │ Domain            │       │  └────────────────┘   │  subscriptions        │  └─────────────────┘   │
-  │ Event             │       │                       │                       │                        │
-  │ Bus               │       │  ┌─────────────────┐  ├──Autoscale────────────┼►┌───────────────────┐  │
-  └───────────────────┘       │  │T1WF1            │  │                       │ │T3WF4              │  │
-                              │  └─────────────────┘  │   Auto-scale after    │ └───────────────────┘  │
-                              │                       │   Node0 shows N       │                        │
-                              │  ┌─────────────────┐  │   number of WFs       │         ...            │
-                              │  │T2WF1            │  │   serving             │                        │
-                              │  └─────────────────┘  │                       │                        │
-                              │       ...             │                       │                        │
-                              │       ...             │                       │                        │
-                              │  ┌─────────────────┐  │                       │                        │
-                              │  │T1WF3            │  │                       │                        │
-                              │  └─────────────────┘  │                       │                        │
-                              │                       │                       │                        │
-                              └───────────────────────┘                       └────────────────────────┘
+However, since each node will be performing a lot of IO-bound operations, each node process will be limited to a number
+of workflows it can serve. 
+
+For scaling beyond single node, we will leverage a message queue supporting exclusive access on per-event base with a 
+timeout (such as Pulsar). Each node will have a process, which can start N workflow processes, and will be responsible 
+to consuming new CDC events for tenant subscriptions to workflow, and persisting the list of the workflows in an orion
+table. 
+```text
+
+
+
+    Node heartbeat status and                                                          Pulsar Sunscription Queue
+    WF allocations                                                                            ┌──────┐
+  ┌────────────────────────┐ ┌───────────────┐                                                │      │
+  │                        │ │               │                                                │      │
+  │ ┌────┬──────┬────────┐ │ │  ┌──────────┐ │                                                │T3WF4 │
+  │ │node│h-beat│wf list │ │ │  │Tenant1WF1├─┼──Initial┼Reconcile────┐    ┌─CDC subscriptions─► ...  │
+  │ ├────┼──────┼────────┤ │ │  │Tenant2WF1│ │                       │    │                   │ ...  │
+  │ │ 0  │active│T1WF1,..│ │ │  │Tenant3WF2│ │             ┌─────────┼────┼────────┐          │T1WF3 │     ┌────────────────────────┐
+  │ │ 1  │failed│T3WF4,..│ │ │  │Tenant1WF3│ │             │ Node0   │    │        │          │ ...  │     │ Node1                  │
+  │ │    │      │        │ │ │  │   ...    │ │             │  ┌──────▼────┴────┐   │          │T2WF1 │     │                        │
+  │ └───▲└───▲──┴────────┘ │ │  └──────────┘ │             │  │Consume kafka   │   │          │T1WF1 │     │                        │
+  │     │    │             │ │               │ ┌───────────┼──►Domain Event Bus│   │          └┬───┬─┘     │                        │
+  └─────┼────┼─────────────┘ └───────┬───────┘ │           │  │-> Pulsar CDC mq│   │           │   │       │                        │
+        │    │                       │         │           │  ─────────────────┴   │           │   │       │                        │
+        │    │                 ┌─────▼─────────┼───┐       │                       │           │   │       │                        │
+        │    │                 │ Domain        │   │       │  ┌────────────────┐   │           │   │       │  ┌─────────────────┐   │
+        │    │                 │ Event             │       │  │WF Manager      ◄───┼───────────┘   └───────┼─►│WF Manager       ├───┼────┐
+        │    │                 │ Bus               │   ┌───┼──┤                │   │  takes N WF           │  │                 │   │    │
+        │    │                 └───────────────────┘   │   │  └────────────────┘   │  subscriptions        │  └─────────────────┘   │    │
+        │    │                                         │   │                       │                       │                        │    │
+        │    │                                         │   │  ┌─────────────────┐  ├──Autoscale────────────┤►┌───────────────────┐  │    │
+        │    └─────────────────────────────────────────┘   │  │T1WF1            │  │                       │ │T3WF4              │  │    │
+        │                                                  │  └─────────────────┘  │   Auto-scale after    │ └───────────────────┘  │    │
+        │                                                  │                       │   Node0 shows N       │                        │    │
+        │                                                  │  ┌─────────────────┐  │   number of WFs       │         ...            │    │
+        │                                                  │  │T2WF1            │  │   serving             │                        │    │
+        │                                                  │  └─────────────────┘  │                       │                        │    │
+        │                                                  │       ...             │                       │                        │    │
+        │                                                  │       ...             │                       │                        │    │
+        │                                                  │  ┌─────────────────┐  │                       │                        │    │
+        │                                                  │  │T1WF3            │  │                       │                        │    │
+        │                                                  │  └─────────────────┘  │                       │                        │    │
+        │                                                  │                       │                       │                        │    │
+        │                                                  └───────────────────────┘                       └────────────────────────┘    │
+        │                                                                                                                                │
+        │                                                                                                                                │
+        └────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────┘
+
+
+
+
  ```
 ## Workflow process
 Workflow process is a nodejs process which is responsible for consuming events from an event source and processing them.
