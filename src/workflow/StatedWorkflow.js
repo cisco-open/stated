@@ -15,7 +15,7 @@ import TemplateProcessor from "../../dist/src/TemplateProcessor.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import express from 'express';
 import Pulsar from 'pulsar-client';
-import {Kafka} from 'kafkajs';
+import {Kafka, logLevel} from 'kafkajs';
 import winston from "winston";
 import {WorkflowDispatcher} from "./WorkflowDispatcher.js";
 
@@ -34,6 +34,7 @@ export class StatedWorkflow {
                 )
             })
         ],
+        level: "debug",
     });
 
     static newWorkflow(template) {
@@ -48,7 +49,7 @@ export class StatedWorkflow {
             "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
-        templateProcessor.logLevel = "debug";
+        templateProcessor.logLevel = logLevel.DEBUG;
         return templateProcessor;
     }
 

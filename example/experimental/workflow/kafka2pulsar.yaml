@@ -10,28 +10,36 @@ KafkaClientParams:
   type: 'kafka'
   
 # starts producer function
-send$: $setInterval(function(){$publish(produceParams, KafkaClientParams)}, 100)
+send$: $setInterval(function(){$publish(produceParams, KafkaClientParams)}, 1000)
 dispatch$: $subscribe(subscribeDispatcherParams, KafkaClientParams)
 
 subscribeDispatcherParams:
   source: cloudEvent
-  type: /${ produceParams.type}
+  type: "domain-event-bus"
   to: | 
     /${ function($e){(
-      $console.log('received - ' & $string($e) );
-      $publish( {'type': 'e.type', 'data': publishByType($e)}, PulsarClientParams);
+      $console.log('received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+      $publish({'type': $e.dataType & $string($e.rando), 'data': dataToParams($e)}, PulsarClientParams);
+      $console.log('publised - ' & $e.dataType & $string($e.rando) & ', message - ' & $string($e));
+      $subscribe({'source': 'cloudEvent', 'type': $e.dataType & $string($e.rando), 'to': toFunc}, KafkaClientParams)
     )}  }
   subscriberId: dingus
   initialPosition: latest
 
-publishByType: "${ function($e){ {'type': e.type, 'data': e.data}} }"
+dataToParams: "${ function($e){ $e } }"
 
 
 
 # producer will be sending data function output to the "type" topic
 produceParams:
-  type: "my-topic"
-  data: "${ function(){  {'name': 'nozzleTime', 'rando': $random()}}  }"
+  type: "domain-event-bus"
+  data: "${ function(){  {'dataType': 'myType', 'name': 'nozzleTime', 'rando': $round($random() * 10)}}  }"
+
+toFunc: |
+  /${ function($e){(
+    $console.log('received in toFunc - ' & $string($e) );
+    $set('/rxLog', rxLog~>$append($e));
+  )}  }
 
 #subscribeKafkaParams: #read from kafka and dispatch to per-topic pulsar
 #  source: cloudEvent
