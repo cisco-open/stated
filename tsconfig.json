@@ -5,7 +5,11 @@
     "sourceMap": true,
     "esModuleInterop": true,
     "moduleResolution": "NodeNext",
-    "outDir": "./dist"
+    "outDir": "./dist",
+    "declaration": true,
+    "declarationDir": "./types",
+    "declarationMap": true,
+
   },
   "include": [
     "src/**/*.ts",
