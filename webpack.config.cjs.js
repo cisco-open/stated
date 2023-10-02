@@ -16,7 +16,9 @@ export default {
     output: {
         path: `${__dirname}/dist`, // Use __dirname here
         filename: 'bundle-common-js.cjs', // Use the '.cjs' extension for CJS
-        libraryTarget: 'commonjs', // Use 'module' as the library target
+        library: {
+          type: "commonjs2",
+        },
     },
     module: {
         rules: [
@@ -49,7 +51,6 @@ export default {
             BUILD_TARGET: JSON.stringify('web'),
         })
     ],
-
-
+    mode: "production",
     node: false
 };

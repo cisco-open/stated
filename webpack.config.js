@@ -58,7 +58,6 @@ export default {
             ],
         })
     ],
-
-
+    mode: "production",
     node: false
 };

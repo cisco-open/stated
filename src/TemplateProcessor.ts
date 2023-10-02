@@ -21,6 +21,7 @@ import MetaInfoProducer, {JsonPointerString, MetaInfo} from './MetaInfoProducer.
 import DependencyFinder from './DependencyFinder.js';
 import path from 'path';
 import fs from 'fs';
+import fetch from 'node-fetch';
 import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import {LOG_LEVELS} from "./ConsoleLogger.js";
