@@ -453,10 +453,10 @@ export default class TemplateProcessor {
     }
 
 
-    private topologicalSort(metaInfos, exprsOnly = true) {
+    private topologicalSort(metaInfos, exprsOnly = true):JsonPointerString[] {
         const visited = new Set();
         const recursionStack = new Set(); //for circular dependency detection
-        const orderedJsonPointers = new Set();
+        const orderedJsonPointers:Set<string> = new Set();
         const templateMeta = this.templateMeta;
 
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
@@ -768,8 +768,9 @@ export default class TemplateProcessor {
     getDependentsTransitiveExecutionPlan(jsonPtr) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
-            const effectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
-            this.executionPlans[jsonPtr] = [jsonPtr, ...[...effectedNodesSet].map(n => n.jsonPointer__)];
+            const affectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
+            const topoSortedPlan:JsonPointerString[] = this.topologicalSort(affectedNodesSet);
+            this.executionPlans[jsonPtr] = [jsonPtr, ...topoSortedPlan];
         }
         return this.executionPlans[jsonPtr];
     }
