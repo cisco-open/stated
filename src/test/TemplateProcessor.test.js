@@ -448,7 +448,7 @@ test("mysql to /tmp/provider", async () => {
     const o = cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    const deps = tp.getDependenciesTransitiveExecutionPlan("/tmp/provider");
+    const deps = tp.to("/tmp/provider");
     expect(deps).toEqual(
         [
             "/providerName",
@@ -970,7 +970,15 @@ test("remove temp vars 1", async () => {
         "b": {
             "b1": 10
         }
-    })
+    });
+    await tp.setData("/a", 100);
+    await tp.setData("/b/b1", -10);
+    expect(tp.output).toEqual({
+        "a": 100,
+        "b": {
+            "b1": -10
+        }
+    });
 });
 test("remove temp vars", async () => {
     let template = {
@@ -1017,7 +1025,7 @@ test("dashboard", async () => {
     const template = yaml.load(templateYaml);
     const tp = new TemplateProcessor(template, {});
     await tp.initialize();
-    expect(tp.getDependenciesTransitiveExecutionPlan('/view/0/2/0/1/warning')).toEqual([
+    expect(tp.to('/view/0/2/0/1/warning')).toEqual([
         "/data/warningStatus/data/0/count",
         "/view/0/2/0/1/warning"
     ])

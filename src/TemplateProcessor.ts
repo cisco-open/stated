@@ -32,7 +32,37 @@ import isEnabled = exports.optimize.InnerGraph.isEnabled;
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 
 export default class TemplateProcessor {
+    /**
+     * Loads a template and initializes a new template processor instance.
+     *
+     * @static
+     * @param {Object} template - The template data to be processed.
+     * @param {Object} [context={}] - Optional context data for the template.
+     * @returns {Promise<TemplateProcessor>} Returns an initialized instance of `TemplateProcessor`.
+     */
+    static async load(template, context = {}) {
+        const t = new TemplateProcessor(template, context);
+        await t.initialize();
+        return t;
+    }
 
+    /**
+     * Default set of functions provided for the template processor.
+     *
+     * @remarks
+     * These functions are commonly used utilities available for
+     * usage within the template processor's context. You can replace set this to
+     * determine which functions are available from templates
+     *
+     * @static
+     * @type {{
+     *   fetch: typeof fetch,
+     *   setInterval: typeof setInterval,
+     *   clearInterval: typeof clearInterval,
+     *   setTimeout: typeof setTimeout,
+     *   console: Console
+     * }}
+     */
     static DEFAULT_FUNCTIONS = {
         "fetch": fetch,
         "setInterval": setInterval,
@@ -40,24 +70,59 @@ export default class TemplateProcessor {
         "setTimeout": setTimeout,
         "console": console
     }
+
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
-    
+
+    /** Represents the logger used within the template processor. */
     logger: StatedLogger;
+
+    /** Contextual data for the template processing. */
     context: any;
+
+    /** Contains the processed output after template processing. */
     output: {};
+
+    /** Represents the raw input for the template processor. */
     input: any;
+
+    /** Meta information related to the template being processed. */
     templateMeta: any;
+
+    /** List of warnings generated during template processing. */
     warnings: any[];
+
+    /** Maps JSON pointers to their associated meta information. */
     metaInfoByJsonPointer: MetaInfoMap;
+
+    /** A set of tags associated with the template. */
     tagSet: Set<unknown>;
+
+    /** Configuration options for the template processor. */
     options: any;
+
+    /** Debugger utility for the template processor. */
     debugger: any;
+
+    /** Contains any errors encountered during template processing. */
     errorReport: {};
+
+    /** Execution plans generated for template processing. */
     private executionPlans: {};
-    private readonly executionQueue = []
+
+    /** A queue of execution plans awaiting processing. */
+    private readonly executionQueue = [];
+
+    /** Common callback function used within the template processor. */
     commonCallback: any;
+
+    /** Flag indicating if the template processor is currently initializing. */
     private isInitializing: boolean;
-    private uniqueId;
+
+    /** A unique identifier for the template processor instance. */
+    private readonly uniqueId;
+
+    private tempVars:JsonPointerString[];
+
 
 
     constructor(template={}, context = {}, options={}) {
@@ -84,6 +149,76 @@ export default class TemplateProcessor {
         this.debugger = new Debugger(this.templateMeta, this.logger);
         this.errorReport = {}
         this.isInitializing = false;
+        this.tempVars = [];
+    }
+    public async initialize(template = this.input, jsonPtr = "/") {
+        if (jsonPtr === "/" && this.isInitializing) {
+            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
+            return;
+        }
+
+        // Set the lock
+        this.isInitializing = true;
+        try {
+            if (jsonPtr === "/") {
+                this.errorReport = {}; //clear the error report when we initialize a root template
+            }
+
+            if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
+                const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
+                this.logger = await FancyLogger.getLogger();
+                this.logger.level = _level;
+            }
+
+            this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
+            this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
+            this.executionPlans = {}; //clear execution plans
+            let parsedJsonPtr = jp.parse(jsonPtr);
+            parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
+            let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
+            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
+            this.sortMetaInfos(metaInfos);
+            this.populateTemplateMeta(metaInfos);
+            this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+            this.propagateTags(metaInfos);
+            this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
+            await this.evaluate(jsonPtr);
+            this.logger.verbose("initialization complete...");
+            this.logOutput();
+        }finally {
+            this.isInitializing = false;
+        }
+    }
+
+
+    private async evaluate(jsonPtr:JsonPointerString) {
+        const startTime = Date.now(); // Capture start time
+
+        this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
+        await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
+        this.removeTemporaryVariables(this.tempVars);
+        const endTime = Date.now(); // Capture end time
+
+        this.logger.verbose(`evaluation complete in ${endTime - startTime} ms...`);
+
+        //the commented out approach below us necessary if we want to push in imports. It has the unsolved problem
+        //that if the existing template has dependencies on the to-be-imported template, and we are not forcing it
+        //in externally but rather the import is written as part of the template that the things that depend on the
+        //import will be executed twice.
+        /*
+        const rootMetaInfos = this.metaInfoByJsonPointer["/"];
+        if (jsonPtr === "/") { //<-- root/parent template
+            await this.evaluateDependencies(rootMetaInfos);
+        } else {  //<-- child/imported template
+            //this is the case of an import. Imports target something other than root
+            const importedMetaInfos = this.metaInfoByJsonPointer[jsonPtr];
+            await this.evaluateDependencies([
+                ...TemplateProcessor.dependsOnImportedTemplate(rootMetaInfos, jsonPtr),
+                ...importedMetaInfos
+            ]);
+        }
+
+         */
     }
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
@@ -118,81 +253,6 @@ export default class TemplateProcessor {
         };
     };
 
-    public async initialize(template = this.input, jsonPtr = "/") {
-        if (jsonPtr === "/" && this.isInitializing) {
-            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
-            return;
-        }
-
-        // Set the lock
-        this.isInitializing = true;
-        try {
-            if (jsonPtr === "/") {
-                this.errorReport = {}; //clear the error report when we initialize a root template
-            }
-
-            if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
-                const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
-                this.logger = await FancyLogger.getLogger();
-                this.logger.level = _level;
-            }
-
-            this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
-            this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
-            this.executionPlans = {}; //clear execution plans
-            let parsedJsonPtr = jp.parse(jsonPtr);
-            parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
-            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
-            this.sortMetaInfos(metaInfos);
-            this.populateTemplateMeta(metaInfos);
-            this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
-            this.propagateTags(metaInfos);
-            await this.evaluate(jsonPtr);
-            this.removeTemporaryVariables(metaInfos);
-            this.logger.verbose("initialization complete...");
-            this.logOutput();
-        }finally {
-            this.isInitializing = false;
-        }
-    }
-
-
-    private async evaluate(jsonPtr:JsonPointerString) {
-        const startTime = Date.now(); // Capture start time
-
-        this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
-        await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
-
-        const endTime = Date.now(); // Capture end time
-
-        this.logger.verbose(`evaluation complete in ${endTime - startTime} ms...`);
-
-        //the commented out approach below us necessary if we want to push in imports. It has the unsolved problem
-        //that if the existing template has dependencies on the to-be-imported template, and we are not forcing it
-        //in externally but rather the import is written as part of the template that the things that depend on the
-        //import will be executed twice.
-        /*
-        const rootMetaInfos = this.metaInfoByJsonPointer["/"];
-        if (jsonPtr === "/") { //<-- root/parent template
-            await this.evaluateDependencies(rootMetaInfos);
-        } else {  //<-- child/imported template
-            //this is the case of an import. Imports target something other than root
-            const importedMetaInfos = this.metaInfoByJsonPointer[jsonPtr];
-            await this.evaluateDependencies([
-                ...TemplateProcessor.dependsOnImportedTemplate(rootMetaInfos, jsonPtr),
-                ...importedMetaInfos
-            ]);
-        }
-
-         */
-    }
-
-    static async load(template, context = {}) {
-        const t = new TemplateProcessor(template, context);
-        await t.initialize();
-        return t;
-    }
 
     async import(template, jsonPtrImportPath) {
         jp.set(this.output, jsonPtrImportPath, template);
@@ -444,12 +504,18 @@ export default class TemplateProcessor {
         metaInfos.forEach(node => dfs(node));
     }
 
-    removeTemporaryVariables(metaInfos){
-        metaInfos.forEach(metaInfo=>{
-            if(metaInfo.temp__){
-                jp.remove(this.output, metaInfo.jsonPointer__);
+    private cacheTmpVarLocations(metaInfos:MetaInfo[]):JsonPointerString[]{
+        const tmpVars = [];
+        metaInfos.forEach(metaInfo => {
+            if (metaInfo.temp__) {
+                tmpVars.push(metaInfo.jsonPointer__);
             }
         })
+        return tmpVars
+    }
+
+    private removeTemporaryVariables(tmpVars:JsonPointerString[]): void{
+        tmpVars.forEach(jsonPtr=>jp.remove(this.output, jsonPtr));
     }
 
 
@@ -530,7 +596,7 @@ export default class TemplateProcessor {
     async setData(jsonPtr, data) {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
-        const sortedJsonPtrs = [...this.getDependentsTransitiveExecutionPlan(jsonPtr)]; //defensive copy
+        const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy
         const plan = {sortedJsonPtrs, data};
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
@@ -551,6 +617,7 @@ export default class TemplateProcessor {
         }
 
         await drainQueue.call(this);
+        this.removeTemporaryVariables(this.tempVars);
         this.logOutput();
         return sortedJsonPtrs;
 
@@ -764,8 +831,8 @@ export default class TemplateProcessor {
         }
 
     }
-
-    getDependentsTransitiveExecutionPlan(jsonPtr) {
+//    getDependentsTransitiveExecutionPlan(jsonPtr) {
+    from(jsonPtr) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
             const affectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
@@ -837,7 +904,7 @@ export default class TemplateProcessor {
     }
 
     //this is the .to repl
-    getDependenciesTransitiveExecutionPlan(jsonPtr) {
+    to(jsonPtr) {
         if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr);
             return this.topologicalSort(node, false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)

@@ -192,7 +192,7 @@ export default class CliCore {
             throw new Error('Initialize the template first.');
         }
         const [jsonPtr, option] = args.split(' ');
-        return option === '--shallow' ? this.templateProcessor.getDependents(jsonPtr) : this.templateProcessor.getDependentsTransitiveExecutionPlan(jsonPtr);
+        return option === '--shallow' ? this.templateProcessor.getDependents(jsonPtr) : this.templateProcessor.from(jsonPtr);
     }
 
     to(args) {
@@ -200,7 +200,7 @@ export default class CliCore {
             throw new Error('Initialize the template first.');
         }
         const [jsonPtr, option] = args.split(' ');
-        return option === '--shallow' ? this.templateProcessor.getDependencies(jsonPtr) : this.templateProcessor.getDependenciesTransitiveExecutionPlan(jsonPtr);
+        return option === '--shallow' ? this.templateProcessor.getDependencies(jsonPtr) : this.templateProcessor.to(jsonPtr);
     }
 
     async plan() {
