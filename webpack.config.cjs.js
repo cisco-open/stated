@@ -2,6 +2,7 @@ import { fileURLToPath } from 'url';
 import { dirname } from 'path';
 import webpack from 'webpack';
 import nodeExternals from 'webpack-node-externals';
+import CopyPlugin from "copy-webpack-plugin";
 
 
 const __filename = fileURLToPath(import.meta.url);
@@ -47,6 +48,11 @@ export default {
         // Define global constants
         new webpack.DefinePlugin({
             BUILD_TARGET: JSON.stringify('web'),
+        }),
+        new CopyPlugin({
+            patterns: [
+                { from: 'types/src', to: 'src' },  // Copies everything from local 'types' directory to 'dist/types' in the output
+            ],
         })
     ],
 

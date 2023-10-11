@@ -164,7 +164,7 @@ export default class TemplateProcessor {
                 this.errorReport = {}; //clear the error report when we initialize a root template
             }
 
-            if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
+            if (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web') {
                 const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
                 this.logger = await FancyLogger.getLogger();
                 this.logger.level = _level;
@@ -795,6 +795,7 @@ export default class TemplateProcessor {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
+            this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
             this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
             this.logger.debug(`Result: ${StatedREPL.stringify(evaluated)}`);
             const _error = new Error(error.message);
