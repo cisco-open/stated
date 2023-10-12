@@ -9,26 +9,25 @@ subscribeParams: #parameters for subscribing to a cloud event
   parallelism: 2
   subscriberId: ../${name}
 myWorkflow$: |
-  function($e){(
-    $e ~> |$|{'parentId': 'myWorkflow', 'data': $e}|;
-    $e ~> $serial([step1, step2, parallelStep$],
+  function($e){
+      $e ~> $serial([step1, step2],
             {
-              'name': "${ $$.name }", 
+              'name': $$.name, 
               'log': $$.log,
               'parentId': 'myWorkflow'
-            });
-  )}
+            })
+  }
 parallelStep$:
-  name: parallelStep, 
+  name: parallelStep,
   function: | 
-    /${ function($e){(
+    function($e){(
       $console.log('parallelStep received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
       $e ~> $serial([step1, step2],
               {
                 'name': name, 
                 'log': log,
               }) 
-    )}}
+    )}
 step1:
   name: primeTheNozzle
   function: |

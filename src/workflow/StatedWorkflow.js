@@ -349,19 +349,19 @@ export class StatedWorkflow {
         }
 
         if (id === undefined) {
-            id = this.generateUniqueId();
+            id = StatedWorkflow.generateUniqueId();
             options.id = id;
         }
 
-        this.initializeLog(log, workflowName, id);
+        StatedWorkflow.initializeLog(log, workflowName, id);
 
         let currentInput = input;
         for (let step of steps) {
-            currentInput = await this.executeStep(step, currentInput, log[workflowName][id]);
+            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id]);
         }
 
-        this.finalizeLog(log[workflowName][id]);
-        this.ensureRetention(log[workflowName]);
+        StatedWorkflow.finalizeLog(log[workflowName][id]);
+        StatedWorkflow.ensureRetention(log[workflowName]);
 
         return currentInput;
     }
