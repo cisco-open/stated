@@ -10,7 +10,7 @@ subscribeParams: #parameters for subscribing to a cloud event
   subscriberId: ../${name}
 myWorkflow$: |
   function($e){
-      $e ~> $serial([step1, step2],
+      $e ~> $serial([step1, step2, parallelStep$],
             {
               'name': $$.name, 
               'log': $$.log,
@@ -19,15 +19,11 @@ myWorkflow$: |
   }
 parallelStep$:
   name: parallelStep,
-  function: | 
-    function($e){(
+  function: |
+    /${ function($e){(
       $console.log('parallelStep received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
-      $e ~> $serial([step1, step2],
-              {
-                'name': name, 
-                'log': log,
-              }) 
-    )}
+      $e ~> $serial([step1, step2], {'name': name, 'log': log}); 
+    )} }
 step1:
   name: primeTheNozzle
   function: |
