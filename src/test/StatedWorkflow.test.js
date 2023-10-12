@@ -16,7 +16,7 @@ import fs from 'fs';
 import yaml from 'js-yaml';
 import { fileURLToPath } from 'url';
 import path from 'path';
-import StatedREPL from "../StatedREPL.js";
+import StatedREPL from "../../dist/src/StatedREPL.js";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

@@ -107,7 +107,7 @@ export class StatedWorkflow {
         serviceUrl: 'pulsar://localhost:6650',
     });
 
-    static host = process.env.HOST_IP || ip.address()
+    static host = process.env.HOST_IP
 
     static kafkaClient = new Kafka({
         clientId: 'workflow-kafka-client',
