@@ -453,7 +453,19 @@ export default class TemplateProcessor {
                     });
                 }
                 const meta = jp.get(this.templateMeta, ptr);
-                meta.dependees__?.push(i.jsonPointer__);
+                //so there is still the possibility that the node in the templateMeta existed, but it was just created
+                //as an empty object or array node when a "deeper" json pointer was set. Like /view/0/0/0/name would
+                //result in 2 empty intermediate array objects. And then someone can have a dependency on /view/0 or
+                ///view/0/0 neither of which would have had their metadata properly defaulted
+                if(meta.jsonPointer__ === undefined){
+                    meta.materialized__ = false;
+                    meta.jsonPointer__ = ptr;
+                    meta.dependees__ = [];
+                    meta.dependencies__ = [];
+                    meta.absoluteDependencies__ = [];
+                    meta.tags__ = [];
+                }
+                meta.dependees__.push(i.jsonPointer__);
             });
         });
     }

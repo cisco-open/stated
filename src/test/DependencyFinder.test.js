@@ -629,6 +629,20 @@ test("$$.foo.($=$$.a)", () => {
     ]);
 });
 
+test("$string(data.pD.data)", () => {
+    const program = `$string(data.pD.data)`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "data",
+            "pD",
+            "data"
+        ]
+    ]);
+});
+
+
+
 
 
 

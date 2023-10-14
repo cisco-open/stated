@@ -17,8 +17,8 @@ import largeResources from './large.js';
 import path from 'path';
 import fs from 'fs';
 import yaml from 'js-yaml';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import {fileURLToPath} from 'url';
+import {dirname} from 'path';
 
 
 test("test 1", async () => {
@@ -817,10 +817,10 @@ test("string in context", async () => {
 
 test("annotations", async () => {
     const o = {
-        "a":42,
-        "b":"@DEV ${'if we are developing, then ' & a}",
-        "c":"${a}", //no @DEV tag so this won't execute,
-        "d":"  @DING    ${b}"
+        "a": 42,
+        "b": "@DEV ${'if we are developing, then ' & a}",
+        "c": "${a}", //no @DEV tag so this won't execute,
+        "d": "  @DING    ${b}"
     };
     const tp = new TemplateProcessor(o);
     tp.tagSet.add("DEV").add("DING");
@@ -836,19 +836,19 @@ test("annotations", async () => {
 test("Solution Environment Files", async () => {
     //define two possible environment configurations
     const env1 = {
-        "a":42,
-        "msg":"I am env1",
+        "a": 42,
+        "msg": "I am env1",
         "tag": "env1"
     };
 
     const env2 = {
-        "a":24,
-        "msg":"I am env2",
+        "a": 24,
+        "msg": "I am env2",
         "tag": "env2"
     };
     const envs = [env1, env2];
     //randomly choose one of them
-    const indexToUse = Math.floor(Math.random()*2);
+    const indexToUse = Math.floor(Math.random() * 2);
     const whichEnvToUse = envs[indexToUse];
 
     const template = {
@@ -863,7 +863,7 @@ test("Solution Environment Files", async () => {
     tp.tagSet.add("INSTALL");
     await tp.initialize();
     let expected;
-    if(indexToUse === 0){
+    if (indexToUse === 0) {
         expected = {
             "somethingAtInstallTime": "I am env1",
             "somethingDependsOnInstall": "I am env1...sure",
@@ -871,7 +871,7 @@ test("Solution Environment Files", async () => {
             "somethingInCodex": "@CODEX ${'hi from codex'}",
             "somethingInDashboard": "@DASHBOARD ${'hi from dashboards'}"
         }
-    }else{
+    } else {
         expected = {
             "somethingAtInstallTime": "I am env2",
             "somethingDependsOnInstall": "I am env2...sure",
@@ -900,7 +900,7 @@ test("remove all DEFAULT_FUNCTIONS", async () => {
 
 test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
     let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = ()=>'hello';
+    TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
     const tp = new TemplateProcessor(template);
     await tp.initialize();
     expect(tp.output).toStrictEqual({
@@ -910,7 +910,7 @@ test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
 
 test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
     let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    const tp = new TemplateProcessor(template, {fetch:()=>"hello"});
+    const tp = new TemplateProcessor(template, {fetch: () => "hello"});
     await tp.initialize();
     expect(tp.output).toStrictEqual({
         "fetchFunctionBecomesHello": "hello"
@@ -919,12 +919,12 @@ test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
 
 test("strict.refs", async () => {
     let template = {
-        "a":42,
-        "b":"${a}",
+        "a": 42,
+        "b": "${a}",
         "c": "${z}",
-        "d$":"c + a"
+        "d$": "c + a"
     };
-    const tp = new TemplateProcessor(template, {}, {strict:{refs:true}});
+    const tp = new TemplateProcessor(template, {}, {strict: {refs: true}});
     await tp.initialize();
     expect(tp.errorReport).toEqual({
         "/c": {
@@ -956,12 +956,12 @@ test("strict.refs", async () => {
 
 test("remove temp vars 1", async () => {
     let template = {
-        "a":42,
-        "b":{
-            "b1":10,
-            "b2":"!${b1}",
+        "a": 42,
+        "b": {
+            "b1": 10,
+            "b2": "!${b1}",
         },
-        "c":"!${a}"
+        "c": "!${a}"
     };
     const tp = new TemplateProcessor(template, {});
     await tp.initialize()
@@ -982,16 +982,16 @@ test("remove temp vars 1", async () => {
 });
 test("remove temp vars", async () => {
     let template = {
-        "a":42,
-        "b":{
-            "b1":10,
-            "b2":"!${b1}",
+        "a": 42,
+        "b": {
+            "b1": 10,
+            "b2": "!${b1}",
             "b3": "!${b2+10}",
-            "b4":{
-                "b5":"!../${b3+10}",
-                "b6":"  !  /${b.b3+10}",
-                "b7":"  !/${b.b3+b.b2}",
-                "b8":" !  ../${b3+b2}",
+            "b4": {
+                "b5": "!../${b3+10}",
+                "b6": "  !  /${b.b3+10}",
+                "b7": "  !/${b.b3+b.b2}",
+                "b8": " !  ../${b3+b2}",
             }
         },
         "c": "${b.b4.b5}",
@@ -1062,7 +1062,7 @@ test("local import with bad filename and no --importPath", async () => {
 test("local import with absolute --importPath", async () => {
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    const importPath = path.join(__dirname, '../','../', 'example');
+    const importPath = path.join(__dirname, '../', '../', 'example');
     const template = {
         "foo": "bar",
         "baz": "${ $import('ex01.json') }"
@@ -1084,7 +1084,7 @@ test("local import with non-absolute --importPath", async () => {
         "foo": "bar",
         "baz": "${ $import('ex01.json') }"
     };
-    const tp = new TemplateProcessor(template, {}, {importPath:'example'});
+    const tp = new TemplateProcessor(template, {}, {importPath: 'example'});
     await tp.initialize();
     expect(tp.output).toEqual({
         "baz": {
@@ -1096,7 +1096,101 @@ test("local import with non-absolute --importPath", async () => {
     });
 });
 
+test("deep view", async () => {
+    const template = {
+        "closureExpression": "/${ ($names := $distinct(data.pD.data.name);  {'yAxis': [ {'categories': $names} ]}) }",
+        "view": [
+            [
 
+                [
+                    [
+                        [
+                            [
+                                "/${ $string(data.pD.data) }"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.from("/data/pD/data")).toEqual([
+            "/data/pD/data",
+            "/view/0/0/0/0/0/0",
+            "/closureExpression"
+        ]
+    );
+    expect(tp.from("/data/pD")).toEqual([
+            "/data/pD",
+            "/view/0/0/0/0/0/0",
+            "/closureExpression"
+        ]
+    );
+    expect(tp.from("/data/pD/data/name")).toEqual([
+            "/data/pD/data/name",
+            "/closureExpression"
+        ]
+    );
+    expect(tp.from("/data")).toEqual([
+            "/data",
+            "/view/0/0/0/0/0/0",
+            "/closureExpression"
+        ]
+    );
+    await tp.setData("/data/pD/data", [{
+        "role": "ACCOUNTADMIN",
+        "privilege": "OWNERSHIP",
+        "table": "6146"
+    }, {"role": "ACCOUNTADMIN", "privilege": "OWNERSHIP", "table": "4100"}, {
+        "role": "ACCOUNTADMIN",
+        "privilege": "OWNERSHIP",
+        "table": "5128"
+    }])
+    expect(tp.output).toEqual({
+            "closureExpression": {
+                "yAxis": [
+                    {}
+                ]
+            },
+            "view": [
+                [
+                    [
+                        [
+                            [
+                                [
+                                    "[{\"role\":\"ACCOUNTADMIN\",\"privilege\":\"OWNERSHIP\",\"table\":\"6146\"},{\"role\":\"ACCOUNTADMIN\",\"privilege\":\"OWNERSHIP\",\"table\":\"4100\"},{\"role\":\"ACCOUNTADMIN\",\"privilege\":\"OWNERSHIP\",\"table\":\"5128\"}]"
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
+            ],
+            "data": {
+                "pD": {
+                    "data": [
+                        {
+                            "role": "ACCOUNTADMIN",
+                            "privilege": "OWNERSHIP",
+                            "table": "6146"
+                        },
+                        {
+                            "role": "ACCOUNTADMIN",
+                            "privilege": "OWNERSHIP",
+                            "table": "4100"
+                        },
+                        {
+                            "role": "ACCOUNTADMIN",
+                            "privilege": "OWNERSHIP",
+                            "table": "5128"
+                        }
+                    ]
+                }
+            }
+        }
+    );
+});
 
 
 /*
