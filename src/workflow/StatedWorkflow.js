@@ -358,19 +358,7 @@ export class StatedWorkflow {
 
         let currentInput = input;
         let serialOrdinal = 0;
-        let parallelSteps = [];
-        while (step || parallelSteps) {
-            if (step.type === 'parallel') {
-                const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"PARALLEL", branchName};
-                parallelSteps.push(step);
-                continue;
-            } else {
-                if (parallelSteps.length > 0) {
-                    let result = await StatedWorkflow.parallel(currentInput, parallelSteps, log[workflowName][id]);
-                    parallelSteps = [];
-                }
-                const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
-            }
+        for (let step of steps) {
             const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
             currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
             serialOrdinal++;
@@ -473,22 +461,22 @@ export class StatedWorkflow {
 
 
     //This function is called by the template processor to execute an array of stages in parallel
-    static async parallel(initialInput, stages, log) {
+    static async parallel(initialInput, steps, log) {
         let promises = [];
 
-        for (let stage of stages) {
-            if (stage.output.results.length > 0 || stage.output.errors.length > 0) {
-                //if we have already run this stage, skip it
-                continue;
-            }
+        for (let step of steps) {
+            // if (step.output.results.length > 0 || step.output.errors.length > 0) {
+            //     //if we have already run this stage, skip it
+            //     continue;
+            // }
 
-            const promise = stage.function.apply(this, [initialInput])
+            const promise = step.function.apply(this, [initialInput])
                 .then(result => {
-                    stage.output.results.push(result);
+                    // step.output.results.push(result);
                     return result;
                 })
                 .catch(error => {
-                    stage.output.errors.push(error);
+                    // step.output.errors.push(error);
                     return error;
                 });
 

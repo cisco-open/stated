@@ -10,8 +10,8 @@ subscribeParams: #parameters for subscribing to a cloud event
   subscriberId: ../${name}
 myWorkflow$: |
   function($e){(
-    $e ~> $workflow(
-      [s1, s2, part2],
+    $e ~> $serial(
+      [s1, s2, part2, j1],
       {
         'name': $$.name, 
         'log': $$.log,
@@ -27,7 +27,6 @@ s1:
       $e~>|$|{'primed':true}|;
     )}  }
   type: serial
-  next: "/${ [ s2 ] }"
 s2:
   name: sprayTheNozzle
   function: |
@@ -36,7 +35,6 @@ s2:
       $e ~>|$|{'sprayed': true}|;
     )}  }
   type: serial
-  next: "/${ [p1, p2] }"
 part2:
   name: parallelPart2
   function: |
@@ -44,7 +42,6 @@ part2:
       $console.log('part2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
       $e ~> $parallel([p1, p2], {'name': name, 'log': log, 'branchName': 'firstSerialInvocation', 'parentId': 'myWorkflow$'}); 
     )} }
-  next: "/${ [j1] }"
 p1:
   name: p1,
   function: |
@@ -53,7 +50,6 @@ p1:
         $e~>|$|{'p1':true}|;
       )}  }
   type: parallel
-  next: "/${ [j1] }"
 p2:
   name: p2,
   function: |
@@ -62,7 +58,6 @@ p2:
         $e~>|$|{'p2':true}|;
       )}  }
   type: parallel
-  next: "/${ [j1] }"
 j1:
   name: j1,
   function: |
