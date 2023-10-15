@@ -1,0 +1,122 @@
+start$: $subscribe(subscribeParams)
+name: nozzleWork
+subscribeParams: #parameters for subscribing to a cloud event
+  source: cloudEvent
+  # hardcore the messageId to make it easier to validate logs
+  testData: "${ [1].([{'messageId': '2023-10-15-1697394418495-o2d6', 'name': 'nozzleTime', 'order':$}]) }"
+  type: 'my-topic'
+  filter$: function($e){ $e.name='nozzleTime' }
+  to: ../${myWorkflow$}
+  parallelism: 2
+  subscriberId: ../${name}
+myWorkflow$: |
+  function($e){(
+    $e ~> $serial(
+      [s1, s2, part2, j1],
+      {
+        'name': $$.name, 
+        'log': $$.log,
+        'id': $e.messageId
+      }
+    );
+  )}
+s1:
+  name: primeTheNozzle
+  function: |
+    /${ function($e){(
+      $console.log('s1 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+      $e~>|$|{'primed':true}|;
+    )}  }
+  type: serial
+s2:
+  name: sprayTheNozzle
+  function: |
+    /${ function($e){(
+      $console.log('s2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+      $e ~>|$|{'sprayed': true}|;
+    )}  }
+  type: serial
+part2:
+  name: parallelPart2
+  function: |
+    /${ function($e){(
+      $console.log('part2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+      $e ~> $parallel([p1, p2], 
+        {
+          'name': name, 
+          'log': log, 
+          'id': part2.invocationId
+        }); 
+    )} }
+p1:
+  name: p1,
+  function: |
+    /${ function($e){(
+        $console.log('p1 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+        $e~>|$|{'p1':true}|;
+      )}  }
+  type: parallel
+p2:
+  name: p2,
+  function: |
+    /${ function($e){(
+        $console.log('p2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+        $e~>|$|{'p2':true}|;
+      )}  }
+  type: parallel
+j1:
+  name: j1,
+  function: |
+    /${ function($e){(
+        $console.log('j1 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+        $e~>|$|{'finally':true}|;
+      )}  }
+  type: sequential
+log:
+  retention:
+    maxWorkflowLogs: 100
+  nozzleWork:
+    2023-10-15-1697394418495-o2d6:
+      info:
+        start: 1697395544032
+        status: succeeded
+        end: 1697395544035
+      execution:
+        primeTheNozzle:
+          invocationId: 2023-10-15-1697394418495-o2d6
+          workflowName: nozzleWork
+          stepName: primeTheNozzle
+          serialOrdinal: 0
+          branchType: SERIAL
+          branchName:
+          start: 1697395544032
+          args:
+            messageId: 2023-10-15-1697394418495-o2d6
+            name: nozzleTime
+            order: 1
+          end: 1697395544033
+          out:
+            messageId: 2023-10-15-1697394418495-o2d6
+            name: nozzleTime
+            order: 1
+            primed: true
+        sprayTheNozzle:
+          invocationId: 2023-10-15-1697394418495-o2d6
+          workflowName: nozzleWork
+          stepName: sprayTheNozzle
+          serialOrdinal: 1
+          branchType: SERIAL
+          branchName:
+          start: 1697395544033
+          args:
+            messageId: 2023-10-15-1697394418495-o2d6
+            name: nozzleTime
+            order: 1
+            primed: true
+          end: 1697395544033
+          out:
+            messageId: 2023-10-15-1697394418495-o2d6
+            name: nozzleTime
+            order: 1
+            primed: true
+            sprayed: true

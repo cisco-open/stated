@@ -409,7 +409,7 @@ export class StatedWorkflow {
                 start: new Date().getTime(),
                 status: 'in-progress'
             },
-            execution: []
+            execution: {}
         };
     }
 
@@ -423,6 +423,10 @@ export class StatedWorkflow {
 
         */
 
+        if (currentLog.execution[stepRecord.stepName]?.out) {
+            console.log(`step ${step.name} has been already executed. Skipping`);
+            return currentLog.execution[stepRecord.stepName].out;
+        }
         stepRecord["start"] = new Date().getTime();
         stepRecord["args"] = input;
 
@@ -433,13 +437,13 @@ export class StatedWorkflow {
             const result = await step.function.apply(this, [input]);
             stepRecord.end = new Date().getTime();
             stepRecord.out = result;
-            currentLog.execution.push(stepRecord);
+            currentLog.execution[stepRecord.stepName] = stepRecord;
             return result;
         } catch (error) {
             stepRecord.end = new Date().getTime();
             stepRecord.error = {message: error.message};
             currentLog.info.status = 'failed';
-            currentLog.execution.push(stepRecord);
+            currentLog.execution[stepRecord.stepName] = stepRecord;
             throw error;
         }
     }
