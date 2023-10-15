@@ -11,7 +11,7 @@ subscribeParams: #parameters for subscribing to a cloud event
 myWorkflow$: |
   function($e){(
     $e ~> $workflow(
-      [s1],
+      [s1, s2, part2],
       {
         'name': $$.name, 
         'log': $$.log,
@@ -37,6 +37,14 @@ s2:
     )}  }
   type: serial
   next: "/${ [p1, p2] }"
+part2:
+  name: parallelPart2
+  function: |
+    /${ function($e){(
+      $console.log('part2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
+      $e ~> $parallel([p1, p2], {'name': name, 'log': log, 'branchName': 'firstSerialInvocation', 'parentId': 'myWorkflow$'}); 
+    )} }
+  next: "/${ [j1] }"
 p1:
   name: p1,
   function: |

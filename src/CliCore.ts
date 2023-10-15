@@ -18,6 +18,7 @@ import yaml from 'js-yaml';
 import minimist from 'minimist';
 import {parseArgsStringToArgv} from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
+import StatedREPL from "./StatedREPL.js";
 
 
 export default class CliCore {
@@ -114,7 +115,9 @@ export default class CliCore {
 
         if (oneshot === true) {
             await this.templateProcessor.initialize();
-            return this.templateProcessor.output;
+            // console.log(StatedREPL.stringify(this.templateProcessor.output))
+            console.log(StatedREPL.stringify(this.templateProcessor.output));
+            return;
         } else {
             try {
                 await this.templateProcessor.initialize();
