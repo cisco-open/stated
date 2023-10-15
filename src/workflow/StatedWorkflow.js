@@ -342,16 +342,14 @@ export class StatedWorkflow {
     }
 
     static async serial(input, steps, options) {
-        const {name: workflowName, log, branchName} = options;
-        let {id} = options;
+        const {name: workflowName, log, id, branchName} = options;
 
         if (log === undefined) {
             throw new Error('log is missing from options');
         }
 
         if (id === undefined) {
-            id = StatedWorkflow.generateUniqueId();
-            options.id = id;
+            throw new Error('invocation id is missing from options');
         }
 
         StatedWorkflow.initializeLog(log, workflowName, id);
@@ -359,7 +357,7 @@ export class StatedWorkflow {
         let currentInput = input;
         let serialOrdinal = 0;
         for (let step of steps) {
-            const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
             currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
             serialOrdinal++;
         }
@@ -370,43 +368,43 @@ export class StatedWorkflow {
         return currentInput;
     }
 
-    static async workflow(input, steps, options) {
-        const {name: workflowName, log, branchName} = options;
-        let {id} = options;
+    // This function is called by the template processor to execute an array of steps in parallel
+    static async parallel(input, steps, options) {
+        const {name: workflowName, log, id, branchName} = options;
 
         if (log === undefined) {
             throw new Error('log is missing from options');
         }
 
         if (id === undefined) {
-            id = StatedWorkflow.generateUniqueId();
-            options.id = id;
+            throw new Error('invocation id is missing from options');
         }
 
         StatedWorkflow.initializeLog(log, workflowName, id);
 
-        let currentInput = input;
+        let promises = [];
         let serialOrdinal = 0;
         for (let step of steps) {
-            const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
-            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
-            serialOrdinal++;
-            if (step.next) StatedWorkflow.workflow(currentInput, step.next, options);
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"PARALLEL", branchName};
+            const promise = StatedWorkflow.executeStep(step, input, log[workflowName][id], stepRecord)
+              .then(result => {
+                  // step.output.results.push(result);
+                  return result;
+              })
+              .catch(error => {
+                  // step.output.errors.push(error);
+                  return error;
+              });
+            promises.push(promise);
         }
 
-        StatedWorkflow.finalizeLog(log[workflowName][id]);
-        StatedWorkflow.ensureRetention(log[workflowName]);
-
-        return currentInput;
+        return await Promise.all(promises);
     }
 
-    static generateUniqueId() {
-        return `${new Date().getTime()}-${Math.random().toString(36).slice(2, 7)}`;
-    }
-
+    // ensures that the log object has the right structure for the workflow invocation
     static initializeLog(log, workflowName, id) {
-        log[workflowName] = log[workflowName] || {};
-        log[workflowName][id] = {
+        if (!log[workflowName]) log[workflowName] = {};
+        if (!log[workflowName][id]) log[workflowName][id] = {
             info: {
                 start: new Date().getTime(),
                 status: 'in-progress'
@@ -415,7 +413,7 @@ export class StatedWorkflow {
         };
     }
 
-    static async executeStep(step, input, currentLog, stepLog) {
+    static async executeStep(step, input, currentLog, stepRecord) {
         /*
         const stepLog = {
             step: step.name,
@@ -425,20 +423,23 @@ export class StatedWorkflow {
 
         */
 
-        stepLog["start"] = new Date().getTime();
-        stepLog["args"] = input;
+        stepRecord["start"] = new Date().getTime();
+        stepRecord["args"] = input;
+
+        // we need to pass invocation id to the step expression
+        step.invocationId = stepRecord.invocationId;
 
         try {
             const result = await step.function.apply(this, [input]);
-            stepLog.end = new Date().getTime();
-            stepLog.out = result;
-            currentLog.execution.push(stepLog);
+            stepRecord.end = new Date().getTime();
+            stepRecord.out = result;
+            currentLog.execution.push(stepRecord);
             return result;
         } catch (error) {
-            stepLog.end = new Date().getTime();
-            stepLog.error = {message: error.message};
+            stepRecord.end = new Date().getTime();
+            stepRecord.error = {message: error.message};
             currentLog.info.status = 'failed';
-            currentLog.execution.push(stepLog);
+            currentLog.execution.push(stepRecord);
             throw error;
         }
     }
@@ -459,31 +460,8 @@ export class StatedWorkflow {
         }
     }
 
-
-    //This function is called by the template processor to execute an array of stages in parallel
-    static async parallel(initialInput, steps, log) {
-        let promises = [];
-
-        for (let step of steps) {
-            // if (step.output.results.length > 0 || step.output.errors.length > 0) {
-            //     //if we have already run this stage, skip it
-            //     continue;
-            // }
-
-            const promise = step.function.apply(this, [initialInput])
-                .then(result => {
-                    // step.output.results.push(result);
-                    return result;
-                })
-                .catch(error => {
-                    // step.output.errors.push(error);
-                    return error;
-                });
-
-            promises.push(promise);
-        }
-
-        return await Promise.all(promises);
+    static generateUniqueId() {
+        return `${new Date().getTime()}-${Math.random().toString(36).slice(2, 7)}`;
     }
 
     static generateDateAndTimeBasedID() {
@@ -493,6 +471,36 @@ export class StatedWorkflow {
         const randomPart = Math.random().toString(36).substring(2, 6);  // 4 random characters for added uniqueness
 
         return `${dateStr}-${timeInMs}-${randomPart}`;
+    }
+
+    static async workflow(input, steps, options) {
+        const {name: workflowName, log, branchName} = options;
+        let {id} = options;
+
+        if (log === undefined) {
+            throw new Error('log is missing from options');
+        }
+
+        if (id === undefined) {
+            id = StatedWorkflow.generateUniqueId();
+            options.id = id;
+        }
+
+        StatedWorkflow.initializeLog(log, workflowName, id);
+
+        let currentInput = input;
+        let serialOrdinal = 0;
+        for (let step of steps) {
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
+            serialOrdinal++;
+            if (step.next) StatedWorkflow.workflow(currentInput, step.next, options);
+        }
+
+        StatedWorkflow.finalizeLog(log[workflowName][id]);
+        StatedWorkflow.ensureRetention(log[workflowName]);
+
+        return currentInput;
     }
 }
 

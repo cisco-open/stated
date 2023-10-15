@@ -40,7 +40,12 @@ part2:
   function: |
     /${ function($e){(
       $console.log('part2 received - ' & $string($e) & ' from "' & 'domain-event-bus' & '"');
-      $e ~> $parallel([p1, p2], {'name': name, 'log': log, 'branchName': 'firstSerialInvocation', 'parentId': 'myWorkflow$'}); 
+      $e ~> $parallel([p1, p2], 
+        {
+          'name': name, 
+          'log': log, 
+          'id': part2.invocationId
+        }); 
     )} }
 p1:
   name: p1,
