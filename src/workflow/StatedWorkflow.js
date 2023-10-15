@@ -46,7 +46,8 @@ export class StatedWorkflow {
             "onHttp": StatedWorkflow.onHttp.bind(this),
             "subscribe": StatedWorkflow.subscribe.bind(this),
             "publish": StatedWorkflow.publish.bind(this),
-            "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
+            "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this),
+            "workflow": StatedWorkflow.workflow.bind(this)
         };
         const templateProcessor = new TemplateProcessor(template, this.context);
         templateProcessor.logLevel = logLevel.DEBUG;
@@ -341,7 +342,7 @@ export class StatedWorkflow {
     }
 
     static async serial(input, steps, options) {
-        const {name: workflowName, log} = options;
+        const {name: workflowName, log, branchName} = options;
         let {id} = options;
 
         if (log === undefined) {
@@ -356,8 +357,53 @@ export class StatedWorkflow {
         StatedWorkflow.initializeLog(log, workflowName, id);
 
         let currentInput = input;
+        let serialOrdinal = 0;
+        let parallelSteps = [];
+        while (step || parallelSteps) {
+            if (step.type === 'parallel') {
+                const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"PARALLEL", branchName};
+                parallelSteps.push(step);
+                continue;
+            } else {
+                if (parallelSteps.length > 0) {
+                    let result = await StatedWorkflow.parallel(currentInput, parallelSteps, log[workflowName][id]);
+                    parallelSteps = [];
+                }
+                const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            }
+            const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
+            serialOrdinal++;
+        }
+
+        StatedWorkflow.finalizeLog(log[workflowName][id]);
+        StatedWorkflow.ensureRetention(log[workflowName]);
+
+        return currentInput;
+    }
+
+    static async workflow(input, steps, options) {
+        const {name: workflowName, log, branchName} = options;
+        let {id} = options;
+
+        if (log === undefined) {
+            throw new Error('log is missing from options');
+        }
+
+        if (id === undefined) {
+            id = StatedWorkflow.generateUniqueId();
+            options.id = id;
+        }
+
+        StatedWorkflow.initializeLog(log, workflowName, id);
+
+        let currentInput = input;
+        let serialOrdinal = 0;
         for (let step of steps) {
-            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id]);
+            const stepRecord = {workflowInvocation: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
+            serialOrdinal++;
+            if (step.next) StatedWorkflow.workflow(currentInput, step.next, options);
         }
 
         StatedWorkflow.finalizeLog(log[workflowName][id]);
@@ -381,12 +427,18 @@ export class StatedWorkflow {
         };
     }
 
-    static async executeStep(step, input, currentLog) {
+    static async executeStep(step, input, currentLog, stepLog) {
+        /*
         const stepLog = {
             step: step.name,
             start: new Date().getTime(),
             args: [input]
         };
+
+        */
+
+        stepLog["start"] = new Date().getTime();
+        stepLog["args"] = input;
 
         try {
             const result = await step.function.apply(this, [input]);
@@ -457,7 +509,7 @@ export class StatedWorkflow {
 }
 
 
-export const generateDateAndTimeBasedID = StatedWorkflow.generateDateAndTimeBasedID;
+export const id = StatedWorkflow.generateDateAndTimeBasedID;
 export const serial = StatedWorkflow.serial;
 export const parallel = StatedWorkflow.parallel;
 export const nextCloudEvent = StatedWorkflow.nextCloudEvent;
@@ -465,3 +517,4 @@ export const onHttp = StatedWorkflow.onHttp;
 export const subscribe = StatedWorkflow.subscribe;
 export const publish = StatedWorkflow.publish;
 export const logFunctionInvocation = StatedWorkflow.logFunctionInvocation;
+export const workflow = StatedWorkflow.workflow;
