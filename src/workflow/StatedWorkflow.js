@@ -138,7 +138,6 @@ export class StatedWorkflow {
 
     static publish(params, clientParams) {
         StatedWorkflow.logger.debug(`publish params ${StatedREPL.stringify(params)} with clientParams ${StatedREPL.stringify(clientParams)}`);
-        const {type, data} = params;
         if (clientParams.type === 'kafka') {
             StatedWorkflow.publishKafka(params, clientParams);
         } else {
@@ -342,7 +341,7 @@ export class StatedWorkflow {
     }
 
     static async serial(input, steps, options) {
-        const {name: workflowName, log, id, branchName} = options;
+        const {name: workflowName, log, id} = options;
 
         if (log === undefined) {
             throw new Error('log is missing from options');
@@ -357,7 +356,7 @@ export class StatedWorkflow {
         let currentInput = input;
         let serialOrdinal = 0;
         for (let step of steps) {
-            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL"};
             currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
             serialOrdinal++;
         }
@@ -370,7 +369,7 @@ export class StatedWorkflow {
 
     // This function is called by the template processor to execute an array of steps in parallel
     static async parallel(input, steps, options) {
-        const {name: workflowName, log, id, branchName} = options;
+        const {name: workflowName, log, id} = options;
 
         if (log === undefined) {
             throw new Error('log is missing from options');
@@ -385,7 +384,7 @@ export class StatedWorkflow {
         let promises = [];
         let serialOrdinal = 0;
         for (let step of steps) {
-            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"PARALLEL", branchName};
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"PARALLEL"};
             const promise = StatedWorkflow.executeStep(step, input, log[workflowName][id], stepRecord)
               .then(result => {
                   // step.output.results.push(result);
@@ -413,6 +412,12 @@ export class StatedWorkflow {
         };
     }
 
+    static async persistLogRecord(stepRecord) {
+        StatedWorkflow.publish(
+          {'type': stepRecord.workflowName, 'data': stepRecord},
+          {type:'pulsar', params: {serviceUrl: 'pulsar://localhost:6650'}}
+        );
+    }
     static async executeStep(step, input, currentLog, stepRecord) {
         /*
         const stepLog = {
@@ -438,12 +443,14 @@ export class StatedWorkflow {
             stepRecord.end = new Date().getTime();
             stepRecord.out = result;
             currentLog.execution[stepRecord.stepName] = stepRecord;
+            StatedWorkflow.persistLogRecord(stepRecord);
             return result;
         } catch (error) {
             stepRecord.end = new Date().getTime();
             stepRecord.error = {message: error.message};
             currentLog.info.status = 'failed';
             currentLog.execution[stepRecord.stepName] = stepRecord;
+            StatedWorkflow.persistLogRecord(stepRecord);
             throw error;
         }
     }
@@ -478,7 +485,7 @@ export class StatedWorkflow {
     }
 
     static async workflow(input, steps, options) {
-        const {name: workflowName, log, branchName} = options;
+        const {name: workflowName, log} = options;
         let {id} = options;
 
         if (log === undefined) {
@@ -495,7 +502,7 @@ export class StatedWorkflow {
         let currentInput = input;
         let serialOrdinal = 0;
         for (let step of steps) {
-            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL", branchName};
+            const stepRecord = {invocationId: id, workflowName, stepName: step.name, serialOrdinal, branchType:"SERIAL"};
             currentInput = await StatedWorkflow.executeStep(step, currentInput, log[workflowName][id], stepRecord);
             serialOrdinal++;
             if (step.next) StatedWorkflow.workflow(currentInput, step.next, options);
