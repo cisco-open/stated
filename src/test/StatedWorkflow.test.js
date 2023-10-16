@@ -110,441 +110,319 @@ test("workflow logs", async () => {
 
     const tp = StatedWorkflow.newWorkflow(template);
     await tp.initialize();
-    const sortedLog = sortLogs(tp.output, 'nozzleWork')
-    const removeUncomparableTimestamps = JSON.parse(StatedREPL.stringify(sortedLog, EnhancedPrintFunc.printFunc));
-    const expectedLog = [
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 1
-                        }
-                    ],
-                    "end": "--timestamp--",
+    const {step1, step2} = tp.output;
+    //correlate each workflowInvocation from step1's log to step2's log
+    Object.keys(step1.log).forEach(workflowInvocation=> {
+            const removeUncomparableTimestamps = JSON.parse(StatedREPL.stringify(step2.log[workflowInvocation], EnhancedPrintFunc.printFunc));
+            expect(removeUncomparableTimestamps).toMatchObject({
+                "start": {
+                    "args": {
+                        "name": "nozzleTime",
+                        "primed": true
+                        //order: 1 ...note we don't test for order because we can't guarantee which workflowInvocation contains 1 or 2
+                    },
+                    "timestamp": "--timestamp--"
+                },
+                "end": {
                     "out": {
                         "name": "nozzleTime",
-                        "order": 1,
-                        "primed": true
+                        "primed": true,
+                        "sprayed": true
                     },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
+                    "timestamp": "--timestamp--"
+                }
+            })
+        }
+    );
+
+    const expectedOutput = {
+        "log": {
+            "retention": {
+                "maxWorkflowLogs": 100
+            }
+        },
+        "myWorkflow$": "{function:}",
+        "name": "nozzleWork",
+        "start$": null,
+        "step1": {
+            "function": "{function:}",
+            "log": {
+                "1697347459331-9nhaf": {
+                    "end": {
+                        "out": {
                             "name": "nozzleTime",
                             "order": 1,
                             "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 1,
-                        "primed": true,
-                        "sprayed": true
+                        },
+                        "timestamp": "--timestamp--"
                     },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
+                    "start": {
+                        "args": {
                             "name": "nozzleTime",
-                            "order": 2
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 2,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
+                            "order": 1
+                        },
+                        "timestamp": "--timestamp--"
+                    }
                 },
-                {
-                    "args": [
-                        {
+                "1697347459331-fb9gc": {
+                    "end": {
+                        "out": {
                             "name": "nozzleTime",
                             "order": 2,
                             "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 2,
-                        "primed": true,
-                        "sprayed": true
+                        },
+                        "timestamp": "--timestamp--"
                     },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
+                    "start": {
+                        "args": {
                             "name": "nozzleTime",
-                            "order": 3
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 3,
-                        "primed": true
+                            "order": 2
+                        },
+                        "timestamp": "--timestamp--"
+                    }
+                }
+            },
+            "name": "primeTheNozzle"
+        },
+        "step2": {
+            "function": "{function:}",
+            "log": {
+                "1697347459331-9nhaf": {
+                    "end": {
+                        "out": {
+                            "name": "nozzleTime",
+                            "order": 1,
+                            "primed": true,
+                            "sprayed": true
+                        },
+                        "timestamp": "--timestamp--"
                     },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
+                    "start": {
+                        "args": {
+                            "name": "nozzleTime",
+                            "order": 1,
+                            "primed": true
+                        },
+                        "timestamp": "--timestamp--"
+                    }
+                },
+                "1697347459331-fb9gc": {
+                    "end": {
+                        "out": {
+                            "name": "nozzleTime",
+                            "order": 2,
+                            "primed": true,
+                            "sprayed": true
+                        },
+                        "timestamp": "--timestamp--"
+                    },
+                    "start": {
+                        "args": {
+                            "name": "nozzleTime",
+                            "order": 2,
+                            "primed": true
+                        },
+                        "timestamp": "--timestamp--"
+                    }
+                }
+            },
+            "name": "sprayTheNozzle"
+        },
+        "subscribeParams": {
+            "filter$": "{function:}",
+            "parallelism": 2,
+            "source": "cloudEvent",
+            "subscriberId": "nozzleWork",
+            "testData": [
+                {
+                    "name": "nozzleTime",
+                    "order": 1
                 },
                 {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 3,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 3,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
+                    "name": "nozzleTime",
+                    "order": 2
                 }
             ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
+            "to": "{function:}",
+            "type": "my-topic"
+        }
+    };
+}, 10000);
+
+test("recover completed workflow - should do nothing", async () => {
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../','../','example', 'experimental', 'wf-recover.yaml');
+    const templateYaml =
+    `
+    recover$: $recover(step0)
+    name: nozzleWork
+    step0:
+      name: entrypoint
+      function: /\${  function($e){$e ~> $serial([step1, step2])}  }
+      "log": {
+            "1697402819332-9q6gg": {
+              "start": {
+                "timestamp": 1697402819332,
+                "args": {
+                  "name": "nozzleTime",
+                  "order": 1
+                }
+              },
+              "end": {
+                "timestamp": 1697402826805,
+                "out": {
+                  "name": "nozzleTime",
+                  "order": 1,
+                  "primed": true,
+                  "sprayed": true
+                }
+              }
             }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 4
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 4,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 4,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 4,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
+          }
+    step1:
+      name: primeTheNozzle
+      function: \${   function($e){ $e~>|$|{'primed':true}|}  }
+    step2:
+      name: sprayTheNozzle
+      function: \${function($e){ $e~>|$|{'sprayed':true}|  }}
+`
+
+    // Parse the YAML
+    var template = yaml.load(templateYaml);
+
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    const {step0, step1, step2} = tp.output;
+    expect(step1.log).isUndefined;
+    expect(step2.log).isUndefined;
+    expect(step0.log).toEqual({ //the entry point log is completed (it has a start and an end) - so we don't do anything
+        "1697402819332-9q6gg": {
+            "start": {
+                "timestamp": 1697402819332,
+                "args": {
+                    "name": "nozzleTime",
+                    "order": 1
                 }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 5
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 5,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 5,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 5,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
+            },
+            "end": {
+                "timestamp": 1697402826805,
+                "out": {
+                    "name": "nozzleTime",
+                    "order": 1,
+                    "primed": true,
+                    "sprayed": true
                 }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 6
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 6,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 6,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 6,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 7
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 7,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 7,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 7,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 8
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 8,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 8,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 8,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 9
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 9,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 9,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 9,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
-            }
-        },
-        {
-            "execution": [
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 10
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 10,
-                        "primed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "primeTheNozzle"
-                },
-                {
-                    "args": [
-                        {
-                            "name": "nozzleTime",
-                            "order": 10,
-                            "primed": true
-                        }
-                    ],
-                    "end": "--timestamp--",
-                    "out": {
-                        "name": "nozzleTime",
-                        "order": 10,
-                        "primed": true,
-                        "sprayed": true
-                    },
-                    "start": "--timestamp--",
-                    "step": "sprayTheNozzle"
-                }
-            ],
-            "info": {
-                "end": "--timestamp--",
-                "start": "--timestamp--",
-                "status": "succeeded"
             }
         }
-    ];
-    expect(removeUncomparableTimestamps).toEqual(expectedLog);
+    });
+}, 10000);
+
+test("recover incomplete workflow - should rerun all steps", async () => {
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../','../','example', 'experimental', 'wf-recover.yaml');
+    const templateYaml =
+        `
+    recover$: $recover(step0)
+    name: nozzleWork
+    step0:
+      name: entrypoint
+      function: /\${  function($e, $context){$e ~> $serial([step1, step2], $context)}  }
+      "log": {
+            "1697402819332-9q6gg": {
+              "start": {
+                "timestamp": 1697402819332,
+                "args": {
+                  "name": "nozzleTime",
+                  "order": 1
+                }
+              }
+          }
+      }
+    step1:
+      name: primeTheNozzle
+      function: \${   function($e){ $e~>|$|{'primed':true}|}  }
+    step2:
+      name: sprayTheNozzle
+      function: \${function($e){ $e~>|$|{'sprayed':true}|  }}
+`
+
+    // Parse the YAML
+    var template = yaml.load(templateYaml);
+
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    const {step0, step1, step2} = tp.output;
+    expect(step0.log['1697402819332-9q6gg'].end).exists;
+    expect(step1.log['1697402819332-9q6gg'].start).exists;
+    expect(step1.log['1697402819332-9q6gg'].end).exists;
+    expect(step2.log['1697402819332-9q6gg'].start).exists;
+    expect(step2.log['1697402819332-9q6gg'].end).exists;
+    expect(step2.log['1697402819332-9q6gg'].end.out).toMatchObject({
+        "name": "nozzleTime",
+        "primed": true,
+        "sprayed": true
+    })
+}, 10000);
+
+test("recover incomplete workflow - step 1 is incomplete - should rerun steps 1 and 2", async () => {
+
+    // Load the YAML from the file
+    const yamlFilePath = path.join(__dirname, '../','../','example', 'experimental', 'wf-recover.yaml');
+    const templateYaml =
+        `
+    recover$: $recover(step0)
+    name: nozzleWork
+    step0:
+      name: entrypoint
+      function: /\${  function($e, $context){$e ~> $serial([step1, step2], $context)}  }
+      "log": {
+            "1697402819332-9q6gg": {
+              "start": {
+                "timestamp": 1697402819332,
+                "args": {
+                  "name": "nozzleTime",
+                  "order": 1
+                }
+              }
+          }
+      }
+    step1:
+      name: primeTheNozzle
+      function: \${   function($e){ $e~>|$|{'primed':true}|}  }
+      "log": {
+            "1697402819332-9q6gg": {
+              "start": {
+                "timestamp": 1697402819336,
+                "args": {
+                  "name": "nozzleTime",
+                  "order": 1
+                }
+              }
+          }
+      }      
+    step2:
+      name: sprayTheNozzle
+      function: \${function($e){ $e~>|$|{'sprayed':true}|  }}
+`
+
+    // Parse the YAML
+    var template = yaml.load(templateYaml);
+
+    const tp = StatedWorkflow.newWorkflow(template);
+    await tp.initialize();
+    const {step0, step1, step2} = tp.output;
+    expect(step0.log['1697402819332-9q6gg'].end).exists;
+    expect(step1.log['1697402819332-9q6gg'].start).exists;
+    expect(step1.log['1697402819332-9q6gg'].end).exists;
+    expect(step2.log['1697402819332-9q6gg'].start).exists;
+    expect(step2.log['1697402819332-9q6gg'].end).exists;
+    expect(step2.log['1697402819332-9q6gg'].end.out).toMatchObject({
+        "name": "nozzleTime",
+        "primed": true,
+        "sprayed": true
+    })
 }, 10000);
 
 test("workflow perf", async () => {

@@ -16,6 +16,10 @@ import StatedREPL from './StatedREPL.js';
 import express from 'express';
 import Pulsar from 'pulsar-client';
 import winston from "winston";
+import matches from 'lodash/matches';
+import {StepLog} from './StepLog.js';
+import Step from './Step.js';
+
 
 //This class is a wrapper around the TemplateProcessor class that provides workflow functionality
 export class StatedWorkflow {
@@ -42,6 +46,7 @@ export class StatedWorkflow {
             "nextCloudEvent": StatedWorkflow.nextCloudEvent.bind(this),
             "onHttp": StatedWorkflow.onHttp.bind(this),
             "subscribe": StatedWorkflow.subscribe.bind(this),
+            "recover": StatedWorkflow.recover.bind(this),
             "publish": StatedWorkflow.pulsarPublish.bind(this),
             "logFunctionInvocation": StatedWorkflow.logFunctionInvocation.bind(this)
         };
@@ -76,26 +81,6 @@ export class StatedWorkflow {
             log.logs = [logMessage];
         }
     }
-
-    // static async logFunctionInvocation(stage, args, result, error = null, logMessage) {
-    //     logMessage = {
-    //         context: stage.name,
-    //         function: stage.function.name,
-    //         start: new Date().toISOString(),
-    //         args: args
-    //     };
-    //     if (error) {
-    //         logMessage.error = {
-    //             timestamp: new Date().toISOString(),
-    //             message: error.message
-    //         };
-    //     } else {
-    //         logMessage.finish = new Date().toISOString();
-    //         logMessage.out = result;
-    //     }
-    //     console.log(StatedREPL.stringify(logMessage));
-    //     log.add(logMessage);
-    // }
 
     static async subscribe(subscribeOptions) {
         const {source} = subscribeOptions;
@@ -228,84 +213,45 @@ export class StatedWorkflow {
 
     }
 
-    static async serial(input, steps, options) {
-        const {name: workflowName, log} = options;
-        let {id} = options;
-
-        if (log === undefined) {
-            throw new Error('log is missing from options');
+    static async recover(stepJson){
+        const stepLog = new StepLog(stepJson);
+        for  (let workflowInvocation of stepLog.getInvocations()){
+            await this.runStep(workflowInvocation, stepJson);
         }
+    }
 
-        if (id === undefined) {
-            id = this.generateUniqueId();
-            options.id = id;
+    static async runStep(workflowInvocation, stepJson, input){
+        const stepLog = new StepLog(stepJson);
+        const {instruction, event:loggedEvent} = stepLog.getCourseOfAction(workflowInvocation);
+        if(instruction === "START"){
+            const step = new Step(stepJson);
+            return await step.run(workflowInvocation, input);
+        }else if (instruction === "RESTART"){
+            const step = new Step(stepJson);
+            return await step.run(workflowInvocation, loggedEvent.args);
+        } else if(instruction === "SKIP"){
+            return loggedEvent.out;
+        }else{
+            throw new Error(`unknown courseOfAction: ${instruction}`);
         }
+    }
 
-        this.initializeLog(log, workflowName, id);
+    static async serial(input, steps, context={}) {
+        const {workflowInvocation=StatedWorkflow.generateUniqueId()} = context;
+        context.workflowInvocation = workflowInvocation; //set the generatedId into the context
 
         let currentInput = input;
-        for (let step of steps) {
-            currentInput = await this.executeStep(step, currentInput, log[workflowName][id]);
+        for (let stepJson of steps) {
+            currentInput = await this.runStep(workflowInvocation, stepJson, currentInput);
         }
-
-        this.finalizeLog(log[workflowName][id]);
-        this.ensureRetention(log[workflowName]);
-
         return currentInput;
     }
+
 
     static generateUniqueId() {
         return `${new Date().getTime()}-${Math.random().toString(36).slice(2, 7)}`;
     }
 
-    static initializeLog(log, workflowName, id) {
-        log[workflowName] = log[workflowName] || {};
-        log[workflowName][id] = {
-            info: {
-                start: new Date().getTime(),
-                status: 'in-progress'
-            },
-            execution: []
-        };
-    }
-
-    static async executeStep(step, input, currentLog) {
-        const stepLog = {
-            step: step.name,
-            start: new Date().getTime(),
-            args: [input]
-        };
-
-        try {
-            const result = await step.function.apply(this, [input]);
-            stepLog.end = new Date().getTime();
-            stepLog.out = result;
-            currentLog.execution.push(stepLog);
-            return result;
-        } catch (error) {
-            stepLog.end = new Date().getTime();
-            stepLog.error = {message: error.message};
-            currentLog.info.status = 'failed';
-            currentLog.execution.push(stepLog);
-            throw error;
-        }
-    }
-
-    static finalizeLog(currentLog) {
-        currentLog.info.end = new Date().getTime();
-        if (currentLog.info.status !== 'failed') {
-            currentLog.info.status = 'succeeded';
-        }
-    }
-
-    static ensureRetention(workflowLogs) {
-        const maxLogs = 100;
-        const sortedKeys = Object.keys(workflowLogs).sort((a, b) => workflowLogs[b].info.start - workflowLogs[a].info.start);
-        while (sortedKeys.length > maxLogs) {
-            const oldestKey = sortedKeys.pop();
-            delete workflowLogs[oldestKey];
-        }
-    }
 
 
     //This function is called by the template processor to execute an array of stages in parallel
@@ -346,8 +292,9 @@ export class StatedWorkflow {
 
 class WorkflowDispatcher {
     constructor(subscribeParams) {
-        const {to: workflowFunction, parallelism, type, subscriberId} = subscribeParams;
-        this.workflowFunction = workflowFunction;
+        const {to: stepJson, parallelism, type, subscriberId} = subscribeParams;
+        this.stepJson = stepJson
+        this.workflowFunction = stepJson.function;
         this.parallelism = parallelism || 1;
         this.subscriberId = subscriberId;
         this.type = type;
@@ -404,8 +351,8 @@ class WorkflowDispatcher {
         while (this.active < this.parallelism && this.queue.length > 0) {
             this.active++;
             const eventData = this.queue.shift();
-
-            const promise = this.workflowFunction.apply(null, [eventData])
+            const step = new Step(this.stepJson);
+            const promise = step.run(StatedWorkflow.generateUniqueId(), eventData) //this.workflowFunction.apply(null, [eventData])
                 .catch(error => {
                     console.error("Error executing workflow:", error);
                 })

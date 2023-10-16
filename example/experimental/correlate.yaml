@@ -1,4 +1,4 @@
-# to run this locally you need to have pulsar running in standalone mode
+ # to run this locally you need to have pulsar running in standalone mode
 sequence$: ["/${$subscribe(listenForCommand)}", "/${$subscribe(listenForResponse)}", "/${$publish(command)}"]
 listenForResponse:
   source: cloudEvent

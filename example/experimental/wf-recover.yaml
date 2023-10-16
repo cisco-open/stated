@@ -1,0 +1,38 @@
+recover$: $recover(step0)
+name: nozzleWork
+step0:
+  name: entrypoint
+  function: /${  function($e){$e ~> $serial([step1, step2])}  }
+  "log": {
+        "1697402819332-9q6gg": {
+          "start": {
+            "timestamp": 1697402819332,
+            "args": {
+              "name": "nozzleTime",
+              "order": 1
+            }
+          },
+          "end": {
+            "timestamp": 1697402826805,
+            "out": {
+              "name": "nozzleTime",
+              "order": 1,
+              "primed": true,
+              "sprayed": true
+            }
+          }
+        }
+      }
+step1:
+  name: primeTheNozzle
+  function: ${   function($e){ $e~>|$|{'primed':true}|}  }
+step2:
+  name: sprayTheNozzle
+  function: ${function($e){ $e~>|$|{'sprayed':true}|  }}
+
+
+
+
+
+
+
