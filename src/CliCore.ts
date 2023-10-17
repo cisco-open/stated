@@ -27,6 +27,7 @@ export default class CliCore {
         this.templateProcessor = null;
         this.logLevel = "info";
     }
+    public onInit: () => void;
 
     static minimistArgs(replCmdInputStr) {
         const args = parseArgsStringToArgv(replCmdInputStr);
@@ -106,6 +107,7 @@ export default class CliCore {
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        this.templateProcessor.onInit = this.onInit;
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
