@@ -218,8 +218,32 @@ async function tryIt() {
     //    }     
 }
 tryIt().catch(err => console.error(err));
-
 ```
+#### Stated-js package.json exports
+The distribution of stated-js exports two different webpacks, one for ES Module (ie "import") which is in `./dist/bundle.mjs`,
+and one for Common JS (ie "require") which is in `./dist/bundle-common-js.cjs`. Using `import` or `require` in your JS
+code from a project with a package.json will automatically choose the correct dist target. Both the ES and Common JS
+exports are designed for use in the browser. Here is an excerpt of package.json showing exactly what is exported.
+```json
+"exports": {
+    ".": {
+      "import": "./dist/bundle.mjs",
+      "require": "./dist/bundle-common-js.cjs"
+    },
+    "./dist/src/TemplateProcessor.js": "./dist/src/TemplateProcessor.js",
+    "./dist/src/CliCore.js": "./dist/src/CliCore.js",
+    "./dist/src/StatedREPL.js": "./dist/src/StatedREPL.js"
+  }
+```
+#### Node.js based projects
+If you are building for a Node.js environment you should not use the webpacked exports for `import` or `require`. 
+Instead, use the 'raw' `TemplateProcessor.js`, `CliCore.js`, and `StatedREPL.js`. Write your import statement like this
+for Node.js :
+```js
+import TemplateProcessor from 'stated-js/dist/src/TemplateProcessor.js';
+```
+When you run Node.js, you must pass `--experimental-vm-modules` flag to the Node.js runtime. This is due to the 
+fact that State-js is written using ES Module syntax.
 
 ### REPL Commands
 
