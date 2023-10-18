@@ -1192,6 +1192,35 @@ test("deep view", async () => {
     );
 });
 
+test("test rxLog", async () => {
+    const templateYaml =
+    `# to run this locally you need to have pulsar running in standalone mode
+    interval$: ($subscribe(subscribeParams); $setInterval(function(){$publish(pubParams)}, 1000))
+    pubParams:
+      type: /\${ subscribeParams.type} #pub to same type we subscribe on
+      data: "\${ function(){  {'msg': 'hello', 'rando': $random()}}  }"
+      testData: [ {'msg':'hello'} ]
+      client:
+        type: test
+    subscribeParams: #parameters for subscribing to a cloud event
+      source: cloudEvent
+      type: 'my-topic'
+      to: \${ function($e){$set('/rxLog/-', $e)}  }
+      subscriberId: dingus
+      initialPosition: latest
+      client:
+        type: test
+    rxLog: [ {"default": 42} ]
+    stop$: ($count(rxLog)=5?$clearInterval(interval$):'still going')
+    `;
+    const template = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(template, {"subscribe": ()=>{}, "publish":()=>{}});
+    await tp.initialize();
+    expect(tp.from("/rxLog")).toEqual([
+        "/rxLog",
+        "/stop$"
+    ]);
+});
 
 /*
 leaving these two import tests commented out because unclear if programatically pushing in imports is what we want

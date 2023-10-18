@@ -531,15 +531,19 @@ export default class TemplateProcessor {
     }
 
 
-    private topologicalSort(metaInfos, exprsOnly = true):JsonPointerString[] {
+    private topologicalSort(metaInfos, exprsOnly = true, fanout=true):JsonPointerString[] {
         const visited = new Set();
         const recursionStack = new Set(); //for circular dependency detection
         const orderedJsonPointers:Set<string> = new Set();
         const templateMeta = this.templateMeta;
 
+
+        //--------------- utility sub-functions follow ----------------//
+
+
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
         //template. Fields that don't end in "__" are children of the given object in the template
-        const processNode = (metaInfoNode) => {
+        const processImplicitChildDependencies = (metaInfoNode) => {
             for (const childKey in metaInfoNode) {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
                     const child = metaInfoNode[childKey];
@@ -584,12 +588,26 @@ export default class TemplateProcessor {
             if (metaInfo.jsonPointer__ && (!exprsOnly || (exprsOnly && metaInfo.expr__))) {
                 orderedJsonPointers.add(metaInfo.jsonPointer__);
             }
-            processNode(metaInfo);
+            processImplicitChildDependencies(metaInfo);
 
             if(metaInfo.jsonPointer__){
                 recursionStack.delete(metaInfo.jsonPointer__);
             } // Clean up after finishing with this node
         }
+
+        const removeExtraneous = (orderedJsonPointers):JsonPointerString[]=>{
+            const desiredToRetain:Set<JsonPointerString> = new Set();
+            metaInfos.forEach(m=>{
+                desiredToRetain.add(m.jsonPointer__);
+            });
+            return [...orderedJsonPointers].reduce((acc, jsonPtr)=>{
+                if(desiredToRetain.has(jsonPtr)){
+                    acc.push(jsonPtr);
+                }
+                return acc;
+            }, []);
+        }
+        //-------- end utility sub functions -------------//
 
         if (!(metaInfos instanceof Set || Array.isArray(metaInfos))) {
             metaInfos = [metaInfos];
@@ -600,8 +618,14 @@ export default class TemplateProcessor {
                 listDependencies(node);
             }
         });
-
-        return [...orderedJsonPointers];
+        if(!fanout) {
+            //when the input metaInfos has come via ".from()" then we are just trying to ensure that any
+            //dependencies *within* that set of metaInfos gets topologically sorted. We don't want to fan
+            //out to any other dependencies
+            return removeExtraneous(orderedJsonPointers);
+        }else{
+            return [...orderedJsonPointers];
+        }
     }
 
 
@@ -849,7 +873,7 @@ export default class TemplateProcessor {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
             const affectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
-            const topoSortedPlan:JsonPointerString[] = this.topologicalSort(affectedNodesSet);
+            const topoSortedPlan:JsonPointerString[] = this.topologicalSort(affectedNodesSet, true, false);
             this.executionPlans[jsonPtr] = [jsonPtr, ...topoSortedPlan];
         }
         return this.executionPlans[jsonPtr];
