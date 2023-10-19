@@ -693,7 +693,8 @@ test("set 0", async () => {
                 "bang": [
                     "/data/a/b/c/bing",
                     "/data/a/b/c/bang",
-                    "/data/a/b/c/boom"
+                    "/data/a/b/c/boom",
+                    "/bar"
                 ],
                 "bing": 1,
                 "boom": 3
@@ -1130,7 +1131,8 @@ test("deep view", async () => {
     );
     expect(tp.from("/data/pD/data/name")).toEqual([
             "/data/pD/data/name",
-            "/closureExpression"
+            "/closureExpression",
+             "/view/0/0/0/0/0/0"
         ]
     );
     expect(tp.from("/data")).toEqual([

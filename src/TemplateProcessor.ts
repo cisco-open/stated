@@ -926,6 +926,17 @@ export default class TemplateProcessor {
                     visited.add(childPtr);
                 }
             }
+            //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
+            const parts = jp.parse(currentPtr);
+            for(let i=1; i<parts.length;i++){
+                const _parentPointer = jp.compile(parts.slice(0,parts.length-i));
+                if(jp.has(this.templateMeta,_parentPointer)){
+                    if (!visited.has(_parentPointer)) {
+                        queue.push(_parentPointer);
+                        visited.add(_parentPointer);
+                    }
+                }
+            }
         }
 
         return dependents;
