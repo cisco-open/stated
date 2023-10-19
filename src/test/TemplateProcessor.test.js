@@ -1222,6 +1222,11 @@ test("test rxLog", async () => {
         "/rxLog",
         "/stop$"
     ]);
+    expect(tp.from("/rxLog/-")).toEqual([
+        "/rxLog/-",
+        "/stop$"
+    ]);
+
 });
 
 /*

@@ -25,8 +25,6 @@ import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import StatedREPL from "./StatedREPL.js";
-import exports from "webpack";
-import isEnabled = exports.optimize.InnerGraph.isEnabled;
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
@@ -888,27 +886,50 @@ export default class TemplateProcessor {
     }
 
     private getDependentsBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
+
+
+        const dependents:MetaInfo[] = [];
+        const queue:JsonPointerString[] = [jsonPtr];
+        const visited:Set<JsonPointerString> = new Set();
+
+        const queueAncestors = (jsonPtr)=>{
+            //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
+            const parts = jp.parse(jsonPtr);
+            for(let i=1; i<parts.length;i++){
+                const _parentPointer = jp.compile(parts.slice(0,parts.length-i));
+                if(jp.has(this.templateMeta,_parentPointer)){
+                    if (!visited.has(_parentPointer)) {
+                        //dependents.push(jp.get(this.templateMeta,_parentPointer));
+                        queue.push(_parentPointer);
+                        visited.add(_parentPointer);
+                    }
+                }
+            }
+        }
+
+        /*
         if (!jp.has(this.templateMeta, jsonPtr)) {
             this.logger.log('warn', `${jsonPtr} does not exist.`);
             return [];
         }
 
-        const dependents = [];
-        const queue = [jsonPtr];
-        const visited = new Set();
+         */
 
         while (queue.length > 0) {
             const currentPtr = queue.shift();
-            visited.add(currentPtr);
 
+            queueAncestors(currentPtr);
+            if (!jp.has(this.templateMeta, currentPtr)){
+                continue;
+            }
             const metaInf = jp.get(this.templateMeta, currentPtr);
-
+            dependents.push(metaInf);
+            //visited.add(currentPtr);
             if (metaInf.dependees__) {
                 metaInf.dependees__.forEach(dependee => {
                     if (!visited.has(dependee)) {
-                        dependents.push(jp.get(this.templateMeta, dependee));
                         queue.push(dependee);
-                        visited.add(dependee);
+                        //visited.add(dependee);
                     }
                 });
             }
@@ -923,20 +944,10 @@ export default class TemplateProcessor {
                 let childPtr = `${currentPtr}/${key}`;
                 if (!visited.has(childPtr)) {
                     queue.push(childPtr);
-                    visited.add(childPtr);
+                    //visited.add(childPtr);
                 }
             }
-            //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
-            const parts = jp.parse(currentPtr);
-            for(let i=1; i<parts.length;i++){
-                const _parentPointer = jp.compile(parts.slice(0,parts.length-i));
-                if(jp.has(this.templateMeta,_parentPointer)){
-                    if (!visited.has(_parentPointer)) {
-                        queue.push(_parentPointer);
-                        visited.add(_parentPointer);
-                    }
-                }
-            }
+            visited.add(currentPtr)
         }
 
         return dependents;
