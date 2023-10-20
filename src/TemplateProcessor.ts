@@ -128,8 +128,12 @@ export default class TemplateProcessor {
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
-        this.context = merge(TemplateProcessor.DEFAULT_FUNCTIONS, context);
-        this.context = merge(this.context, {"set": this.setData});
+        this.context = merge(
+            {},
+            TemplateProcessor.DEFAULT_FUNCTIONS,
+            context,
+            { "set": this.setData }
+        );
         const safe = this.withErrorHandling.bind(this);
         for (const key in this.context) {
             if (typeof this.context[key] === 'function') {
@@ -139,7 +143,7 @@ export default class TemplateProcessor {
 
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
-        this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to initialize the templateMeta
+        this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to `initialize the templateMeta
         this.warnings = [];
         this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
         this.tagSet = new Set();

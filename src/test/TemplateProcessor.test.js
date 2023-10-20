@@ -459,6 +459,15 @@ test("mysql to /tmp/provider", async () => {
 
 });
 
+// test default functions does not include set
+test("default functions", async () => {
+    expect(TemplateProcessor.DEFAULT_FUNCTIONS['set']).toBeUndefined();
+    const o = cloneDeep(mysql);
+    const tp = new TemplateProcessor(o);
+    await tp.initialize();
+    expect(TemplateProcessor.DEFAULT_FUNCTIONS['set']).toBeUndefined();
+})
+
 
 test("nested arrays", async () => {
         const o = {
