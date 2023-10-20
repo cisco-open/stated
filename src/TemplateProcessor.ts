@@ -893,29 +893,34 @@ export default class TemplateProcessor {
         const visited:Set<JsonPointerString> = new Set();
 
         //----------------- utility functions ----------------//
-        const queueAncestors = (jsonPtr)=>{
+        const queueAncestorsWithDependees = (jsonPtr)=>{
             //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
             const parts = jp.parse(jsonPtr);
-            for(let i=1; i<parts.length;i++){
-                const _parentPointer = jp.compile(parts.slice(0,parts.length-i));
-                if(jp.has(this.templateMeta,_parentPointer)){
-                    if (!visited.has(_parentPointer)) {
-                        queue.push(_parentPointer);
-                        visited.add(_parentPointer);
-                    }
+            if(parts.length>1) {
+                const _parentPointer = jp.compile(parts.slice(0, parts.length - 1));
+                if (!visited.has(_parentPointer)) {
+                    queue.push(_parentPointer);
+                    visited.add(_parentPointer);
                 }
             }
         }
 
-        const queueDependees = (metaInf: MetaInfo)=>{
-            if (metaInf.dependees__) {
-                metaInf.dependees__.forEach(dependee => {
-                    if (!visited.has(dependee)) {
-                        queue.push(dependee);
-                        visited.add(dependee);
-                    }
-                });
+        const queueDependees = (jsonPtr:JsonPointerString)=>{
+            if(jp.has(this.templateMeta,jsonPtr)){
+                const metaInf = jp.get(this.templateMeta, jsonPtr);
+                if(metaInf.expr__ !== undefined){
+                    dependents.push(metaInf);
+                }
+                if (metaInf.dependees__) {
+                    metaInf.dependees__.forEach(dependee => {
+                        if (!visited.has(dependee)) {
+                            queue.push(dependee);
+                            visited.add(dependee);
+                        }
+                    });
+                }
             }
+
         }
 
         const queueDescendents = (metaInf:MetaInfo, currentPtr:JsonPointerString)=>{
@@ -938,9 +943,8 @@ export default class TemplateProcessor {
 
         while (queue.length > 0) {
             const currentPtr = queue.shift();
-
-            queueAncestors(currentPtr); //these are IMPLICIT dependees
-            //calling queueAncestors before the templateMeta existence check allows us to find ancestors of
+            queueAncestorsWithDependees(currentPtr); //these are IMPLICIT dependees
+            //calling queueAncestorsWithDependees before the templateMeta existence check allows us to find ancestors of
             //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". QueueAncestors() allows us to
             //pickup the /rxLog array as being an implicit dependency of it's array elements. So if an element
             //is added or removed, we will recognize anyone who depends on /rxLog as a dependent
@@ -948,8 +952,7 @@ export default class TemplateProcessor {
                 continue;
             }
             const metaInf = jp.get(this.templateMeta, currentPtr);
-            dependents.push(metaInf);
-            queueDependees(metaInf); //these are EXPLICIT dependees
+            queueDependees(currentPtr); //these are EXPLICIT dependees
             queueDescendents(metaInf, currentPtr); //these are IMPLICIT dependees
         }
 
