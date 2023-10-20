@@ -893,7 +893,7 @@ export default class TemplateProcessor {
         const visited:Set<JsonPointerString> = new Set();
 
         //----------------- utility functions ----------------//
-        const queueAncestorsWithDependees = (jsonPtr)=>{
+        const queueParent = (jsonPtr)=>{
             //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
             const parts = jp.parse(jsonPtr);
             if(parts.length>1) {
@@ -905,22 +905,15 @@ export default class TemplateProcessor {
             }
         }
 
-        const queueDependees = (jsonPtr:JsonPointerString)=>{
-            if(jp.has(this.templateMeta,jsonPtr)){
-                const metaInf = jp.get(this.templateMeta, jsonPtr);
-                if(metaInf.expr__ !== undefined){
-                    dependents.push(metaInf);
-                }
-                if (metaInf.dependees__) {
-                    metaInf.dependees__.forEach(dependee => {
-                        if (!visited.has(dependee)) {
-                            queue.push(dependee);
-                            visited.add(dependee);
-                        }
-                    });
-                }
+        const queueDependees = (metaInf: MetaInfo)=>{
+            if (metaInf.dependees__) {
+                metaInf.dependees__.forEach(dependee => {
+                    if (!visited.has(dependee)) {
+                        queue.push(dependee);
+                        visited.add(dependee);
+                    }
+                });
             }
-
         }
 
         const queueDescendents = (metaInf:MetaInfo, currentPtr:JsonPointerString)=>{
@@ -943,16 +936,19 @@ export default class TemplateProcessor {
 
         while (queue.length > 0) {
             const currentPtr = queue.shift();
-            queueAncestorsWithDependees(currentPtr); //these are IMPLICIT dependees
-            //calling queueAncestorsWithDependees before the templateMeta existence check allows us to find ancestors of
-            //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". QueueAncestors() allows us to
-            //pickup the /rxLog array as being an implicit dependency of it's array elements. So if an element
+            queueParent(currentPtr); //these are IMPLICIT dependees
+            //calling queueParent before the templateMeta existence check allows us to find ancestors of
+            //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". queueParent() allows us to
+            //pickup the /rxLog array as being an implicit dependency of its array elements. So if an element
             //is added or removed, we will recognize anyone who depends on /rxLog as a dependent
             if (!jp.has(this.templateMeta, currentPtr)){
                 continue;
             }
             const metaInf = jp.get(this.templateMeta, currentPtr);
-            queueDependees(currentPtr); //these are EXPLICIT dependees
+            if(metaInf.expr__ !== undefined){
+                dependents.push(metaInf);
+            }
+            queueDependees(metaInf); //these are EXPLICIT dependees
             queueDescendents(metaInf, currentPtr); //these are IMPLICIT dependees
         }
 
