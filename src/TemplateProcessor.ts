@@ -377,12 +377,13 @@ export default class TemplateProcessor {
     }
 
     private async createMetaInfos(template, rootJsonPtr = []) {
-        let metaInfos = await MetaInfoProducer.getMetaInfos(template);
+        let initialMetaInfos = await MetaInfoProducer.getMetaInfos(template);
 
-        metaInfos = await Promise.all(metaInfos.map(async metaInfo => {
-            metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__]; //templates can be rooted under other templates
+        let metaInfos = initialMetaInfos.reduce((acc, metaInfo) => {
+            metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
             metaInfo.parentJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
             const cdUpPath = metaInfo.exprRootPath__;
+
             if (cdUpPath) {
                 const cdUpParts = cdUpPath.match(/\.\.\//g);
                 if (cdUpParts) {
@@ -390,21 +391,33 @@ export default class TemplateProcessor {
                 } else if (cdUpPath.match(/^\/$/g)) {
                     metaInfo.parentJsonPointer__ = [];
                 } else {
-                    throw new Error(`unexpected 'path' expression: ${cdUpPath}`);
+                    const jsonPtr = jp.compile(metaInfo.jsonPointer__);
+                    const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;
+                    const errorObject = {name:'invalidExpRoot', message: msg}
+                    this.errorReport[jsonPtr] = {error:errorObject};
+                    this.logger.error(msg);
                 }
             }
+
             if (metaInfo.expr__ !== undefined) {
                 try {
                     const depFinder = new DependencyFinder(metaInfo.expr__);
                     metaInfo.compiledExpr__ = depFinder.compiledExpression;
-                    metaInfo.dependencies__ = depFinder.findDependencies(); //TemplateProcessor.getAncestors(depFinder.findDependencies()); //FIXME TODO
-                }catch(e){
-                    this.logger.error(`problem analysing expression at : ${jp.compile(metaInfo.jsonPointer__)}`);
-                    throw(e);
+                    metaInfo.dependencies__ = depFinder.findDependencies();
+                    acc.push(metaInfo);
+                } catch(e) {
+                    const jsonPtr = jp.compile(metaInfo.jsonPointer__);
+                    const msg = `problem analysing expression : ${metaInfo.expr__}`;
+                    const errorObject = {name:"badJSONata", message: msg}
+                    this.errorReport[jsonPtr] = {error:errorObject};
+                    this.logger.error(msg);
                 }
+            } else {
+                acc.push(metaInfo);
             }
-            return metaInfo;
-        }));
+
+            return acc;
+        }, []);
 
         return metaInfos;
     }

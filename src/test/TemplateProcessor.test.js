@@ -1238,59 +1238,20 @@ test("test rxLog", async () => {
 
 });
 
-/*
-leaving these two import tests commented out because unclear if programatically pushing in imports is what we want
-test("import 2", async () => {
-    const tp = new TemplateProcessor({
-        "a": "${'hello A'}",
-        "b": "${ c }"
-    });
+test("plunked expression", async () => {
+    let template = {"foo$": "2$%&^"};
+    const tp = new TemplateProcessor(template);
     await tp.initialize();
-    await tp.import("${ 'hello from C' }", "/c")
-    expect(tp.output).toEqual(
-        {
-            "a": "hello A",
-            "b": "hello from C",
-            "c": "hello from C"
+    expect(tp.output).toStrictEqual({"foo$": "2$%&^"});
+    expect(tp.errorReport).toEqual({
+        "/foo$": {
+            "error": {
+                "message": "problem analysing expression : 2$%&^",
+                "name": "badJSONata"
+            }
         }
-    );
-});
-
-test("import 3", async () => {
-    const tp = new TemplateProcessor({
-        "a": "${'hello A'}",
-        "b": "${ c.c2 }",
-        "x": "${ c.c3[1]}",
-        "y": "${ c.c3 }"
     });
-    await tp.initialize();
-    await tp.import({
-            "c2": "${ 'hello from c2' }",
-            "c3": ["bing", "bang", "boom"],
-        }, "/c")
-    expect(tp.output).toEqual(
-        {
-            "a": "hello A",
-            "b": "hello from c2",
-            "c": {
-                "c2": "hello from c2",
-                "c3": [
-                    "bing",
-                    "bang",
-                    "boom"
-                ]
-            },
-            "x": "bang",
-            "y": [
-                "bing",
-                "bang",
-                "boom"
-            ]
-        }
-    );
 });
-
- */
 
 
 
