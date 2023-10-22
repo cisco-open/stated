@@ -1545,9 +1545,9 @@ This can be combined with the `--importPath` option to import files relative to 
 ```
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
-Stated formulates plans. 
+Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 
+with an example:
 
-In the diagram below shows these steps:
 0. A template is shown with a graph tree visualizing the JSON. 
 The template contains 3 expressions. For any valid template there is at least one ordering 
 of all expressions that produces a correct output. We call such as correct ordering a Plan. 
