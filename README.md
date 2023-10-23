@@ -1556,7 +1556,7 @@ of a correct plan, what would happen if the first expression executed was `${e.i
 be garbage/undefined because `e.i` has not been evaluated.
 1. From the template, a plan is formulated (we will explain how this happens in the following section)
 2. The Plan is executed sequentially producing the final `output` 
-![plan execution](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/48f632c438f034917171bf2600e5a0e25645d01b/plan-execute.svg)
+![plan execution](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated%20metainfo%20algorithms%20-%20Page%201.svg)
 # Planning
 Planning is the process of 
 1. Analyzing each expression to produce a MetaInfo Node recording facts about the Node such as its dependencies
@@ -1578,7 +1578,7 @@ that does not exist in the JSON template. Such non-materialized nodes come in 2 
    is not material in the template. 
 
 The MetaInfo graph for our example above is:
-![Planning](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/26976f84024bd312a24833fa66d3c5e62d7fe7c6/dependencies.svg)
+![Planning](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated%20metainfo%20algorithms%20-%20Page%202.svg)
 ## DFS Tree Traversal
 The tree traversal, which we will call `findDeps` begins by picking any node, `node`, and calling `findDeps(node)`
 
@@ -1598,4 +1598,4 @@ that the other expression is emitted first into the plan.
 Assuming we call findDeps on node `/b/f` the diagram below shows the order (1,2,3,4) in which links are traversed. Since
 the algorithm is DFS, _expression nodes_ are added in reverse traversal order: `['/a/c/g/i', '/b/e', '/b/f']`
 
-![Traversal](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/e83e35c49997f301ae781554675351cab267c6c5/order-of-traversal.svg)
+![Traversal](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated%20metainfo%20algorithms%20-%20Page%203.svg)
