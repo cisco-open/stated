@@ -1253,6 +1253,51 @@ test("plunked expression", async () => {
     });
 });
 
+test("example from README explaining plans", async () => {
+    let template = {
+        a: {
+            c: {
+                g: {
+                    h: 100,
+                    i: "${h}"
+                },
+                d: 100
+            }
+        },
+        b: {
+            e: "/${a.c.g}",
+            f: "${e.i+100}"
+        }
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    const plan = await tp.getEvaluationPlan();
+    expect(plan).toStrictEqual([
+        "/a/c/g/i",
+        "/b/e",
+        "/b/f"
+    ]);
+    expect(tp.output).toStrictEqual({
+        a: {
+            c: {
+                g: {
+                    h: 100,
+                    i: 100,
+                },
+                d: 100
+            }
+        },
+        b: {
+            e: {
+                h: 100,
+                i: 100,
+            },
+            f: 200
+        }
+    });
+
+});
+
 
 
 

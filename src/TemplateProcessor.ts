@@ -552,13 +552,38 @@ export default class TemplateProcessor {
         const orderedJsonPointers:Set<string> = new Set();
         const templateMeta = this.templateMeta;
 
-
         //--------------- utility sub-functions follow ----------------//
 
+        const listDependencies = (metaInfo) => {
+            markAsVisited(metaInfo);
+            addToScope(metaInfo);
+
+            followDependencies(metaInfo);
+            emit(metaInfo);
+            followChildren(metaInfo);
+
+            removeFromScope(metaInfo);
+        }
+
+        const hasJsonPointer = (metaInfo) => {
+            return metaInfo.jsonPointer__ !== undefined;
+        }
+
+        const markAsVisited = (metaInfo) => {
+            visited.add(metaInfo.jsonPointer__);
+        }
+
+        const addToScope = (metaInfo) => {
+            recursionStack.add(metaInfo.jsonPointer__);
+        }
+
+        const removeFromScope = (metaInfo) => {
+            recursionStack.delete(metaInfo.jsonPointer__);
+        }
 
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
         //template. Fields that don't end in "__" are children of the given object in the template
-        const processImplicitChildDependencies = (metaInfoNode) => {
+        const followChildren = (metaInfoNode) => {
             for (const childKey in metaInfoNode) {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
                     const child = metaInfoNode[childKey];
@@ -568,46 +593,55 @@ export default class TemplateProcessor {
                 }
             }
         }
-        const listDependencies = (metaInfo) => {
-            if(metaInfo.jsonPointer__) {
-                visited.add(metaInfo.jsonPointer__);
-                recursionStack.add(metaInfo.jsonPointer__);
-            }
-            if (metaInfo.absoluteDependencies__) {
-                for (const dependency of metaInfo.absoluteDependencies__) {
-                    if (recursionStack.has(dependency)) {
-                        const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ') + " → " + dependency;
-                        this.warnings.push(e);
-                        this.logger.log('warn', e);
-                    }
-                    if (!visited.has(dependency)) {
-                        const dependencyNode = jp.get(templateMeta, dependency);
-                        if (dependencyNode.materialized__ === false) { // a node such as ex10.json's totalCount[0] won't be materialized until it's would-be parent node has run it's expression
-                            const ancestor = this.searchUpForExpression(dependencyNode);
-                            //if (ancestor && !visited.has(ancestor.jsonPointer__)) {
-                            if (ancestor) {
-                                //orderedJsonPointers.add(ancestor.jsonPointer__); //we cannot listDependencies of these "virtual" ancestor dependencies as that creates circular dependencies as it would in ex10
-                                listDependencies(ancestor);
-                            }
-                        }
-                        listDependencies(dependencyNode);
-                    }
+        const searchUpForExpression = (childNode)=> {
+            let pathParts = jp.parse(childNode.jsonPointer__);
+            while (pathParts.length > 1) {
+                pathParts = pathParts.slice(0, -1); //get the parent expression
+                const jsonPtr = jp.compile(pathParts);
+                const ancestorNode = jp.get(this.templateMeta, jsonPtr);
+                if (ancestorNode.materialized__ === true) {
+                    return ancestorNode;
                 }
             }
+            return undefined;
 
-            // when we are forming the topological order for the 'plan' command, we don't need to include
-            // nodes in the execution plan that don't have expressions. On the other hand, when we are forming
-            // the topological order to see all the nodes that are dependencies of a particular target node, which
-            // is what the 'to' command does in the repl, then we DO want to see dependencies that are constants/
-            // literals that don't have expressions
-            if (metaInfo.jsonPointer__ && (!exprsOnly || (exprsOnly && metaInfo.expr__))) {
-                orderedJsonPointers.add(metaInfo.jsonPointer__);
+        }
+
+        const followDependencies = (metaInfo) => {
+            if (!metaInfo.absoluteDependencies__) return;
+
+            for (const dependency of metaInfo.absoluteDependencies__) {
+                if (recursionStack.has(dependency)) {
+                    logCircularDependency(dependency);
+                    continue;
+                }
+
+                if (visited.has(dependency)) continue;
+
+                const dependencyNode = jp.get(templateMeta, dependency);
+                processUnmaterializedDependency(dependencyNode);
+                listDependencies(dependencyNode);
             }
-            processImplicitChildDependencies(metaInfo);
+        }
 
-            if(metaInfo.jsonPointer__){
-                recursionStack.delete(metaInfo.jsonPointer__);
-            } // Clean up after finishing with this node
+        const logCircularDependency = (dependency) => {
+            const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ') + " → " + dependency;
+            this.warnings.push(e);
+            this.logger.log('warn', e);
+        }
+
+        const processUnmaterializedDependency = (dependencyNode) => {
+            if (dependencyNode.materialized__ === false) {
+                const ancestor = searchUpForExpression(dependencyNode);
+                if (ancestor) {
+                    listDependencies(ancestor);
+                }
+            }
+        }
+
+        const emit = (metaInfo) => {
+            if (exprsOnly && !metaInfo.expr__) return;
+            orderedJsonPointers.add(metaInfo.jsonPointer__);
         }
 
         const removeExtraneous = (orderedJsonPointers):JsonPointerString[]=>{
@@ -1004,20 +1038,6 @@ export default class TemplateProcessor {
         return this.topologicalSort(this.metaInfoByJsonPointer["/"], true);
     }
 
-    private searchUpForExpression(childNode) {
-        let pathParts = jp.parse(childNode.jsonPointer__);
-        while (pathParts.length > 1) {
-            pathParts = pathParts.slice(0, -1); //get the parent expression
-            const jsonPtr = jp.compile(pathParts);
-            const ancestorNode = jp.get(this.templateMeta, jsonPtr);
-            if (ancestorNode.materialized__ === true) {
-                return ancestorNode;
-            }
-        }
-        //this.logger.info(`No parent or ancestor of '${childNode.jsonPointer__}'`);
-        return undefined;
-
-    }
 
     //when importing a template we must only evaluate expressions in the enclosing root template
     //that have dependencies to something inside the target template. Otherwise we will get looping
