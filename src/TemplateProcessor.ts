@@ -25,6 +25,7 @@ import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import StatedREPL from "./StatedREPL.js";
+import jsonata from "jsonata";
 
 
 
@@ -1084,9 +1085,26 @@ export default class TemplateProcessor {
 
     setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString, removed?:boolean)=>void) {
         if(jsonPtr === "/"){
+            if (this.commonCallback !== undefined) {
+                return false;
+            }
             this.commonCallback = cbFn;
+            return true;
         }else{
+            if (this.changeCallbacks.has(jsonPtr)) {
+                return false
+            }
             this.changeCallbacks.set(jsonPtr, cbFn);
+            return true;
+        }
+        return false;
+    }
+
+    removeDataChangeCallback(jsonPtr) {
+        if(jsonPtr === "/"){
+            this.commonCallback = undefined;
+        }else if (this.changeCallbacks.has(jsonPtr)) {
+            this.changeCallbacks.delete(jsonPtr);
         }
     }
 
@@ -1109,6 +1127,72 @@ export default class TemplateProcessor {
             return jp.get(this.output, jsonPointer)
         };
         return null;
+    }
+
+
+    async waitCondition(waitCondition, timeout = 10000) {
+        return new Promise((resolve, reject) => {
+            const startTime = Date.now();
+            let conditionExpression;
+            let timeoutId;  // Declare timeoutId here
+
+            try {
+                conditionExpression = jsonata(waitCondition);
+            } catch (e) {
+                this.logger.error(`invalid wait condition expression: ${waitCondition}, ${e}`);
+                resolve({
+                    "error": {
+                        message: e.message,
+                        name: e.name,
+                        stack: e.stack,
+                        input: this.input
+                    }
+                });
+            }
+
+            const checkTimeout = () => {
+                if (Date.now() - startTime >= timeout) {
+                    this.removeDataChangeCallback('/');
+                    this.logger.debug(`wait condition ${waitCondition} timed out in ${timeout}ms`);
+                    resolve({
+                        "error": {
+                            message: `wait condition ${waitCondition} timed out in ${timeout}ms`,
+                            output: JSON.parse(StatedREPL.stringify(this.output)) // deep copy
+                        }
+                    });
+                } else {
+                    timeoutId = setTimeout(checkTimeout, 100);  // save timer id so we can cancel it later
+                }
+            };
+
+            let checkConditionCallback = async (data, jsonPtr) => {
+                let matchedCondition = await conditionExpression.evaluate(this.output);
+                if (matchedCondition===true) {
+                    this.removeDataChangeCallback('/');
+                    clearTimeout(timeoutId);  // Clear the timeout when condition is met
+                    this.logger.debug(`received data change matching ${waitCondition} for ${jsonPtr} with data ${data}`);
+                    resolve(JSON.parse(StatedREPL.stringify(this.output))); // deep copy
+                } else {
+                    this.logger.debug(`received data change not matching ${waitCondition} for ${jsonPtr} with data ${data}`);
+                }
+            };
+
+            checkConditionCallback = checkConditionCallback.bind(this);
+            const callbackIsSet = this.setDataChangeCallback("/", checkConditionCallback);
+            if(callbackIsSet === false){
+                clearTimeout(timeoutId);
+                resolve({"error": {
+                    message: "can't use wait condition because a callback is already set"
+                }});
+            }
+
+            //execute the callback once to evaluate if the condition is already met
+            if (this.isInitializing === false) {
+                checkConditionCallback({}, "/");
+            }
+
+            timeoutId = setTimeout(checkTimeout, 100);  // Assign the timeout ID here
+        });
     }
 
     private async localImport(filePathInPackage) {
@@ -1138,6 +1222,5 @@ export default class TemplateProcessor {
         }
         return content;
     }
-
 }
 

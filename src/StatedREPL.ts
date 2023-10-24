@@ -51,6 +51,7 @@ export default class StatedREPL {
             ["log", "set the log level [debug, info, warn, error]"],
             ["debug", "set debug commands (WIP)"],
             ["errors", "return an error report"],
+            ["wait", '-w jsonataCondition -t 1000 to wait for the condition to return true within 1000ms'],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;

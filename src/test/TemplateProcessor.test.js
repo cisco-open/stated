@@ -21,6 +21,7 @@ import {fileURLToPath} from 'url';
 import {dirname} from 'path';
 import MetaInfoProducer from "../../dist/src/MetaInfoProducer.js";
 import jsonata from "jsonata";
+import StatedREPL from "../../dist/src/StatedREPL.js";
 
 
 test("test 1", async () => {
@@ -30,9 +31,13 @@ test("test 1", async () => {
     });
     await tp.initialize();
     const received = [];
-    tp.setDataChangeCallback("/a", (data, jsonPtr) => {
+    expect(tp.setDataChangeCallback("/a", (data, jsonPtr) => {
         received.push({data, jsonPtr})
-    });
+    })).toBe(true);
+    // can't set data change a
+    expect(tp.setDataChangeCallback("/a", (data, jsonPtr) => {
+        received.push({data, jsonPtr})
+    })).toBe(false);
     tp.setDataChangeCallback("/b", (data, jsonPtr) => {
         received.push({data, jsonPtr})
     });
@@ -901,39 +906,53 @@ test("Solution Environment Files", async () => {
     expect(tp.output).toEqual(expected);
 });
 
-test("remove all DEFAULT_FUNCTIONS", async () => {
-    let template = {"fetchFunctionShouldNotExists": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    TemplateProcessor.DEFAULT_FUNCTIONS = {};
-    const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    expect(tp.output).toStrictEqual({
-        "fetchFunctionShouldNotExists": {
-            "error": {
-                "message": "Attempted to invoke a non-function",
-                "name": "JSONata evaluation exception"
+describe("Testing DEFAULT_FUNCTIONS manipulation", () => {
+    let originalDefaultFunctions;
+
+    beforeEach(() => {
+        // Save the global variable before the test
+        originalDefaultFunctions = TemplateProcessor.DEFAULT_FUNCTIONS;
+    });
+
+    afterEach(() => {
+        // Restore the global variable after the test
+        TemplateProcessor.DEFAULT_FUNCTIONS = originalDefaultFunctions;
+    });
+
+    test("remove all DEFAULT_FUNCTIONS", async () => {
+        let template = {"fetchFunctionShouldNotExists": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+        TemplateProcessor.DEFAULT_FUNCTIONS = {};
+        const tp = new TemplateProcessor(template);
+        await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "fetchFunctionShouldNotExists": {
+                "error": {
+                    "message": "Attempted to invoke a non-function",
+                    "name": "JSONata evaluation exception"
+                }
             }
-        }
+        });
+    });
+
+    test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
+        let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+        TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
+        const tp = new TemplateProcessor(template);
+        await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "fetchFunctionBecomesHello": "hello"
+        })
     });
 });
 
-test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
-    let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
-    const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    expect(tp.output).toStrictEqual({
-        "fetchFunctionBecomesHello": "hello"
-    })
-});
-
-test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
-    let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    const tp = new TemplateProcessor(template, {fetch: () => "hello"});
-    await tp.initialize();
-    expect(tp.output).toStrictEqual({
-        "fetchFunctionBecomesHello": "hello"
-    })
-});
+    test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
+        let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
+        const tp = new TemplateProcessor(template, {fetch: () => "hello"});
+        await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "fetchFunctionBecomesHello": "hello"
+        })
+    });
 
 test("strict.refs", async () => {
     let template = {
@@ -1217,24 +1236,9 @@ test("deep view", async () => {
 
 test("test rxLog", async () => {
     const templateYaml =
-    `# to run this locally you need to have pulsar running in standalone mode
-    interval$: ($subscribe(subscribeParams); $setInterval(function(){$publish(pubParams)}, 1000))
-    pubParams:
-      type: /\${ subscribeParams.type} #pub to same type we subscribe on
-      data: "\${ function(){  {'msg': 'hello', 'rando': $random()}}  }"
-      testData: [ {'msg':'hello'} ]
-      client:
-        type: test
-    subscribeParams: #parameters for subscribing to a cloud event
-      source: cloudEvent
-      type: 'my-topic'
-      to: \${ function($e){$set('/rxLog/-', $e)}  }
-      subscriberId: dingus
-      initialPosition: latest
-      client:
-        type: test
+    `
     rxLog: [ {"default": 42} ]
-    stop$: ($count(rxLog)=5?$clearInterval(interval$):'still going')
+    stop$: ($count(rxLog)=5?'done':'still going')
     `;
     const template = yaml.load(templateYaml);
     const tp = new TemplateProcessor(template, {"subscribe": ()=>{}, "publish":()=>{}});
@@ -1357,10 +1361,9 @@ test("ex14.yaml", async () => {
     expect(tp.to('/counter')).toEqual(    [
         "/counter"
     ]);
-
 });
-describe('TemplateProcessor.fromString', () => {
 
+describe('TemplateProcessor.fromString', () => {
     it('should correctly identify and parse JSON string', () => {
         const jsonString = '{"key": "value"}';
         const instance = TemplateProcessor.fromString(jsonString);
@@ -1394,10 +1397,7 @@ key: value`;
         expect(instance).toBeInstanceOf(TemplateProcessor);
         expect(instance.output).toEqual({ greeting: "Hello: World" });
     });
-
-
 });
-
 
 test("test /__META__/tags callback ", async () => {
     const tp = new TemplateProcessor({
@@ -1429,8 +1429,6 @@ test("test /__META__/tags callback ", async () => {
         }
     ]);
 });
-
-
 
 test("test /__META__/tags array callback ", async () => {
     const tp = new TemplateProcessor({
@@ -1528,11 +1526,53 @@ test("test array with /__META__/tags callback ", async () => {
 });
 
 
+test("wait condition", async () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const yamlFilePath = path.join(__dirname, '..','..','example', 'ex14.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    const t = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(t);
+    await tp.initialize();
+    let conditionMatched = await tp.waitCondition('status$="done"', 500);
+    expect(StatedREPL.stringify(conditionMatched)).toEqual(StatedREPL.stringify({
+        "incr$": "{function:}",
+        "counter": 11,
+        "upCount$": "--interval/timeout--",
+        "status$": "done"
+    }));
+});
 
+test("wait condition timeout", async () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const yamlFilePath = path.join(__dirname, '..','..','example', 'ex14.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    const t = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(t);
+    await tp.initialize();
+    let conditionMatched = await tp.waitCondition('status$="done"', 50);
+    expect(StatedREPL.stringify(conditionMatched)).toEqual(StatedREPL.stringify({
+        "error": {
+            "message": "wait condition status$=\"done\" timed out in 50ms",
+            "output": {
+                "incr$": "{function:}",
+                "counter": 9,
+                "upCount$": "--interval/timeout--",
+                "status$": "counting"
+            }
+        }
+    }));
+});
 
-
-
-
-
-
-
+test("wait condition with commomCallback already set", async () => {
+    const tp = new TemplateProcessor({});
+    tp.setDataChangeCallback("/", (data, jsonPtr) => {});
+    await tp.initialize();
+    let conditionMatched = await tp.waitCondition('status$="done"', 500);
+    expect(StatedREPL.stringify(conditionMatched)).toEqual(StatedREPL.stringify({
+        "error": {
+            "message": "can't use wait condition because a callback is already set",
+        }
+    }));
+});

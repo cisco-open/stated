@@ -75,6 +75,12 @@ export function runMarkdownTests(testData, cliInstance, printFunction = StatedRE
 
       if (jsonataExpr) {
         const compiledExpr = jsonata(jsonataExpr);
+        const result = await compiledExpr.evaluate(responseNormalized);
+        if (result !== true) {
+          // If the result is not true, throw an error with details
+          throw new Error(`JSONata Test Failed: Expected JSONata expression to evaluate to true.\nExpression: ${jsonataExpr}\nResponse: ${JSON.stringify(responseNormalized, null, 2)}\nEvaluation result: ${result}`);
+        }
+        expect(result).toBe(true);
         expect(await compiledExpr.evaluate(responseNormalized)).toBe(true);
       } else {
         const expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;

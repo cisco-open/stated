@@ -34,10 +34,7 @@ test("test stringify custom print function", async () => {
 /** Test that the onInit function is called when the .init command is called */
 test("test onInit", async () => {
   const repl1 = new StatedREPL();
-  await repl1.initialize();
-
   const repl2 = new StatedREPL();
-  await repl2.initialize();
 
   let beenCalled1 = false;
   repl1.cliCore.onInit = () => { beenCalled1 = true;}
@@ -52,5 +49,22 @@ test("test onInit", async () => {
 });
 
 
+test("test wait condition", async () => {
+  const repl = new StatedREPL();
 
+  await repl.cliCore.init('-f "example/ex01.yaml"');
+  const result = await repl.cliCore.wait(`-w 'c="the answer is: 42" -t 50`);
+  expect(StatedREPL.stringify(result)).toBe(StatedREPL.stringify({
+    "a": 42,
+    "b": 42,
+    "c": "the answer is: 42"
+  }));
+});
 
+test("test wait condition timeout", async () => {
+  const repl = new StatedREPL();
+
+  await repl.cliCore.init('-f "example/ex14.yaml"');
+  const result = await repl.cliCore.wait(`-w 'status$="done" -t 10`);
+  expect(result.error.message).toBe("wait condition status$=\"done\" timed out in 10ms");
+});

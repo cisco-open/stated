@@ -96,7 +96,7 @@ export default class CliCore {
         return path.join(process.cwd(), filepath);
     }
 
-    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
+    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json -w jsonataExpression -t 1000
     async init(replCmdInputStr) {
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
         const {filepath, tags,oneshot, options, xf:contextFilePath, importPath} = parsed;
@@ -112,20 +112,8 @@ export default class CliCore {
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
 
-        if (oneshot === true) {
-            await this.templateProcessor.initialize();
-            return this.templateProcessor.output;
-        } else {
-            try {
-                await this.templateProcessor.initialize();
-                return this.templateProcessor.input;
-            } catch (error) {
-                return {
-                    name: error.name,
-                    message: error.message
-                };
-            }
-        }
+        await this.templateProcessor.initialize();
+        return await this.wait(replCmdInputStr);
     }
 
 
@@ -237,6 +225,19 @@ export default class CliCore {
             throw new Error('Initialize the template first.');
         }
         return this.templateProcessor.errorReport;
+    }
+
+    // .wait -w jsonataExpression -t 1000
+    async wait(replCmdInputStr) {
+        if (!this.templateProcessor) {
+            throw new Error('Initialize the template first.');
+        }
+        const parsed = CliCore.parseInitArgs(replCmdInputStr);
+        let { w: waitCondition, t: timeout } = parsed;
+
+        if (!waitCondition) return this.templateProcessor.input;
+
+        return await this.templateProcessor.waitCondition(waitCondition, timeout);
     }
 }
 

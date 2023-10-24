@@ -249,18 +249,19 @@ fact that State-js is written using ES Module syntax.
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command  | Description                                              | flags & args                                                                                                                             | Example                                                                                                                                      |
-|----------|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `.init`  | Initialize the template from a JSON file.                | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates` |
-| `.set`   | Set data to a JSON pointer path.                         | `<path> <data>`                                                                                                                          | `.set /to "jsonata"`                                                                                                                         |
-| `.from`  | Show the dependents of a given JSON pointer.             | `<path>`                                                                                                                                 | `.from /a`                                                                                                                                   |
-| `.to`    | Show the dependencies of a given JSON pointer.           | `<path>`                                                                                                                                 | `.to /b`                                                                                                                                     |
-| `.in`    | Show the input template.                                 | `None`                                                                                                                                   | `.in`                                                                                                                                        |
-| `.out`   | Show the current state of the template.                  | `[<jsonPtr>]`                                                                                                                            | `.out` <br>`.out /data/accounts`                                                                                                             |
-| `.state` | Show the current state of the template metadata.         | `None`                                                                                                                                   | `.state`                                                                                                                                     |
-| `.plan`  | Show the execution plan for rendering the template.      | `None`                                                                                                                                   | `.plan`                                                                                                                                      |
-| `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                                                              | `.note "Example 8"`                                                                                                                          |
-| `.log`   | Set the logging level                                    | `[silent, error, warn, info, verbose, debug]`                                                                                            | `.log silent`                                                                                                                                |
+| Command  | Description                                              | flags & args                                                                                                                                                                                                                    | Example                                                                                                                                      |
+|----------|----------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.                | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` <br> &bull; `-w 'waitConditionJsonata'` <br> &bull; `-t 'conditionWaitTimeoutMs'` <br> | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates` |
+| `.set`   | Set data to a JSON pointer path.                         | `<path> <data>`                                                                                                                                                                                                                 | `.set /to "jsonata"`                                                                                                                         |
+| `.from`  | Show the dependents of a given JSON pointer.             | `<path>`                                                                                                                                                                                                                        | `.from /a`                                                                                                                                   |
+| `.to`    | Show the dependencies of a given JSON pointer.           | `<path>`                                                                                                                                                                                                                        | `.to /b`                                                                                                                                     |
+| `.in`    | Show the input template.                                 | `None`                                                                                                                                                                                                                          | `.in`                                                                                                                                        |
+| `.out`   | Show the current state of the template.                  | `[<jsonPtr>]`                                                                                                                                                                                                                   | `.out` <br>`.out /data/accounts`                                                                                                             |
+| `.state` | Show the current state of the template metadata.         | `None`                                                                                                                                                                                                                          | `.state`                                                                                                                                     |
+| `.plan`  | Show the execution plan for rendering the template.      | `None`                                                                                                                                                                                                                          | `.plan`                                                                                                                                      |
+| `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                                                                                                                                                     | `.note "Example 8"`                                                                                                                          |
+| `.log`   | Set the logging level                                    | `[silent, error, warn, info, verbose, debug]`                                                                                                                                                                                   | `.log silent`                                                                                                                                |
+| `.wait`  | Wait for jsonata condition to occur in the template.     | &bull; `-w 'waitConditionJsonata'` <br> &bull; `-t 'conditionWaitTimeoutMs'` <br>                                                                                                                                               | `.wait -w foo=bar -t 1500`                                                                                                                   |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -1545,6 +1546,30 @@ This can be combined with the `--importPath` option to import files relative to 
   "res": "bar: foo"
 }
 ```
+## Waiting for a Jsonata Condition
+To wait for a specific condition to become true, use -w option and an optional timeout (default is 10s). 
+```json ["error.output.status$=\"counting\"", "status$=\"done\""]
+> .init -f example/ex14.yaml -w 'status$="done"' -t 10
+{
+  "error": {
+    "message": "wait condition status$=\"done\" timed out in 10ms",
+    "output": {
+      "incr$": "{function:}",
+      "counter": 9,
+      "upCount$": "--interval/timeout--",
+      "status$": "counting"
+    }
+  }
+}
+> .init -f example/ex14.yaml -w 'status$="done"' -t 150
+{
+   "incr$": "{function:}",
+   "counter": 11,
+   "upCount$": "--interval/timeout--",
+   "status$": "done"
+}
+```
+
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
 Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 
