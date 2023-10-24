@@ -121,7 +121,8 @@ export default class TemplateProcessor {
 
     private tempVars:JsonPointerString[];
 
-
+    /** Allows caller to set a callback to propagate initialization into their framework */
+    public onInit: () => void;
 
     constructor(template={}, context = {}, options={}) {
         this.uniqueId = Math.random()*1e6;
@@ -154,6 +155,9 @@ export default class TemplateProcessor {
         this.tempVars = [];
     }
     public async initialize(template = this.input, jsonPtr = "/") {
+        if (this.onInit) {
+            await this.onInit();
+        }
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;

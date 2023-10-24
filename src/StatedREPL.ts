@@ -27,7 +27,7 @@ export default class StatedREPL {
         const {oneshot} = CliCore.parseInitArgs(cmdLineArgsStr)
         const resp = await this.cliCore.init(cmdLineArgsStr)
         if(oneshot){
-            console.log(resp);
+            console.log(StatedREPL.stringify(resp));
             return; //do not start REPL. We produced oneshot output, now bail
         }
         //crank up the interactive REPL
@@ -113,8 +113,8 @@ export default class StatedREPL {
         return value;
     }
 
-    static stringify(o){
-        return JSON.stringify(o, StatedREPL.printFunc, 2)
+    static stringify(o, printFunction=StatedREPL.printFunc){
+        return JSON.stringify(o, printFunction, 2)
     }
 
 }
