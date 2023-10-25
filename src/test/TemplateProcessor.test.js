@@ -1346,8 +1346,47 @@ test("ex14.yaml", async () => {
         "/counter"
     ]);
 
+});
+describe('TemplateProcessor.fromString', () => {
+
+    it('should correctly identify and parse JSON string', () => {
+        const jsonString = '{"key": "value"}';
+        const instance = TemplateProcessor.fromString(jsonString);
+        expect(instance).toBeInstanceOf(TemplateProcessor);
+        expect(instance.output).toEqual({ key: "value" });  // Assuming parsedObject is publicly accessible
+    });
+
+    it('should correctly identify and parse YAML string using ---', () => {
+        const yamlString = `---
+key: value`;
+        const instance = TemplateProcessor.fromString(yamlString);
+        expect(instance).toBeInstanceOf(TemplateProcessor);
+        expect(instance.output).toEqual({ key: "value" });
+    });
+
+    it('should correctly identify and parse YAML string using colon', () => {
+        const yamlString = `key: value`;
+        const instance = TemplateProcessor.fromString(yamlString);
+        expect(instance).toBeInstanceOf(TemplateProcessor);
+        expect(instance.output).toEqual({ key: "value" });
+    });
+
+    it('should throw an error for unknown formats', () => {
+        const unknownString = `Hello World`;
+        expect(() => TemplateProcessor.fromString(unknownString)).toThrow("Unknown format");
+    });
+
+    it('should not misinterpret colon in JSON string', () => {
+        const jsonString = '{"greeting": "Hello: World"}';
+        const instance = TemplateProcessor.fromString(jsonString);
+        expect(instance).toBeInstanceOf(TemplateProcessor);
+        expect(instance.output).toEqual({ greeting: "Hello: World" });
+    });
+
 
 });
+
+
 
 
 

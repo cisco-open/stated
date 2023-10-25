@@ -142,7 +142,7 @@ export default class TemplateProcessor {
             if (inferredType === "JSON") {
                 parsedObject = JSON.parse(template);
             } else if (inferredType === "YAML") {
-                parsedObject = yaml.safeLoad(template);
+                parsedObject = yaml.load(template);
             } else {
                 throw new Error("Unknown format");
             }
