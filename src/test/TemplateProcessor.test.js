@@ -1298,6 +1298,59 @@ test("example from README explaining plans", async () => {
 
 });
 
+test("ex14.yaml", async () => {
+
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const yamlFilePath = path.join(__dirname, '..','..','example', 'ex14.yaml');
+    const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
+    const template = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(template, {});
+    await tp.initialize();
+    expect(await tp.getEvaluationPlan()).toEqual([
+        "/incr$",
+        "/upCount$",
+        "/status$"
+    ]);
+    expect(tp.to('/status$')).toEqual([
+        "/counter",
+        "/incr$",
+        "/upCount$",
+        "/status$"
+    ]);
+    expect(tp.to('/upCount$')).toEqual([
+        "/counter",
+        "/incr$",
+        "/upCount$"
+    ]);
+    expect(tp.from('/incr$')).toEqual([
+        "/incr$"
+    ]);
+    expect(tp.from('/counter')).toEqual([
+            "/counter",
+            "/status$"
+        ]
+    );
+    expect(tp.from('/upCount$')).toEqual([
+        "/upCount$",
+        "/status$"
+    ]);
+    expect(tp.from('/status$')).toEqual([
+        "/status$"
+    ]);
+    expect(tp.to('/incr$')).toEqual([
+        "/counter",
+        "/incr$"
+    ]);
+    expect(tp.to('/counter')).toEqual(    [
+        "/counter"
+    ]);
+
+
+});
+
+
+
 
 
 
