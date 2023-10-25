@@ -124,6 +124,33 @@ export default class TemplateProcessor {
     /** Allows caller to set a callback to propagate initialization into their framework */
     public onInit: () => void;
 
+    public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
+            let inferredType: "JSON" | "YAML" | "UNKNOWN" = "UNKNOWN";
+
+            // Check for JSON
+            if (template.trim().startsWith('{') || template.trim().startsWith('[')) {
+                inferredType = "JSON";
+            }
+            // Check for YAML
+            else if (template.includes('---') || /[^":]\s*:\s*[^"]/g.test(template)) {
+                inferredType = "YAML";
+            }
+
+            let parsedObject;
+
+            // Based on the inferred type, parse the string
+            if (inferredType === "JSON") {
+                parsedObject = JSON.parse(template);
+            } else if (inferredType === "YAML") {
+                parsedObject = yaml.safeLoad(template);
+            } else {
+                throw new Error("Unknown format");
+            }
+
+            // Return an instance of TemplateProcessor with the parsed object
+            return new TemplateProcessor(parsedObject, context, options);
+    }
+
     constructor(template={}, context = {}, options={}) {
         this.uniqueId = Math.random()*1e6;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
@@ -946,6 +973,7 @@ export default class TemplateProcessor {
         const dependents:MetaInfo[] = [];
         const queue:JsonPointerString[] = [jsonPtr];
         const visited:Set<JsonPointerString> = new Set();
+        const origin = jsonPtr;
 
         //----------------- utility functions ----------------//
         const queueParent = (jsonPtr)=>{
@@ -1000,7 +1028,11 @@ export default class TemplateProcessor {
                 continue;
             }
             const metaInf = jp.get(this.templateMeta, currentPtr);
-            if(metaInf.expr__ !== undefined){
+            const isFunction = metaInf.data__?._jsonata_lambda;
+            if(isFunction){
+                continue; //function never gets re-evaluated
+            }
+            if(currentPtr !== origin && metaInf.expr__ !== undefined){
                 dependents.push(metaInf);
             }
             queueDependees(metaInf); //these are EXPLICIT dependees
