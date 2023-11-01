@@ -580,7 +580,7 @@ export default class TemplateProcessor {
     private cacheTmpVarLocations(metaInfos:MetaInfo[]):JsonPointerString[]{
         const tmpVars = [];
         metaInfos.forEach(metaInfo => {
-            if (metaInfo.temp__) {
+            if (metaInfo.temp__ === true) {
                 tmpVars.push(metaInfo.jsonPointer__);
             }
         })
@@ -588,7 +588,11 @@ export default class TemplateProcessor {
     }
 
     private removeTemporaryVariables(tmpVars:JsonPointerString[]): void{
-        tmpVars.forEach(jsonPtr=>jp.remove(this.output, jsonPtr));
+        tmpVars.forEach(jsonPtr=>{
+            if(jp.has(this.output, jsonPtr)) {
+                jp.remove(this.output, jsonPtr)
+            }
+        });
     }
 
 

@@ -978,7 +978,11 @@ test("remove temp vars 1", async () => {
             "b1": 10,
             "b2": "!${b1}",
         },
-        "c": "!${a}"
+        "c": "!${a}",
+        "d!": {
+            "b1": 10,
+            "b2": "!/${b}",
+        },
     };
     const tp = new TemplateProcessor(template, {});
     await tp.initialize()

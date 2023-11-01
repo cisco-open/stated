@@ -40,7 +40,7 @@ export default class MetaInfoProducer {
         const stack: MetaInfo[] = [];
         const emit: MetaInfo[] = [];
 
-        async function getPaths(o, path: JsonPointerStructureArray = []) {
+        async function getPaths(o, path: JsonPointerStructureArray = [], isTemp=false) {
             const type = typeof o;
             const metaInfo: MetaInfo = {
                 "materialized__": true,
@@ -50,7 +50,8 @@ export default class MetaInfoProducer {
                 "absoluteDependencies__": [],
                 "treeHasExpressions__": false,
                 "tags__": new Set(),
-                "parent__": jp.parent(path)
+                "parent__": jp.parent(path),
+                "temp__": isTemp
             };
             stack.push(metaInfo);
             if (Array.isArray(o)) {
@@ -60,9 +61,10 @@ export default class MetaInfoProducer {
                 }
             } else if (type === 'object') {
                 for (const key in o) {
+                    const _isTemp = key.endsWith('!');
                     const v = o[key];
                     const nextPath = path.concat(key);
-                    await getPaths(v, nextPath);
+                    await getPaths(v, nextPath, _isTemp);
                 }
             } else {
                 const match = MetaInfoProducer.EMBEDDED_EXPR_REGEX.exec(o);
@@ -80,15 +82,14 @@ export default class MetaInfoProducer {
                 if (hasExpression) {
                     stack[stack.length - 1] = {
                         ...metaInfo,
-                        "materialized__": true,
                         "exprRootPath__": slashOrCdUp,
                         "expr__": expr,
-                        "jsonPointer__": path,
                         "exprTargetJsonPointer__": jp.parent(path)
                     };
                     if (tag) {
                         stack[stack.length - 1].tags__.add(tag);
                     }
+                    //if the expression is like '! /${...}'
                     if (exclamationPoint) {
                         stack[stack.length - 1].temp__ = true
                     }

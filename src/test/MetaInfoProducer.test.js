@@ -20,6 +20,7 @@ test("tt1", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -35,6 +36,7 @@ test("tt1", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -50,6 +52,7 @@ test("tt1", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -60,6 +63,7 @@ test("tt1", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         }
     ]);
@@ -88,6 +92,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -100,6 +105,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -115,6 +121,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -130,6 +137,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -145,6 +153,7 @@ test("t2", async () => {
                 "e"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -165,6 +174,7 @@ test("t2", async () => {
                 "e"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -177,6 +187,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -187,6 +198,7 @@ test("t2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         }
     ]);
@@ -241,6 +253,7 @@ test("t3", async () => {
             "tags__": [
                 "INSTALL"
             ],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -253,6 +266,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -265,6 +279,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -280,6 +295,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -295,6 +311,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -310,6 +327,7 @@ test("t3", async () => {
                 "e"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -330,6 +348,7 @@ test("t3", async () => {
                 "e"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -342,6 +361,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -357,6 +377,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -369,6 +390,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -389,6 +411,7 @@ test("t3", async () => {
                 "j"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -409,6 +432,7 @@ test("t3", async () => {
                 "j"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -432,6 +456,7 @@ test("t3", async () => {
                 2
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -455,6 +480,7 @@ test("t3", async () => {
                 2
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -470,6 +496,7 @@ test("t3", async () => {
                 "j"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -485,6 +512,7 @@ test("t3", async () => {
                 "j"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -500,6 +528,7 @@ test("t3", async () => {
                 "j"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -512,6 +541,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -529,6 +559,7 @@ test("t3", async () => {
                 "z"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -544,6 +575,7 @@ test("t3", async () => {
                 "k"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -564,6 +596,7 @@ test("t3", async () => {
                 "k"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -576,6 +609,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -591,6 +625,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -601,6 +636,7 @@ test("t3", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         }
     ]);
@@ -636,6 +672,7 @@ test("temp vars 1", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         }
     ]);
@@ -653,9 +690,12 @@ test("temp vars 2", async () => {
                 "b6":"  !  /${b.b3+b.b2}",
                 "b7":"  !/${b.b3+b.b2}",
                 "b8":" !  ../${b3+b2}",
+            },
+            "b5!":{ //should be marked as temporary
+                "nozzle":42
             }
         },
-        "c": "${b4}"
+        "c": "${b4}" //non-existant node reference
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
@@ -669,6 +709,7 @@ test("temp vars 2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -684,6 +725,7 @@ test("temp vars 2", async () => {
                 "b"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": false
         },
         {
@@ -837,7 +879,42 @@ test("temp vars 2", async () => {
                 "b"
             ],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b",
+                "b5!",
+                "nozzle"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "b",
+                "b5!"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b",
+                "b5!"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "b"
+            ],
+            "tags__": [],
+            "temp__": true,
+            "treeHasExpressions__": false
         },
         {
             "absoluteDependencies__": [],
@@ -849,6 +926,7 @@ test("temp vars 2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -864,6 +942,7 @@ test("temp vars 2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         },
         {
@@ -874,8 +953,169 @@ test("temp vars 2", async () => {
             "materialized__": true,
             "parent__": [],
             "tags__": [],
+            "temp__": false,
             "treeHasExpressions__": true
         }
     ]);
 });
+
+test("temp vars 3", async () => {
+    const template = {
+        "a": 42,
+        "b": {
+            "b1": 10,
+            "b2": "!${b1}",
+        },
+        "c": "!${a}",
+        "d!": {
+            "b1": 10,
+            "b2": "!/${b}",
+        }
+    };
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "a"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b",
+                "b1"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "b"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "exprRootPath__": null,
+            "exprTargetJsonPointer__": [
+                "b"
+            ],
+            "expr__": "b1",
+            "jsonPointer__": [
+                "b",
+                "b2"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "b"
+            ],
+            "tags__": [],
+            "temp__": true,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
+            "expr__": "a",
+            "jsonPointer__": [
+                "c"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": true,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "d!",
+                "b1"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "d!"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "exprRootPath__": "/",
+            "exprTargetJsonPointer__": [
+                "d!"
+            ],
+            "expr__": "b",
+            "jsonPointer__": [
+                "d!",
+                "b2"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "d!"
+            ],
+            "tags__": [],
+            "temp__": true,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "d!"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": true,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        }
+    ]);
+});
+
+
 

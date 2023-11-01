@@ -395,24 +395,26 @@ elements like this, where there is no field name. For array elements the `${}` m
 [1, 2, "${$[0]+$[1]}"]
 ```
 ### Temporary Expressions
-The `!` symbol is used mark an expression's field as temporary. Temporary fields are removed from the output. 
-Notice how /b and /c/c1 are removed from the output.
+The `!` symbol is used mark fields as temporary. The `!` can be used both as a prefix to the expression, and as a suffix
+to a key. Temporary fields are removed from the output. 
+Notice how /b and /c! are removed from the output. Also notice that when an expression like ```${`c!`.c1}``` refers to `c!` 
+that backtics must be used.
 ```json
 > .init -f "example/tempVars.json"
 {
-  "a": "42",
-  "b": "!${a}",
-  "c": {
-    "c1": "!../${b}"
-  },
-  "d": "${c.c1}"
+   "a": 42,
+   "b": "!${a}",
+   "c!": {
+      "c1": "../${a + 1}"
+   },
+   "d": "${`c!`.c1}"
 }
 > .out
 {
-  "a": "42",
-  "c": {},
-  "d": "42"
+   "a": 42,
+   "d": 43
 }
+
 
 ```
 ### References
