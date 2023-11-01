@@ -124,6 +124,7 @@ export default class TemplateProcessor {
     /** Allows caller to set a callback to propagate initialization into their framework */
     public onInit: () => void;
 
+
     public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
             let inferredType: "JSON" | "YAML" | "UNKNOWN" = "UNKNOWN";
 
@@ -208,7 +209,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            let metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
@@ -412,15 +413,15 @@ export default class TemplateProcessor {
 
         let metaInfos = initialMetaInfos.reduce((acc, metaInfo) => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
-            metaInfo.parentJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
+            metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
             const cdUpPath = metaInfo.exprRootPath__;
 
             if (cdUpPath) {
                 const cdUpParts = cdUpPath.match(/\.\.\//g);
                 if (cdUpParts) {
-                    metaInfo.parentJsonPointer__ = metaInfo.parentJsonPointer__.slice(0, -cdUpParts.length);
+                    metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
                 } else if (cdUpPath.match(/^\/$/g)) {
-                    metaInfo.parentJsonPointer__ = [];
+                    metaInfo.exprTargetJsonPointer__ = [];
                 } else {
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;
@@ -466,7 +467,7 @@ export default class TemplateProcessor {
     private populateTemplateMeta(metaInfos) {
         metaInfos.forEach(meta => {
             const initialDependenciesPathParts = this.removeLeadingDollarsFromDependencies(meta);
-            meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.parentJsonPointer__, initialDependenciesPathParts);
+            meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.exprTargetJsonPointer__, initialDependenciesPathParts);
             meta.dependencies__ = initialDependenciesPathParts;
             //so if we will never allow replacement of the entire root document. But modulo that if-statement we can setup the templateMeta
             if (meta.jsonPointer__.length > 0) {
@@ -481,22 +482,29 @@ export default class TemplateProcessor {
     private static compileToJsonPointer(meta) {
         meta.absoluteDependencies__ = [...new Set(meta.absoluteDependencies__.map(jp.compile))];
         meta.dependencies__ = meta.dependencies__.map(jp.compile);
-        meta.parentJsonPointer__ = jp.compile(meta.parentJsonPointer__);
+        meta.exprTargetJsonPointer__ = jp.compile(meta.exprTargetJsonPointer__);
         meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
+        meta.parent__ = jp.compile(meta.parent__);
     }
 
     private setupDependees(metaInfos) {
         metaInfos.forEach(i => {
             i.absoluteDependencies__?.forEach(ptr => {
                 if (!jp.has(this.templateMeta, ptr)) {
-                    jp.set(this.templateMeta, ptr, {
+                    const parent = jp.parent(ptr);
+                    const  nonMaterialized = {
                         "materialized__": false,
                         "jsonPointer__": ptr,
-                        "dependees__": [],
-                        "dependencies__": [],
-                        "absoluteDependencies__": [],
-                        "tags__": new Set()
-                    });
+                        "dependees__": [], //a non-materialized node has a dependency on the parent node
+                        "dependencies__": [], //we are passed the phase where dependencies have been converted to absolute so we can skip populating this
+                        "absoluteDependencies__": [], //parent.length===0?[]:[parent], //empty parent is root document; tracking dep's on root is silly
+                        "tags__": new Set<string>(),
+                        "treeHasExpressions__": false,
+                        parent__: parent
+                    };
+                    jp.set(this.templateMeta, ptr, nonMaterialized);
+                    metaInfos.push(nonMaterialized); //create metaInfos node for non-materialized node
+
                 }
                 const meta = jp.get(this.templateMeta, ptr);
                 //so there is still the possibility that the node in the templateMeta existed, but it was just created
@@ -504,13 +512,20 @@ export default class TemplateProcessor {
                 //result in 2 empty intermediate array objects. And then someone can have a dependency on /view/0 or
                 ///view/0/0 neither of which would have had their metadata properly defaulted
                 if(meta.jsonPointer__ === undefined){
-                    meta.materialized__ = false;
-                    meta.jsonPointer__ = ptr;
-                    meta.dependees__ = [];
-                    meta.dependencies__ = [];
-                    meta.absoluteDependencies__ = [];
-                    meta.tags__ = [];
+                    const parent = jp.parent(ptr);
+                    const  nonMaterialized = {
+                        "materialized__": false,
+                        "jsonPointer__": ptr,
+                        "dependees__": [],
+                        "dependencies__": [],
+                        "absoluteDependencies__": [], //parent.length===0?[]:[parent],
+                        "tags__": new Set<string>(),
+                        "treeHasExpressions__": false,
+                        parent__: parent
+                    };
+                    merge(meta, nonMaterialized);
                 }
+
                 meta.dependees__.push(i.jsonPointer__);
             });
         });
@@ -624,7 +639,7 @@ export default class TemplateProcessor {
                 }
             }
         }
-        const searchUpForExpression = (childNode)=> {
+        const searchUpForExpression = (childNode):MetaInfo=> {
             let pathParts = jp.parse(childNode.jsonPointer__);
             while (pathParts.length > 1) {
                 pathParts = pathParts.slice(0, -1); //get the parent expression
@@ -899,10 +914,10 @@ export default class TemplateProcessor {
 
     private async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, callback__, parentJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
+        const {compiledExpr__, callback__, exprTargetJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
         let target;
         try {
-            target = jp.get(this.output, parentJsonPointer__); //an expression is always relative to a target
+            target = jp.get(this.output, exprTargetJsonPointer__); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
             evaluated = await compiledExpr__.evaluate(
                 target,
@@ -978,13 +993,10 @@ export default class TemplateProcessor {
         //----------------- utility functions ----------------//
         const queueParent = (jsonPtr)=>{
             //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
-            const parts = jp.parse(jsonPtr);
-            if(parts.length>1) {
-                const _parentPointer = jp.compile(parts.slice(0, parts.length - 1));
-                if (!visited.has(_parentPointer)) {
-                    queue.push(_parentPointer);
-                    visited.add(_parentPointer);
-                }
+            const parentPointer = jp.parent(jsonPtr);//jp.compile(parts.slice(0, parts.length - 1));
+            if (parentPointer !== '' && !visited.has(parentPointer)) {
+                queue.push(parentPointer);
+                visited.add(parentPointer);
             }
         }
 

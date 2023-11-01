@@ -19,6 +19,7 @@ import fs from 'fs';
 import yaml from 'js-yaml';
 import {fileURLToPath} from 'url';
 import {dirname} from 'path';
+import MetaInfoProducer from "../../dist/src/MetaInfoProducer.js";
 
 
 test("test 1", async () => {
@@ -676,6 +677,12 @@ test("set 0", async () => {
             },
             "bar": "${data.a}"
         });
+    expect(tp.from('/data/a/b/c/bing')).toStrictEqual([
+        "/data/a/b/c/bing",
+        "/data/a/b/c/bang",
+        "/data/a/b/c/boom",
+        "/bar"
+    ]);
     expect(tp.output).toEqual(
         {
             "bar": {

@@ -11,44 +11,54 @@ test("tt1", async () => {
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "a"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "a",
             "jsonPointer__": [
                 "b"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "'the answer is: '& b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         }
@@ -69,50 +79,61 @@ test("t2", async () => {
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "a"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "b"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "$$.a*b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "c-a-b",
             "jsonPointer__": [
                 "d"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -120,37 +141,51 @@ test("t2", async () => {
                 "f"
             ],
             "materialized__": true,
+            "parent__": [
+                "e"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [
+                "e"
+            ],
             "expr__": "e.f",
             "jsonPointer__": [
                 "e",
                 "g"
             ],
             "materialized__": true,
+            "parent__": [
+                "e"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "e"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         }
@@ -192,64 +227,78 @@ test("t3", async () => {
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "  k.z~>|$|{'band':true}|",
             "jsonPointer__": [
                 "x"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [
                 "INSTALL"
             ],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "a"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "b"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "$$.a*b",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "c-a-b",
             "jsonPointer__": [
                 "d"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -257,84 +306,120 @@ test("t3", async () => {
                 "f"
             ],
             "materialized__": true,
+            "parent__": [
+                "e"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "e"
+            ],
             "expr__": "h",
             "jsonPointer__": [
                 "e",
                 "g"
             ],
             "materialized__": true,
+            "parent__": [
+                "e"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "e"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "i",
             "jsonPointer__": [
                 "h"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "i"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "j"
+            ],
             "expr__": "c",
             "jsonPointer__": [
                 "j",
                 0
             ],
             "materialized__": true,
+            "parent__": [
+                "j"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "j"
+            ],
             "expr__": "d",
             "jsonPointer__": [
                 "j",
                 1
             ],
             "materialized__": true,
+            "parent__": [
+                "j"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "j",
+                2
+            ],
             "expr__": "$[1]",
             "jsonPointer__": [
                 "j",
@@ -342,13 +427,22 @@ test("t3", async () => {
                 0
             ],
             "materialized__": true,
+            "parent__": [
+                "j",
+                2
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../../",
+            "exprTargetJsonPointer__": [
+                "j",
+                2
+            ],
             "expr__": "a",
             "jsonPointer__": [
                 "j",
@@ -356,10 +450,15 @@ test("t3", async () => {
                 1
             ],
             "materialized__": true,
+            "parent__": [
+                "j",
+                2
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -367,10 +466,14 @@ test("t3", async () => {
                 2
             ],
             "materialized__": true,
+            "parent__": [
+                "j"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -378,10 +481,14 @@ test("t3", async () => {
                 3
             ],
             "materialized__": true,
+            "parent__": [
+                "j"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -389,20 +496,26 @@ test("t3", async () => {
                 4
             ],
             "materialized__": true,
+            "parent__": [
+                "j"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "j"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -411,10 +524,15 @@ test("t3", async () => {
                 "zz"
             ],
             "materialized__": true,
+            "parent__": [
+                "k",
+                "z"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -422,49 +540,66 @@ test("t3", async () => {
                 "z"
             ],
             "materialized__": true,
+            "parent__": [
+                "k"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [
+                "k"
+            ],
             "expr__": "$.z.zz",
             "jsonPointer__": [
                 "k",
                 "q"
             ],
             "materialized__": true,
+            "parent__": [
+                "k"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "k"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "j",
             "jsonPointer__": [
                 "l"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         }
@@ -478,23 +613,28 @@ test("temp vars 1", async () => {
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "42",
             "jsonPointer__": [
                 "a"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         }
@@ -520,16 +660,19 @@ test("temp vars 2", async () => {
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
     expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "a"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -537,41 +680,63 @@ test("temp vars 2", async () => {
                 "b1"
             ],
             "materialized__": true,
+            "parent__": [
+                "b"
+            ],
             "tags__": [],
             "treeHasExpressions__": false
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [
+                "b"
+            ],
             "expr__": "b1",
             "jsonPointer__": [
                 "b",
                 "b2"
             ],
             "materialized__": true,
+            "parent__": [
+                "b"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [
+                "b"
+            ],
             "expr__": "b2+10",
             "jsonPointer__": [
                 "b",
                 "b3"
             ],
             "materialized__": true,
+            "parent__": [
+                "b"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "b",
+                "b4"
+            ],
             "expr__": "b3+b2",
             "jsonPointer__": [
                 "b",
@@ -579,14 +744,23 @@ test("temp vars 2", async () => {
                 "b5"
             ],
             "materialized__": true,
+            "parent__": [
+                "b",
+                "b4"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "/",
+            "exprTargetJsonPointer__": [
+                "b",
+                "b4"
+            ],
             "expr__": "b.b3+b.b2",
             "jsonPointer__": [
                 "b",
@@ -594,14 +768,23 @@ test("temp vars 2", async () => {
                 "b6"
             ],
             "materialized__": true,
+            "parent__": [
+                "b",
+                "b4"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "/",
+            "exprTargetJsonPointer__": [
+                "b",
+                "b4"
+            ],
             "expr__": "b.b3+b.b2",
             "jsonPointer__": [
                 "b",
@@ -609,14 +792,23 @@ test("temp vars 2", async () => {
                 "b7"
             ],
             "materialized__": true,
+            "parent__": [
+                "b",
+                "b4"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": "../",
+            "exprTargetJsonPointer__": [
+                "b",
+                "b4"
+            ],
             "expr__": "b3+b2",
             "jsonPointer__": [
                 "b",
@@ -624,11 +816,16 @@ test("temp vars 2", async () => {
                 "b8"
             ],
             "materialized__": true,
+            "parent__": [
+                "b",
+                "b4"
+            ],
             "tags__": [],
             "temp__": true,
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
@@ -636,36 +833,46 @@ test("temp vars 2", async () => {
                 "b4"
             ],
             "materialized__": true,
+            "parent__": [
+                "b"
+            ],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [
                 "b"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
             "expr__": "b4",
             "jsonPointer__": [
                 "c"
             ],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         },
         {
+            "absoluteDependencies__": [],
             "dependees__": [],
             "dependencies__": [],
             "jsonPointer__": [],
             "materialized__": true,
+            "parent__": [],
             "tags__": [],
             "treeHasExpressions__": true
         }

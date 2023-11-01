@@ -223,4 +223,10 @@ export default class JSONPointer {
         if (refTokens.length === 0) { return ''; }
         return '/' + refTokens.map(JSONPointer.escape).join('/');
     }
+
+    static parent(pointer){
+        const asArray = Array.isArray(pointer);
+        const refTokens =  Array.isArray(pointer) ? pointer : JSONPointer.parse(pointer);
+        return asArray?refTokens.slice(0,-1):this.compile(refTokens.slice(0,-1));
+    }
 }

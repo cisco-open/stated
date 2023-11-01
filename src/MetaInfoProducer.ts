@@ -1,20 +1,25 @@
 import jsonata from "jsonata";
+import TemplateProcessor from "./TemplateProcessor.js";
+import { default as jp } from './JsonPointer.js';
 
 export interface MetaInfo{
     materialized__:boolean,
     jsonPointer__: JsonPointerStructureArray|JsonPointerString;
+    parent__:JsonPointerStructureArray|JsonPointerString;
     dependees__:JsonPointerStructureArray[]|JsonPointerString[];
     dependencies__:JsonPointerStructureArray[]|JsonPointerString[];
+    absoluteDependencies__:JsonPointerStructureArray[]|JsonPointerString[];
     treeHasExpressions__: boolean;
     tags__:Set<string>;
     exprRootPath__?: string;
     expr__?: string;
     compiledExpr__?: jsonata.Expression;
     temp__?:boolean; //temp field indicates this field is !${...} and will be removed after template is processed
-    parentJsonPointer__?:JsonPointerStructureArray|JsonPointerString
+    exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString
+    data__?:any
 }
 
-export type JsonPointerStructureArray = string[];
+export type JsonPointerStructureArray = (string|number)[];
 export type JsonPointerString = string;
 
 export default class MetaInfoProducer {
@@ -32,18 +37,20 @@ export default class MetaInfoProducer {
 
     static async getMetaInfos(template):Promise<MetaInfo[]> {
 
-        const stack:MetaInfo[] = [];
-        const emit:MetaInfo[] = [];
+        const stack: MetaInfo[] = [];
+        const emit: MetaInfo[] = [];
 
-        async function getPaths(o, path = []) {
+        async function getPaths(o, path: JsonPointerStructureArray = []) {
             const type = typeof o;
-            const metaInfo:MetaInfo = {
+            const metaInfo: MetaInfo = {
                 "materialized__": true,
                 "jsonPointer__": path,
                 "dependees__": [],
                 "dependencies__": [],
+                "absoluteDependencies__": [],
                 "treeHasExpressions__": false,
                 "tags__": new Set(),
+                "parent__": jp.parent(path)
             };
             stack.push(metaInfo);
             if (Array.isArray(o)) {
@@ -61,7 +68,7 @@ export default class MetaInfoProducer {
                 const match = MetaInfoProducer.EMBEDDED_EXPR_REGEX.exec(o);
                 const getMatchGroup = (groupName) => match && match.groups[groupName];
 
-                const keyEndsWithDollars = typeof path[path.length - 1] === 'string' && path[path.length - 1].endsWith('$');
+                const keyEndsWithDollars = typeof path[path.length - 1] === 'string' && String(path[path.length - 1]).endsWith('$');
                 const tag = getMatchGroup('tag');
                 const exclamationPoint = !!getMatchGroup('tempVariable');
                 const leadingSlash = getMatchGroup('slash');
@@ -77,6 +84,7 @@ export default class MetaInfoProducer {
                         "exprRootPath__": slashOrCdUp,
                         "expr__": expr,
                         "jsonPointer__": path,
+                        "exprTargetJsonPointer__": jp.parent(path)
                     };
                     if (tag) {
                         stack[stack.length - 1].tags__.add(tag);
