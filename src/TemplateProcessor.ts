@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { default as jp } from './JsonPointer.js';
+import JSONPointer, { default as jp } from './JsonPointer.js';
 import isEqual from "lodash-es/isEqual.js";
 import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
@@ -112,6 +112,7 @@ export default class TemplateProcessor {
 
     /** Common callback function used within the template processor. */
     commonCallback: any;
+    private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString)=>void>;
 
     /** Flag indicating if the template processor is currently initializing. */
     private isInitializing: boolean;
@@ -181,6 +182,7 @@ export default class TemplateProcessor {
         this.errorReport = {}
         this.isInitializing = false;
         this.tempVars = [];
+        this.changeCallbacks = new Map();
     }
     public async initialize(template = this.input, jsonPtr = "/") {
         if (this.onInit) {
@@ -739,7 +741,6 @@ export default class TemplateProcessor {
             this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
         }
         if(this.executionQueue.length>1){
-            console.debug();
             return sortedJsonPtrs; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
         }
 
@@ -836,7 +837,7 @@ export default class TemplateProcessor {
         const {templateMeta, output} = this;
         let data;
         const metaInfo = jp.get(templateMeta, jsonPtr);
-        const {expr__, tags__, callback__} = metaInfo;
+        const {expr__, tags__} = metaInfo;
         let success = false;
         if (expr__ !== undefined) {
             if(this.allTagsPresent(tags__)) {
@@ -849,7 +850,7 @@ export default class TemplateProcessor {
                     data = {error:errorObject}; //errors get placed into the template output
                     this.errorReport[jsonPtr] = errorObject;
                 }
-                this._setData(jsonPtr, data, callback__);
+                this._setData(jsonPtr, data);
             } else {
                 this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${Array.from(tags__)}) were set with --tags`);
                 return false;
@@ -888,12 +889,12 @@ export default class TemplateProcessor {
     }
 
     private setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
-        const {treeHasExpressions__, callback__} = jp.get(templateMeta, jsonPtr);
+        const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr);
         if (treeHasExpressions__) {
             this.logger.log('warn', `nodes containing expressions cannot be overwritten: ${jsonPtr}`);
             return false;
         }
-        let didSet = this._setData(jsonPtr, data, callback__);
+        let didSet = this._setData(jsonPtr, data);
         if (didSet) {
             jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
             jp.set(templateMeta, jsonPtr + "/materialized__", true);
@@ -918,7 +919,7 @@ export default class TemplateProcessor {
 
     private async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, callback__, exprTargetJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
+        const {compiledExpr__, exprTargetJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
         let target;
         try {
             target = jp.get(this.output, exprTargetJsonPointer__); //an expression is always relative to a target
@@ -947,7 +948,7 @@ export default class TemplateProcessor {
         return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
     }
 
-    private _setData(jsonPtr, data, callback) {
+    private _setData(jsonPtr, data) {
         if (data === TemplateProcessor.NOOP) { //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
             return false;
         }
@@ -958,6 +959,7 @@ export default class TemplateProcessor {
         }
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
+            const callback = this.changeCallbacks.get(jsonPtr);
             callback && callback(data, jsonPtr);
             //this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
@@ -1076,12 +1078,11 @@ export default class TemplateProcessor {
         return [];
     }
 
-    setDataChangeCallback(jsonPtr, cbFn) {
+    setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString)=>void) {
         if(jsonPtr === "/"){
             this.commonCallback = cbFn;
-        }else if (jp.has(this.templateMeta, jsonPtr)) {
-            const node = jp.get(this.templateMeta, jsonPtr);
-            node.callback__ = cbFn;
+        }else{
+            this.changeCallbacks.set(jsonPtr, cbFn);
         }
     }
 

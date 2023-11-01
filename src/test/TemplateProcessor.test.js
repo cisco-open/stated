@@ -1398,6 +1398,32 @@ key: value`;
 });
 
 
+test("test /__META__/tags callback ", async () => {
+    const tp = new TemplateProcessor({
+        "solutionId": "@INSTALL ${$sys.solutionId}",
+        "ex": "example1",
+        "version": "@INSTALL ${$manifest.solutionVersion}",
+        "name": "@INSTALL ${$env.name}",
+        "__META__": {
+            "tags": "@INSTALL ${'hello'}"
+        }
+    });
+    tp.tagSet.add("INSTALL");
+    const received = [];
+    tp.setDataChangeCallback("/__META__/tags", (data, jsonPtr) => {
+        received.push({data, jsonPtr})
+    });
+    await tp.initialize();
+
+    expect(received).toEqual([
+        {
+            "data": "hello",
+            "jsonPtr": "/__META__/tags"
+        }
+    ]);
+});
+
+
 
 
 
