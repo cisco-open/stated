@@ -1404,21 +1404,27 @@ test("test /__META__/tags callback ", async () => {
         "ex": "example1",
         "version": "@INSTALL ${$manifest.solutionVersion}",
         "name": "@INSTALL ${$env.name}",
-        "__META__": {
+        "__META__!": {
             "tags": "@INSTALL ${'hello'}"
         }
-    });
+    }, {sys:{solutionId:123}, manifest:{solutionVersion: 2.0}, env:{name:"dev"}});
     tp.tagSet.add("INSTALL");
     const received = [];
-    tp.setDataChangeCallback("/__META__/tags", (data, jsonPtr) => {
+    tp.setDataChangeCallback("/__META__!/tags", (data, jsonPtr) => {
         received.push({data, jsonPtr})
     });
     await tp.initialize();
+    expect(tp.output).toEqual({
+        "ex": "example1",
+        "name": "dev",
+        "solutionId": 123,
+        "version": 2
+    });
 
     expect(received).toEqual([
         {
             "data": "hello",
-            "jsonPtr": "/__META__/tags"
+            "jsonPtr": "/__META__!/tags"
         }
     ]);
 });
