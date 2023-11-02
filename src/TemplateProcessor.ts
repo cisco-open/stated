@@ -27,6 +27,7 @@ import {LOG_LEVELS} from "./ConsoleLogger.js";
 import StatedREPL from "./StatedREPL.js";
 
 
+
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 
 export default class TemplateProcessor {
@@ -112,7 +113,7 @@ export default class TemplateProcessor {
 
     /** Common callback function used within the template processor. */
     commonCallback: any;
-    private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString)=>void>;
+    private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString, removed:boolean)=>void>;
 
     /** Flag indicating if the template processor is currently initializing. */
     private isInitializing: boolean;
@@ -123,7 +124,9 @@ export default class TemplateProcessor {
     private tempVars:JsonPointerString[];
 
     /** Allows caller to set a callback to propagate initialization into their framework */
-    public onInit: () => void;
+    public onInitialize: () => Promise<void>;
+    /** Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are removed*/
+    public postInitialize: ()=> Promise<void>;
 
 
     public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
@@ -185,9 +188,7 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
     }
     public async initialize(template = this.input, jsonPtr = "/") {
-        if (this.onInit) {
-            await this.onInit();
-        }
+        this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
@@ -219,6 +220,8 @@ export default class TemplateProcessor {
             this.propagateTags(metaInfos);
             this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
             await this.evaluate(jsonPtr);
+            this.postInitialize && await this.postInitialize();
+            this.removeTemporaryVariables(this.tempVars);
             this.logger.verbose("initialization complete...");
             this.logOutput();
         }finally {
@@ -229,10 +232,8 @@ export default class TemplateProcessor {
 
     private async evaluate(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
-
         this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
         await this.evaluateDependencies(this.metaInfoByJsonPointer[jsonPtr]);
-        this.removeTemporaryVariables(this.tempVars);
         const endTime = Date.now(); // Capture end time
 
         this.logger.verbose(`evaluation complete in ${endTime - startTime} ms...`);
@@ -592,7 +593,10 @@ export default class TemplateProcessor {
     private removeTemporaryVariables(tmpVars:JsonPointerString[]): void{
         tmpVars.forEach(jsonPtr=>{
             if(jp.has(this.output, jsonPtr)) {
-                jp.remove(this.output, jsonPtr)
+                const current = jp.get(this.output, jsonPtr);
+                jp.remove(this.output, jsonPtr);
+                const callback = this.changeCallbacks.get(jsonPtr);
+                callback && callback(current, jsonPtr, true);
             }
         });
     }
@@ -960,7 +964,7 @@ export default class TemplateProcessor {
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             const callback = this.changeCallbacks.get(jsonPtr);
-            callback && callback(data, jsonPtr);
+            callback && callback(data, jsonPtr, false);
             //this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
         } else {
@@ -1078,7 +1082,7 @@ export default class TemplateProcessor {
         return [];
     }
 
-    setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString)=>void) {
+    setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString, removed?:boolean)=>void) {
         if(jsonPtr === "/"){
             this.commonCallback = cbFn;
         }else{

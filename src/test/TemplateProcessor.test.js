@@ -20,6 +20,7 @@ import yaml from 'js-yaml';
 import {fileURLToPath} from 'url';
 import {dirname} from 'path';
 import MetaInfoProducer from "../../dist/src/MetaInfoProducer.js";
+import jsonata from "jsonata";
 
 
 test("test 1", async () => {
@@ -1427,6 +1428,103 @@ test("test /__META__/tags callback ", async () => {
             "jsonPtr": "/__META__!/tags"
         }
     ]);
+});
+
+
+
+test("test /__META__/tags array callback ", async () => {
+    const tp = new TemplateProcessor({
+        "solutionId": "@INSTALL ${$sys.solutionId}",
+        "ex": "example1",
+        "version": "@INSTALL ${$manifest.solutionVersion}",
+        "name": "@INSTALL ${$env.name}",
+        "__META__!": [{ "tags": { "foo": 'bar' } }]
+    }, {sys:{solutionId:123}, manifest:{solutionVersion: 2.0}, env:{name:"dev"}});
+    tp.tagSet.add("INSTALL");
+    const received = [];
+    tp.setDataChangeCallback("/__META__!", (data, jsonPtr, removed) => {
+        received.push({data, jsonPtr})
+    });
+    await tp.initialize();
+    const plan = await tp.getEvaluationPlan();
+    expect(plan).toEqual([
+          "/name",
+          "/solutionId",
+          "/version",
+        ]);
+    expect(tp.output).toEqual({
+        "ex": "example1",
+        "name": "dev",
+        "solutionId": 123,
+        "version": 2
+    });
+
+    expect(received).toEqual([
+        {
+            "data": [
+                {
+                    "tags": {
+                        "foo": "bar"
+                    }
+                }
+            ],
+            "jsonPtr": "/__META__!"
+        }
+    ]);
+});
+
+test("test array with /__META__/tags callback ", async () => {
+    const tp = new TemplateProcessor([
+            {
+                "solutionId": "@INSTALL ${$sys.solutionId}",
+                "ex": "example1",
+                "version": "@INSTALL ${$manifest.solutionVersion}",
+                "name": "@INSTALL ${$env.name}",
+                "__META__!": [{ "tags": { "foo": 'bar' } }]
+            },
+            {
+                "solutionId": "@INSTALL ${$sys.solutionId}",
+                "ex": "example1",
+                "version": "@INSTALL ${$manifest.solutionVersion}",
+                "name": "@INSTALL ${$env.name}",
+                "__META__!": [{ "tags": { "foo": "@INSTALL${41+1}" } }]
+            }
+        ], {sys:{solutionId:123}, manifest:{solutionVersion: 2.0}, env:{name:"dev"}});
+    tp.tagSet.add("INSTALL");
+    tp.postInitialize = async()=>{
+        expect(tp.output).toEqual([
+            {
+                "ex": "example1",
+                "name": "dev",
+                "solutionId": 123,
+                "version": 2,
+                "__META__!": [{ "tags": { "foo": 'bar' } }]
+            },
+            {
+                "ex": "example1",
+                "name": "dev",
+                "solutionId": 123,
+                "version": 2,
+                "__META__!": [{ "tags": { "foo": 42 } }]
+            }
+        ])
+    }
+    await tp.initialize();
+    expect(tp.output).toStrictEqual([
+        {
+            "ex": "example1",
+            "name": "dev",
+            "solutionId": 123,
+            "version": 2
+        },
+        {
+            "ex": "example1",
+            "name": "dev",
+            "solutionId": 123,
+            "version": 2
+        }
+    ]);
+
 });
 
 
