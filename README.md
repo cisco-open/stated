@@ -399,7 +399,7 @@ The `!` symbol is used mark fields as temporary. The `!` can be used both as a p
 to a key. Temporary fields are removed from the output. 
 Notice how /b and /c! are removed from the output. Also notice that when an expression like ```${`c!`.c1}``` refers to `c!` 
 that backtics must be used.
-```json
+```json {"testWith":"tempVarsTest:}
 > .init -f "example/tempVars.json"
 {
    "a": 42,
