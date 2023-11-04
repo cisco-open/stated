@@ -15,6 +15,7 @@
 import CliCore from './dist/src/CliCore.js';
 import fs from 'fs';
 import StatedREPL  from './dist/src/StatedREPL.js';
+import jsonata from "jsonata";
 
 /**
  * Regular expression for command extraction from README.md file. This program finds all the markup code blocks
@@ -49,35 +50,67 @@ import StatedREPL  from './dist/src/StatedREPL.js';
  * m: Multiline flag, to allow ^ and $ to match the start and end of lines, not just the start and end of the whole string.
  */
 const markdownContent = fs.readFileSync("README.md", 'utf-8');
-const commandRegex  = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;;
+const codeBlockRegex = /```(?<codeBlock>[\s\S]*?)```/g;
+const jsonataExpressionsArrayRegex = /^[^\[]*(?<jsonataExpressionsArrayString>\s*\[.*?\]\s*)$/m
+const commandRegex  = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;
 let match;
 const cliCore = new CliCore();
 const testData = [];
 
-while ((match = commandRegex.exec(markdownContent)) !== null) {
-    const command = match.groups.command.trim();
-    const expectedResponseString = match.groups.expectedResponse.trim();
-    const args = command.split(' ');
-
-    if (args.length > 0) {
-        const cmdName = args.shift();
-        const method = cliCore[cmdName];
-
-        if (typeof method === 'function') {
-            testData.push([cmdName, args, expectedResponseString]);
-        } else {
-            throw Error(`Unknown command: .${cmdName}`);
+while ((match = codeBlockRegex.exec(markdownContent)) !== null) {
+    const {codeBlock} = match.groups;
+    let _match = jsonataExpressionsArrayRegex.exec(codeBlock);
+    let jsonataExprArrayJson;
+    if(_match!==null){
+        const {jsonataExpressionsArrayString} = _match.groups;
+        if(jsonataExpressionsArrayString !== undefined){
+            jsonataExprArrayJson = JSON.parse(jsonataExpressionsArrayString);
         }
     }
+    let i=0;
+    while((_match = commandRegex.exec(codeBlock)) !== null){
+        const {command, expectedResponse} = _match.groups;
+        const expectedResponseString = _match.groups.expectedResponse.trim();
+        const args = command.trim().split(' ');
+
+        if (args.length > 0) {
+            const cmdName = args.shift();
+            const method = cliCore[cmdName];
+
+            if (typeof method === 'function') {
+                let jsonataExpr;
+                if(jsonataExprArrayJson !== undefined){
+                    jsonataExpr = jsonataExprArrayJson[i];
+                }else{
+                    jsonataExpr = false;
+                }
+                testData.push([cmdName, args, expectedResponse, jsonataExpr]);
+            } else {
+                throw Error(`Unknown command: .${cmdName}`);
+            }
+        }
+        i++;
+    }
+
 }
 
-testData.forEach(([cmdName, args, expectedResponseString], i) => {
+
+testData.forEach(([cmdName, args, expectedResponseString, jsonataExpression], i) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
         const rest = args.join(" ");
         const resp = await cliCore[cmdName].apply(cliCore, [rest]);
         const respNormalized = JSON.parse(StatedREPL.stringify(resp));
-        const _expected = JSON.parse(expectedResponseString);
-        expect(respNormalized).toEqual(_expected);
+        if(jsonataExpression){ //if we have an optional jsonata expression specified after the codeblock, likje ````json <optionaJsonataExpression>
+            const compiledExpr = jsonata(jsonataExpression);
+            expect(await compiledExpr.evaluate(respNormalized)).toBe(true);
+        }else {
+            if(expectedResponseString){
+                const _expected = JSON.parse(expectedResponseString);
+                expect(respNormalized).toEqual(_expected);
+            }else{
+                expect(respNormalized).toBeDefined();
+            }
+        }
     }, 30000);  // set timeout to 10 seconds for each test since in the readme we call web apis
 });
 

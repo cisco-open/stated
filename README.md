@@ -26,7 +26,7 @@ Unlike an ordinary program, Stated templates can be kept "alive" indefinitely. A
 causes change propagation throughout the DAG. Stated includes a node REPL, `stated.ts`, for testing Stated json templates, and a JS library for embedding stated
 in applications. A typical REPL session consists of loading a template with the `init` command, viewing the computed
 output with the `.out` command and then setting values with the `.set` command and observing the changed output.
-```json
+```json [false, false, "a=87 and e=42"]
 falken$ stated
 > .init -f "example/ex08.json"
 {
@@ -399,7 +399,7 @@ The `!` symbol is used mark fields as temporary. The `!` can be used both as a p
 to a key. Temporary fields are removed from the output. 
 Notice how /b and /c! are removed from the output. Also notice that when an expression like ```${`c!`.c1}``` refers to `c!` 
 that backtics must be used.
-```json {"testWith":"tempVarsTest:}
+```json 
 > .init -f "example/tempVars.json"
 {
    "a": 42,
