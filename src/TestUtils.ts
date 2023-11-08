@@ -4,6 +4,18 @@ import fs from 'fs';
 import jsonata from "jsonata";
 import StatedREPL  from './StatedREPL.js';
 import { test, expect } from '@jest/globals';
+import CliCore from "./CliCore.js";
+
+export type CommandAndResponse = {
+  cmdName: string;
+  args: string[];
+  expectedResponse: string;
+  jsonataExpr: string;
+};
+
+export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, printFunction:(k:any, v:any)=>any = StatedREPL.stringify){
+  runMarkdownTests(parseMarkdownTests(md, cliCore), cliCore, printFunction);
+}
 
 /**
  * Read the markdown file and extract the code blocks for testing.
@@ -11,16 +23,16 @@ import { test, expect } from '@jest/globals';
  * @param {object} cliInstance An instance of the CLI class that has the methods to be tested.
  * @return {Array} Array of test data including commands and expected responses.
  */
-export function parseMarkdownTests(markdownPath, cliInstance) {
+export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):CommandAndResponse[] {
   const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
   const codeBlockRegex = /```(?<codeBlock>[\s\S]*?)```/g;
   const jsonataExpressionsArrayRegex = /^[^\[]*(?<jsonataExpressionsArrayString>\s*\[.*?\]\s*)$/m;
   const commandRegex = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;
 
   let match;
-  const testData = [];
+  const testData: CommandAndResponse[] = [];
 
-  while ((match = codeBlockRegex.exec(markdownContent)) !== null) {
+  while ((match = codeBlockRegex.exec(markdownContent)) !== null){
     const { codeBlock } = match.groups;
     let jsonataExpressionsArrayJson;
     let _match = jsonataExpressionsArrayRegex.exec(codeBlock);
@@ -66,8 +78,8 @@ export function parseMarkdownTests(markdownPath, cliInstance) {
  * @param {object} cliInstance An instance of the CLI class that has the methods to be tested.
  * @param {function} printFunction The function is used to print response output to compare with expected response.
  */
-export function runMarkdownTests(testData, cliInstance, printFunction = StatedREPL.stringify) {
-  testData.forEach(({ cmdName, args, expectedResponse, jsonataExpr }, i) => {
+export function runMarkdownTests(testData:CommandAndResponse[], cliInstance:CliCore, printFunction = StatedREPL.stringify) {
+  testData.forEach(({ cmdName, args, expectedResponse, jsonataExpr }) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
       const method = cliInstance[cmdName];
       const response = await method.apply(cliInstance, [args.join(' ')]);

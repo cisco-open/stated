@@ -12,11 +12,9 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { parseMarkdownTests, runMarkdownTests } from './dist/src/TestUtils.js';
+import {parseMarkdownAndTestCodeblocks } from './dist/src/TestUtils.js';
 import CliCore from './dist/src/CliCore.js';
 
 
-const cliCore = new CliCore();
-const testData = parseMarkdownTests('./README.md', cliCore);
+parseMarkdownAndTestCodeblocks('./README.md', new CliCore());
 
-runMarkdownTests(testData, cliCore);

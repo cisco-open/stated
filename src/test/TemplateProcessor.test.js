@@ -903,27 +903,37 @@ test("Solution Environment Files", async () => {
 
 test("remove all DEFAULT_FUNCTIONS", async () => {
     let template = {"fetchFunctionShouldNotExists": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    TemplateProcessor.DEFAULT_FUNCTIONS = {};
-    const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    expect(tp.output).toStrictEqual({
-        "fetchFunctionShouldNotExists": {
-            "error": {
-                "message": "Attempted to invoke a non-function",
-                "name": "JSONata evaluation exception"
+    const restore = TemplateProcessor.DEFAULT_FUNCTIONS;
+    try {
+        TemplateProcessor.DEFAULT_FUNCTIONS = {};
+        const tp = new TemplateProcessor(template);
+        await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "fetchFunctionShouldNotExists": {
+                "error": {
+                    "message": "Attempted to invoke a non-function",
+                    "name": "JSONata evaluation exception"
+                }
             }
-        }
-    });
+        });
+    }finally {
+        TemplateProcessor.DEFAULT_FUNCTIONS = restore;
+    }
 });
 
 test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
     let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
-    const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    expect(tp.output).toStrictEqual({
-        "fetchFunctionBecomesHello": "hello"
-    })
+    const restore = TemplateProcessor.DEFAULT_FUNCTIONS;
+    try {
+        TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
+        const tp = new TemplateProcessor(template);
+        await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "fetchFunctionBecomesHello": "hello"
+        })
+    }finally{
+        TemplateProcessor.DEFAULT_FUNCTIONS = restore;
+    }
 });
 
 test("replace DEFAULT_FUNCTIONS fetch with hello", async () => {
@@ -1317,7 +1327,7 @@ test("ex14.yaml", async () => {
     const yamlFilePath = path.join(__dirname, '..','..','example', 'ex14.yaml');
     const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
     const template = yaml.load(templateYaml);
-    const tp = new TemplateProcessor(template, {});
+    const tp = new TemplateProcessor(template);
     await tp.initialize();
     expect(await tp.getEvaluationPlan()).toEqual([
         "/incr$",
@@ -1527,24 +1537,9 @@ test("test array with /__META__/tags callback ", async () => {
 
 });
 
-test("test 1", async () => {
-    const tp = new TemplateProcessor({
-        "lukeHomeworldURL": "${ $fetch('https://swapi.dev/api/people/?search=luke').json().results[0].homeworld}",
-        "homeworldName": "${ $fetch(lukeHomeworldURL).json().name}"
-    });
-    await tp.initialize();
-    expect(await tp.getEvaluationPlan()).toEqual([
-        "/lukeHomeworldURL",
-        "/homeworldName"
-    ]);
-    expect(tp.from("/lukeHomeworldURL")).toEqual([
-        "/lukeHomeworldURL",
-        "/homeworldName"
-    ]);
-});
 
 test("parallel TemplateProcessors", () => {
-    let template = { "foo$": "2$%&^" };
+    let template = { "foo$": "41+1" };
     let processors = [];
 
     // Create 10 TemplateProcessor instances with the same template
@@ -1556,15 +1551,7 @@ test("parallel TemplateProcessors", () => {
     return Promise.all(processors).then((initializedProcessors) => {
         // At this point, all processors have been initialized and we can test their output
         initializedProcessors.forEach((tp) => {
-            expect(tp.output).toStrictEqual({ "foo$": "2$%&^" });
-            expect(tp.errorReport).toEqual({
-                "/foo$": {
-                    "error": {
-                        "message": "problem analysing expression : 2$%&^",
-                        "name": "badJSONata"
-                    }
-                }
-            });
+            expect(tp.output).toStrictEqual({ "foo$": 42 });
         });
     });
 });

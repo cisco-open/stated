@@ -113,7 +113,7 @@ export default class StatedREPL {
         return value;
     }
 
-    static stringify(o, printFunction=StatedREPL.printFunc){
+    static stringify(o:any, printFunction:(k:any,v:any)=>any=StatedREPL.printFunc){
         return JSON.stringify(o, printFunction, 2)
     }
 

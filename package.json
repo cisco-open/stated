@@ -12,7 +12,8 @@
     },
     "./dist/src/TemplateProcessor.js": "./dist/src/TemplateProcessor.js",
     "./dist/src/CliCore.js": "./dist/src/CliCore.js",
-    "./dist/src/StatedREPL.js": "./dist/src/StatedREPL.js"
+    "./dist/src/StatedREPL.js": "./dist/src/StatedREPL.js",
+    "./dist/src/TestUtils.js": "./dist/src/TestUtils.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
