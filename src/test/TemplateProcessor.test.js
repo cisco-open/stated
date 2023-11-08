@@ -1527,6 +1527,48 @@ test("test array with /__META__/tags callback ", async () => {
 
 });
 
+test("test 1", async () => {
+    const tp = new TemplateProcessor({
+        "lukeHomeworldURL": "${ $fetch('https://swapi.dev/api/people/?search=luke').json().results[0].homeworld}",
+        "homeworldName": "${ $fetch(lukeHomeworldURL).json().name}"
+    });
+    await tp.initialize();
+    expect(await tp.getEvaluationPlan()).toEqual([
+        "/lukeHomeworldURL",
+        "/homeworldName"
+    ]);
+    expect(tp.from("/lukeHomeworldURL")).toEqual([
+        "/lukeHomeworldURL",
+        "/homeworldName"
+    ]);
+});
+
+test("parallel TemplateProcessors", () => {
+    let template = { "foo$": "2$%&^" };
+    let processors = [];
+
+    // Create 10 TemplateProcessor instances with the same template
+    for (let i = 0; i < 10; i++) {
+        let tp = new TemplateProcessor(template);
+        processors.push(tp.initialize().then(() => tp)); // Store the initialized promise
+    }
+
+    return Promise.all(processors).then((initializedProcessors) => {
+        // At this point, all processors have been initialized and we can test their output
+        initializedProcessors.forEach((tp) => {
+            expect(tp.output).toStrictEqual({ "foo$": "2$%&^" });
+            expect(tp.errorReport).toEqual({
+                "/foo$": {
+                    "error": {
+                        "message": "problem analysing expression : 2$%&^",
+                        "name": "badJSONata"
+                    }
+                }
+            });
+        });
+    });
+});
+
 
 
 

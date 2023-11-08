@@ -243,7 +243,7 @@ for Node.js :
 import TemplateProcessor from 'stated-js/dist/src/TemplateProcessor.js';
 ```
 When you run Node.js, you must pass `--experimental-vm-modules` flag to the Node.js runtime. This is due to the 
-fact that State-js is written using ES Module syntax.
+fact that stated-js is written using ES Module syntax.
 
 ### REPL Commands
 
