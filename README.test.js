@@ -17,6 +17,6 @@ import CliCore from './dist/src/CliCore.js';
 
 
 const cliCore = new CliCore();
-const testData = parseMarkdownTests('./README.md', cliCore);
+const testData = await parseMarkdownTests('./README.md', cliCore);
 
-runMarkdownTests(testData, cliCore);
+await runMarkdownTests(testData, cliCore);
