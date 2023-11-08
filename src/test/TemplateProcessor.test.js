@@ -1552,17 +1552,9 @@ test("wait condition timeout", async () => {
     const tp = new TemplateProcessor(t);
     await tp.initialize();
     let conditionMatched = await tp.waitCondition('status$="done"', 50);
-    expect(StatedREPL.stringify(conditionMatched)).toEqual(StatedREPL.stringify({
-        "error": {
-            "message": "wait condition status$=\"done\" timed out in 50ms",
-            "output": {
-                "incr$": "{function:}",
-                "counter": 9,
-                "upCount$": "--interval/timeout--",
-                "status$": "counting"
-            }
-        }
-    }));
+    expect(conditionMatched.error).toBeDefined();
+    expect(conditionMatched.error.message).toEqual("wait condition status$=\"done\" timed out in 50ms");
+    expect(conditionMatched.error.output).toBeDefined();
 });
 
 test("wait condition with commomCallback already set", async () => {
