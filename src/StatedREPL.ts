@@ -34,6 +34,7 @@ export default class StatedREPL {
         this.r = repl.start({
             prompt: '> ',
         });
+        this.cliCore.replServer = this.r;
         this.registerCommands();
     }
 
@@ -51,14 +52,14 @@ export default class StatedREPL {
             ["log", "set the log level [debug, info, warn, error]"],
             ["debug", "set debug commands (WIP)"],
             ["errors", "return an error report"],
+            ["tail", "'tail /count 100' will tail 100 changes to the /count"],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
             this.r.defineCommand(cmdName, {
                 help: helpMsg,
                 action: async (args) => {
-                    const method = this.cliCore[cmdName].bind(this.cliCore);
-                    await this.cli(method, args);
+                    await this.cli(cmdName, args);
                 },
             });
         });
@@ -83,12 +84,15 @@ export default class StatedREPL {
 
     async cli(cliCoreMethod, args){
         try{
-            const result = await cliCoreMethod(args);
+            const method = this.cliCore[cliCoreMethod].bind(this.cliCore);
+            const result = await method(args);
             console.log(StatedREPL.stringify(result));
         } catch (e) {
             console.error(e);
         }
-        this.r.displayPrompt();
+        if(cliCoreMethod !== 'tail'){
+            this.r.displayPrompt(); //all commands except tail should throw the prompt up aftert they return
+        }
     }
 
     static printFunc(key, value) {

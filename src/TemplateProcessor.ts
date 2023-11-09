@@ -1090,6 +1090,14 @@ export default class TemplateProcessor {
         }
     }
 
+    removeDataChangeCallback(jsonPtr:JsonPointerString) {
+        if(jsonPtr==="/"){
+            this.commonCallback = undefined;
+        }else {
+            this.changeCallbacks.delete(jsonPtr);
+        }
+    }
+
     //returns the evaluation plan for evaluating the entire template
     async getEvaluationPlan() {
         return this.topologicalSort(this.metaInfoByJsonPointer["/"], true);
