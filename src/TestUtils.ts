@@ -26,33 +26,31 @@ export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, print
 export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):CommandAndResponse[] {
   const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
   const codeBlockRegex = /```(?<codeBlock>[\s\S]*?)```/g;
-  const jsonataExpressionsArrayRegex = /^[^\[]*(?<jsonataExpressionsArrayString>\s*\[.*?\]\s*)$/m;
-  const commandRegex = /^> \.(?<command>.+[\r\n])((?<expectedResponse>(?:(?!^>|```)[\s\S])*))$/gm;
-
+  const jsonataExpressionsArrayRegex = /^json \s*(?<jsonataExpressionsArrayString>\s*\[.*?])\s*[\r\n]/;
+  const commandRegex = /^> \.(?<command>.+[\r\n])(?<expectedResponse>(?:(?!^>|```)[\s\S])*)$/gm;
   let match;
-  const testData: CommandAndResponse[] = [];
-
-  while ((match = codeBlockRegex.exec(markdownContent)) !== null){
+  const testData = [];
+  while ((match = codeBlockRegex.exec(markdownContent)) !== null) {
     const { codeBlock } = match.groups;
     let jsonataExpressionsArrayJson;
     let _match = jsonataExpressionsArrayRegex.exec(codeBlock);
-
     if (_match !== null) {
       const { jsonataExpressionsArrayString } = _match.groups;
       if (jsonataExpressionsArrayString !== undefined) {
-        jsonataExpressionsArrayJson = JSON.parse(jsonataExpressionsArrayString);
+        try {
+          jsonataExpressionsArrayJson = JSON.parse(jsonataExpressionsArrayString);
+        }catch(e){
+          throw new Error(`failed to parse JSON from markdown codeblock jsonata expressions array:  ${jsonataExpressionsArrayString}`);
+        }
       }
     }
-
     let i = 0;
     while ((_match = commandRegex.exec(codeBlock)) !== null) {
       const { command, expectedResponse } = _match.groups;
       const args = command.trim().split(' ');
-
       if (args.length > 0) {
         const cmdName = args.shift();
         const method = cliInstance[cmdName];
-
         if (typeof method === 'function') {
           let jsonataExpr = jsonataExpressionsArrayJson ? jsonataExpressionsArrayJson[i] : false;
           testData.push({
@@ -61,14 +59,14 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
             expectedResponse: expectedResponse.trim(),
             jsonataExpr
           });
-        } else {
+        }
+        else {
           throw Error(`Unknown command: .${cmdName}`);
         }
       }
       i++;
     }
   }
-
   return testData;
 }
 
@@ -78,21 +76,25 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
  * @param {object} cliInstance An instance of the CLI class that has the methods to be tested.
  * @param {function} printFunction The function is used to print response output to compare with expected response.
  */
-export function runMarkdownTests(testData:CommandAndResponse[], cliInstance:CliCore, printFunction = StatedREPL.stringify) {
+function runMarkdownTests(testData, cliInstance, printFunction = StatedREPL.stringify) {
   testData.forEach(({ cmdName, args, expectedResponse, jsonataExpr }) => {
     test(`${cmdName} ${args.join(' ')}`, async () => {
       const method = cliInstance[cmdName];
       const response = await method.apply(cliInstance, [args.join(' ')]);
       const responseNormalized = JSON.parse(printFunction(response));
-
       if (jsonataExpr) {
         const compiledExpr = jsonata(jsonataExpr);
-        expect(await compiledExpr.evaluate(responseNormalized)).toBe(true);
-      } else {
+        const success = await compiledExpr.evaluate(responseNormalized);
+        if(success===false){
+          throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr}`);
+        }
+      }
+      else {
         const expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;
         if (expected) {
           expect(responseNormalized).toEqual(expected);
-        } else {
+        }
+        else {
           expect(responseNormalized).toBeDefined();
         }
       }
