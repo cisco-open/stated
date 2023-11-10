@@ -19,7 +19,7 @@
     "clean": "rm -rf dist",
     "build": "tsc && npm run webpack",
     "webpack": "webpack && webpack --config webpack.config.cjs.js",
-    "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "test-fast": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "stated": "node --experimental-vm-modules dist/stated.js"
   },

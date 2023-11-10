@@ -20,6 +20,7 @@ import {parseArgsStringToArgv} from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
+import {template} from "@babel/core";
 
 
 export default class CliCore {
@@ -30,6 +31,11 @@ export default class CliCore {
     constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";
+    }
+    public close(){
+        if(this.templateProcessor){
+            this.templateProcessor.close();
+        }
     }
     public onInit: () => Promise<void>;
 
@@ -102,6 +108,9 @@ export default class CliCore {
 
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
     async init(replCmdInputStr) {
+        if(this.templateProcessor){
+            this.templateProcessor.close();
+        }
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
         const {filepath, tags,oneshot, options, xf:contextFilePath, importPath, tail} = parsed;
         if(filepath===undefined){
@@ -253,20 +262,20 @@ export default class CliCore {
 
         if(this.replServer) { //in unit test REPL server won't be present
             let printedLines = 0;
-            const listener = (data) => {
-                this.replServer.output.write(StatedREPL.stringify(data) + "\n"); // Write data to the REPL's output stream
-                if (lineCount !== -1 && ++printedLines >= lineCount) {
-                    this.templateProcessor.removeDataChangeCallback(jsonPointer); // Stop listening after 'n' lines
-                }
-            };
-            this.templateProcessor.setDataChangeCallback(jsonPointer, listener);
 
             const sigListener = () => { // Listen for the interrupt signal (Ctrl+C) in REPL
                 this.templateProcessor.removeDataChangeCallback(jsonPointer)
                 this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
-                this.replServer.displayPrompt(); // Display the REPL prompt again
             }
             this.replServer.on('SIGINT', sigListener);
+            const listener = (data) => {
+                this.replServer.output.write(StatedREPL.stringify(data) + "\n"); // Write data to the REPL's output stream
+                if (lineCount !== -1 && ++printedLines >= lineCount) {
+                    this.templateProcessor.removeDataChangeCallback(jsonPointer); // Stop listening after 'n' lines
+                    this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
+                }
+            };
+            this.templateProcessor.setDataChangeCallback(jsonPointer, listener);
         }
         return "Started tailing... Press Ctrl+C to stop.";
     }

@@ -25,7 +25,7 @@ import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import StatedREPL from "./StatedREPL.js";
-
+import {TimerManager} from "./TimerManager.js";
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
@@ -123,6 +123,8 @@ export default class TemplateProcessor {
 
     private tempVars:JsonPointerString[];
 
+    private timerManager:TimerManager;
+
     /** Allows caller to set a callback to propagate initialization into their framework */
     public onInitialize: () => Promise<void>;
     /** Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are removed*/
@@ -157,23 +159,12 @@ export default class TemplateProcessor {
     }
 
     constructor(template={}, context = {}, options={}) {
+        this.timerManager = new TimerManager(); //prevent leaks from $setTimeout and $setInterval
         this.uniqueId = Math.random()*1e6;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
-        this.context = merge(
-            {},
-            TemplateProcessor.DEFAULT_FUNCTIONS,
-            context,
-            { "set": this.setData }
-        );
-        const safe = this.withErrorHandling.bind(this);
-        for (const key in this.context) {
-            if (typeof this.context[key] === 'function') {
-                this.context[key] = safe(this.context[key]);
-            }
-        }
-
+        this.setupContext(context);
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to `initialize the templateMeta
@@ -187,7 +178,29 @@ export default class TemplateProcessor {
         this.tempVars = [];
         this.changeCallbacks = new Map();
     }
+
+    private setupContext(context: {}) {
+        this.context = merge(
+            {},
+            TemplateProcessor.DEFAULT_FUNCTIONS,
+            context,
+            {"set": this.setData}
+        );
+        const safe = this.withErrorHandling.bind(this);
+        for (const key in this.context) {
+            if (typeof this.context[key] === 'function') {
+                if (key === "setTimeout" || key === "setInterval") {
+                    //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
+                    this.context[key] = this.timerManager[key].bind(this.timerManager);
+                } else {
+                    this.context[key] = safe(this.context[key]);
+                }
+            }
+        }
+    }
+
     public async initialize(template = this.input, jsonPtr = "/") {
+        this.timerManager.clearAll();
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
@@ -229,6 +242,9 @@ export default class TemplateProcessor {
         }
     }
 
+    close():void{
+        this.timerManager.clearAll();
+    }
 
     private async evaluate(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time

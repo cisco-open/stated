@@ -42,6 +42,11 @@ export default class StatedREPL {
         this.registerCommands();
     }
 
+    close(){
+        this.cliCore.close();
+        this.r.close();
+    }
+
     registerCommands() {
         [ //these are CLICore commands
             ["init", '-f <fname> to Initialize the template'],
