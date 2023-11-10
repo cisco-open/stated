@@ -81,7 +81,13 @@ function runMarkdownTests(testData, cliInstance, printFunction = StatedREPL.stri
     test(`${cmdName} ${args.join(' ')}`, async () => {
       const method = cliInstance[cmdName];
       const response = await method.apply(cliInstance, [args.join(' ')]);
-      const responseNormalized = JSON.parse(printFunction(response));
+      let responseNormalized;
+      try {
+        responseNormalized = JSON.parse(printFunction(response));
+      }catch(error){
+        console.log(error);
+        throw error;
+      }
       if (jsonataExpr) {
         const compiledExpr = jsonata(jsonataExpr);
         const success = await compiledExpr.evaluate(responseNormalized);
@@ -90,7 +96,13 @@ function runMarkdownTests(testData, cliInstance, printFunction = StatedREPL.stri
         }
       }
       else {
-        const expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;
+        let expected;
+        try {
+          expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;
+        }catch(error){
+          console.log(error);
+          throw error;
+        }
         if (expected) {
           expect(responseNormalized).toEqual(expected);
         }

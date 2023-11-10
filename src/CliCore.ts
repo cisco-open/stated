@@ -27,7 +27,7 @@ export default class CliCore {
     private logLevel: keyof typeof LOG_LEVELS;
     replServer:repl.REPLServer;
 
-    constructor(replServer?: repl.REPLServer) {
+    constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";
     }
@@ -41,7 +41,7 @@ export default class CliCore {
     static parseInitArgs(replCmdInputStr){
 
         const parsed = CliCore.minimistArgs(replCmdInputStr);
-        let {_:bareArgs ,f:filepath, tags = "", o:oneshot,options="{}"} = parsed;
+        let {_:bareArgs ,f:filepath, tags = "", o:oneshot,options="{}", tail} = parsed;
         if(tags === true){ //weird case of --tags with no arguments
             tags = "";
         }
@@ -103,7 +103,7 @@ export default class CliCore {
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
     async init(replCmdInputStr) {
         const parsed = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath} = parsed;
+        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath, tail} = parsed;
         if(filepath===undefined){
             return undefined;
         }
@@ -116,20 +116,23 @@ export default class CliCore {
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
 
-        if (oneshot === true) {
+        try {
             await this.templateProcessor.initialize();
-            return this.templateProcessor.output;
-        } else {
-            try {
-                await this.templateProcessor.initialize();
-                return this.templateProcessor.input;
-            } catch (error) {
-                return {
-                    name: error.name,
-                    message: error.message
-                };
+            if (oneshot === true) {
+                return this.templateProcessor.output;
             }
+            if(tail !== undefined){
+                return this.tail(tail);
+            }
+            return this.templateProcessor.input;
+
+        } catch (error) {
+            return {
+                name: error.name,
+                message: error.message
+            };
         }
+
     }
 
 
@@ -248,24 +251,24 @@ export default class CliCore {
         const [jsonPointer, linesArg] = args.split(' '); // Assuming it's called with '.tail 10' for 10 lines
         const lineCount = parseInt(linesArg, 10) || -1; // Default to unlimited if not specified
 
+        if(this.replServer) { //in unit test REPL server won't be present
+            let printedLines = 0;
+            const listener = (data) => {
+                this.replServer.output.write(StatedREPL.stringify(data) + "\n"); // Write data to the REPL's output stream
+                if (lineCount !== -1 && ++printedLines >= lineCount) {
+                    this.templateProcessor.removeDataChangeCallback(jsonPointer); // Stop listening after 'n' lines
+                }
+            };
+            this.templateProcessor.setDataChangeCallback(jsonPointer, listener);
 
-        let printedLines = 0;
-        const listener = (data) => {
-            this.replServer.output.write(StatedREPL.stringify(data)+"\n"); // Write data to the REPL's output stream
-            if (lineCount !== -1 && ++printedLines >= lineCount) {
-                this.templateProcessor.removeDataChangeCallback(jsonPointer); // Stop listening after 'n' lines
+            const sigListener = () => { // Listen for the interrupt signal (Ctrl+C) in REPL
+                this.templateProcessor.removeDataChangeCallback(jsonPointer)
+                this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
+                this.replServer.displayPrompt(); // Display the REPL prompt again
             }
-        };
-        this.templateProcessor.setDataChangeCallback(jsonPointer, listener);
-
-        const sigListener = () => { // Listen for the interrupt signal (Ctrl+C) in REPL
-            this.templateProcessor.removeDataChangeCallback(jsonPointer)
-            this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
-            this.replServer.displayPrompt(); // Display the REPL prompt again
+            this.replServer.on('SIGINT', sigListener);
         }
-        this.replServer.on('SIGINT', sigListener);
-
-        return "Started tailing... Press Ctrl+C to stop.\n";
+        return "Started tailing... Press Ctrl+C to stop.";
     }
 }
 

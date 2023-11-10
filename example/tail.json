@@ -1,5 +1,5 @@
 {
   "incr": "${function(){$set('/counter',counter+1)}}",
   "counter": 0,
-  "upCount": "${  $setInterval(incr, 1000)  }"
+  "upCount": "${  $setInterval(incr, 10)  }"
 }

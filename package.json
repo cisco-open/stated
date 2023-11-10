@@ -39,8 +39,10 @@
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "dependencies": {
+    "chalk": "^5.3.0",
     "flatbuffers": "^23.5.26",
     "js-yaml": "^4.1.0",
+    "json-colorizer": "^2.2.2",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",

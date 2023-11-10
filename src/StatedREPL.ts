@@ -13,16 +13,20 @@
 // limitations under the License.
 import repl from 'repl';
 import CliCore from './CliCore.js';
+import colorizeJson from "json-colorizer";
+import chalk from 'chalk';
 
 
 export default class StatedREPL {
     private readonly cliCore: CliCore;
     r: repl.REPLServer;
+    private isColorized:boolean;
     constructor() {
         this.cliCore = new CliCore();
     }
 
     async initialize() {
+        this.isColorized = false;
         const cmdLineArgsStr = process.argv.slice(2).join(" ");
         const {oneshot} = CliCore.parseInitArgs(cmdLineArgsStr)
         const resp = await this.cliCore.init(cmdLineArgsStr)
@@ -52,7 +56,7 @@ export default class StatedREPL {
             ["log", "set the log level [debug, info, warn, error]"],
             ["debug", "set debug commands (WIP)"],
             ["errors", "return an error report"],
-            ["tail", "'tail /count 100' will tail 100 changes to the /count"],
+            ["tail", "tail /count 100' will tail 100 changes to the /count"],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
@@ -62,6 +66,17 @@ export default class StatedREPL {
                     await this.cli(cmdName, args);
                 },
             });
+        });
+        this.r.defineCommand("color", {
+            help: "[on|off] colorize JSON",
+            action: async (args) => {
+                if(args.trim()==="on"){
+                    this.isColorized = true;
+                }else if(args.trim()==="off"){
+                    this.isColorized = false;
+                }
+                this.r.displayPrompt();
+            },
         });
 
         //these other commands are REPL-only commands and are not part of the CLiCore that does
@@ -83,15 +98,20 @@ export default class StatedREPL {
     }
 
     async cli(cliCoreMethod, args){
+        let result;
         try{
             const method = this.cliCore[cliCoreMethod].bind(this.cliCore);
-            const result = await method(args);
-            console.log(StatedREPL.stringify(result));
+            result = await method(args);
+            let stringify = StatedREPL.stringify(result);
+            if(this.isColorized === true){
+                stringify = StatedREPL.colorize(stringify);
+            }
+            console.log(stringify);
         } catch (e) {
             console.error(e);
         }
-        if(cliCoreMethod !== 'tail'){
-            this.r.displayPrompt(); //all commands except tail should throw the prompt up aftert they return
+        if(!result.toString().startsWith("Started tailing...")){
+            this.r.displayPrompt(); //all commands except tail or those that support --tail should throw the prompt up after they return
         }
     }
 
@@ -118,7 +138,24 @@ export default class StatedREPL {
     }
 
     static stringify(o:any, printFunction:(k:any,v:any)=>any=StatedREPL.printFunc){
-        return JSON.stringify(o, printFunction, 2)
+        return JSON.stringify(o, printFunction, 2);
+    }
+
+    static colorize(s:string):string{
+        return colorizeJson(s).replace(/(true|false)/g, chalk.yellow('$1')) // booleans in yellow
+            .replace(/\b(\d+)\b/g, chalk.green('$1')) // numbers green
+            .replace(/'([^']*)'/g, chalk.cyanBright("'$1'"))
+            .replace(/(".*?)(\$\{)\s*(.*?)\s*(\}")/g, (match,p0, p1, p2, p3) => {
+                // p1 is the opening "${"
+                // p2 is the JSONata expression
+                // p3 is the closing "}"
+                return p0 + chalk.gray(p1) + chalk.bgRed(chalk.bold(p2)) + chalk.gray(p3);
+            })
+            .replace(/\$(\w+)/g, (match) => {
+                // Entire match will be replaced with this return value
+                // Use chalk to add color - cyan in this case
+                return chalk.cyan(match);
+            });
     }
 
 }
