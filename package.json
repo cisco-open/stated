@@ -19,7 +19,7 @@
     "clean": "rm -rf dist",
     "build": "tsc && npm run webpack",
     "webpack": "webpack && webpack --config webpack.config.cjs.js",
-    "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js",
+    "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "test-fast": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "stated": "node --experimental-vm-modules dist/stated.js"
   },
@@ -39,8 +39,10 @@
   ],
   "author": "Geoff Hendrey <ghendreyl@cisco.com>",
   "dependencies": {
+    "chalk": "^5.3.0",
     "flatbuffers": "^23.5.26",
     "js-yaml": "^4.1.0",
+    "json-colorizer": "^2.2.2",
     "jsonata": "^2.0.3",
     "lodash": "^4.17.21",
     "lodash-es": "^4.17.21",

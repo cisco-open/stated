@@ -39,16 +39,25 @@ test("test onInit", async () => {
   const repl2 = new StatedREPL();
   await repl2.initialize();
 
-  let beenCalled1 = false;
-  repl1.cliCore.onInit = () => { beenCalled1 = true;}
-  let beenCalled2 = false;
-  repl2.cliCore.onInit = () => { beenCalled2 = true;}
-  await repl1.cliCore.init('-f "example/ex01.yaml"');
-  expect(beenCalled1).toBe(true);
-  expect(beenCalled2).toBe(false);
+  try {
+    let beenCalled1 = false;
+    repl1.cliCore.onInit = () => {
+      beenCalled1 = true;
+    }
+    let beenCalled2 = false;
+    repl2.cliCore.onInit = () => {
+      beenCalled2 = true;
+    }
+    await repl1.cliCore.init('-f "example/ex01.yaml"');
+    expect(beenCalled1).toBe(true);
+    expect(beenCalled2).toBe(false);
 
-  await repl2.cliCore.init('-f "example/ex01.yaml"');
-  expect(beenCalled2).toBe(true);
+    await repl2.cliCore.init('-f "example/ex01.yaml"');
+    expect(beenCalled2).toBe(true);
+  }finally {
+    repl1.close();
+    repl2.close();
+  }
 });
 
 

@@ -73,31 +73,45 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
 /**
  * Runs the tests based on the extracted test data.
  * @param {Array} testData The test data containing the commands and expected responses.
- * @param {object} cliInstance An instance of the CLI class that has the methods to be tested.
+ * @param {object} cliCore An instance of the CLI class that has the methods to be tested.
  * @param {function} printFunction The function is used to print response output to compare with expected response.
  */
-function runMarkdownTests(testData, cliInstance, printFunction = StatedREPL.stringify) {
-  testData.forEach(({ cmdName, args, expectedResponse, jsonataExpr }) => {
-    test(`${cmdName} ${args.join(' ')}`, async () => {
-      const method = cliInstance[cmdName];
-      const response = await method.apply(cliInstance, [args.join(' ')]);
-      const responseNormalized = JSON.parse(printFunction(response));
-      if (jsonataExpr) {
-        const compiledExpr = jsonata(jsonataExpr);
-        const success = await compiledExpr.evaluate(responseNormalized);
-        if(success===false){
-          throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr}`);
+function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = StatedREPL.stringify) {
+  try {
+    testData.forEach(({cmdName, args, expectedResponse, jsonataExpr}) => {
+      test(`${cmdName} ${args.join(' ')}`, async () => {
+        const method = cliCore[cmdName];
+        const response = await method.apply(cliCore, [args.join(' ')]);
+        let responseNormalized;
+        try {
+          responseNormalized = JSON.parse(printFunction(response));
+        } catch (error) {
+          console.log(error);
+          throw error;
         }
-      }
-      else {
-        const expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;
-        if (expected) {
-          expect(responseNormalized).toEqual(expected);
+        if (jsonataExpr) {
+          const compiledExpr = jsonata(jsonataExpr);
+          const success = await compiledExpr.evaluate(responseNormalized);
+          if (success === false) {
+            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr}`);
+          }
+        } else {
+          let expected;
+          try {
+            expected = expectedResponse ? JSON.parse(expectedResponse) : undefined;
+          } catch (error) {
+            console.log(error);
+            throw error;
+          }
+          if (expected) {
+            expect(responseNormalized).toEqual(expected);
+          } else {
+            expect(responseNormalized).toBeDefined();
+          }
         }
-        else {
-          expect(responseNormalized).toBeDefined();
-        }
-      }
-    }, 30000); // set timeout to 30 seconds for each test
-  });
+      }, 30000); // set timeout to 30 seconds for each test
+    });
+  }finally {
+    cliCore.close();
+  }
 }

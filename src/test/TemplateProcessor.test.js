@@ -1247,16 +1247,25 @@ test("test rxLog", async () => {
     stop$: ($count(rxLog)=5?$clearInterval(interval$):'still going')
     `;
     const template = yaml.load(templateYaml);
-    const tp = new TemplateProcessor(template, {"subscribe": ()=>{}, "publish":()=>{}});
-    await tp.initialize();
-    expect(tp.from("/rxLog")).toEqual([
-        "/rxLog",
-        "/stop$"
-    ]);
-    expect(tp.from("/rxLog/-")).toEqual([
-        "/rxLog/-",
-        "/stop$"
-    ]);
+    let tp
+    try {
+        tp = new TemplateProcessor(template, {
+            "subscribe": () => {
+            }, "publish": () => {
+            }
+        });
+        await tp.initialize();
+        expect(tp.from("/rxLog")).toEqual([
+            "/rxLog",
+            "/stop$"
+        ]);
+        expect(tp.from("/rxLog/-")).toEqual([
+            "/rxLog/-",
+            "/stop$"
+        ]);
+    }finally{
+        tp.close();
+    }
 
 });
 
@@ -1327,47 +1336,51 @@ test("ex14.yaml", async () => {
     const yamlFilePath = path.join(__dirname, '..','..','example', 'ex14.yaml');
     const templateYaml = fs.readFileSync(yamlFilePath, 'utf8');
     const template = yaml.load(templateYaml);
-    const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    expect(await tp.getEvaluationPlan()).toEqual([
-        "/incr$",
-        "/upCount$",
-        "/status$"
-    ]);
-    expect(tp.to('/status$')).toEqual([
-        "/counter",
-        "/incr$",
-        "/upCount$",
-        "/status$"
-    ]);
-    expect(tp.to('/upCount$')).toEqual([
-        "/counter",
-        "/incr$",
-        "/upCount$"
-    ]);
-    expect(tp.from('/incr$')).toEqual([
-        "/incr$"
-    ]);
-    expect(tp.from('/counter')).toEqual([
-            "/counter",
+    let tp;
+    try {
+        tp = new TemplateProcessor(template);
+        await tp.initialize();
+        expect(await tp.getEvaluationPlan()).toEqual([
+            "/incr$",
+            "/upCount$",
             "/status$"
-        ]
-    );
-    expect(tp.from('/upCount$')).toEqual([
-        "/upCount$",
-        "/status$"
-    ]);
-    expect(tp.from('/status$')).toEqual([
-        "/status$"
-    ]);
-    expect(tp.to('/incr$')).toEqual([
-        "/counter",
-        "/incr$"
-    ]);
-    expect(tp.to('/counter')).toEqual(    [
-        "/counter"
-    ]);
-
+        ]);
+        expect(tp.to('/status$')).toEqual([
+            "/counter",
+            "/incr$",
+            "/upCount$",
+            "/status$"
+        ]);
+        expect(tp.to('/upCount$')).toEqual([
+            "/counter",
+            "/incr$",
+            "/upCount$"
+        ]);
+        expect(tp.from('/incr$')).toEqual([
+            "/incr$"
+        ]);
+        expect(tp.from('/counter')).toEqual([
+                "/counter",
+                "/status$"
+            ]
+        );
+        expect(tp.from('/upCount$')).toEqual([
+            "/upCount$",
+            "/status$"
+        ]);
+        expect(tp.from('/status$')).toEqual([
+            "/status$"
+        ]);
+        expect(tp.to('/incr$')).toEqual([
+            "/counter",
+            "/incr$"
+        ]);
+        expect(tp.to('/counter')).toEqual([
+            "/counter"
+        ]);
+    }finally {
+        tp.close();
+    }
 });
 describe('TemplateProcessor.fromString', () => {
 

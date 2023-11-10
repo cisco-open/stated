@@ -249,18 +249,20 @@ fact that stated-js is written using ES Module syntax.
 
 stated provides a set of REPL commands to interact with the system:
 
-| Command  | Description                                              | flags & args                                                                                                                             | Example                                                                                                                                      |
-|----------|----------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------|
-| `.init`  | Initialize the template from a JSON file.                | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates` |
-| `.set`   | Set data to a JSON pointer path.                         | `<path> <data>`                                                                                                                          | `.set /to "jsonata"`                                                                                                                         |
-| `.from`  | Show the dependents of a given JSON pointer.             | `<path>`                                                                                                                                 | `.from /a`                                                                                                                                   |
-| `.to`    | Show the dependencies of a given JSON pointer.           | `<path>`                                                                                                                                 | `.to /b`                                                                                                                                     |
-| `.in`    | Show the input template.                                 | `None`                                                                                                                                   | `.in`                                                                                                                                        |
-| `.out`   | Show the current state of the template.                  | `[<jsonPtr>]`                                                                                                                            | `.out` <br>`.out /data/accounts`                                                                                                             |
-| `.state` | Show the current state of the template metadata.         | `None`                                                                                                                                   | `.state`                                                                                                                                     |
-| `.plan`  | Show the execution plan for rendering the template.      | `None`                                                                                                                                   | `.plan`                                                                                                                                      |
-| `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                                                              | `.note "Example 8"`                                                                                                                          |
-| `.log`   | Set the logging level                                    | `[silent, error, warn, info, verbose, debug]`                                                                                            | `.log silent`                                                                                                                                |
+| Command  | Description                                              | flags & args                                                                                                                                                      | Example                                                                                                                                                |
+|----------|----------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.init`  | Initialize the template from a JSON file.                | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` <br> &bull; `--tail=<n>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates --tail=10` |
+| `.set`   | Set data to a JSON pointer path.                         | `<path> <data>`                                                                                                                                                   | `.set /to "jsonata"`                                                                                                                                   |
+| `.from`  | Show the dependents of a given JSON pointer.             | `<path>`                                                                                                                                                          | `.from /a`                                                                                                                                             |
+| `.to`    | Show the dependencies of a given JSON pointer.           | `<path>`                                                                                                                                                          | `.to /b`                                                                                                                                               |
+| `.in`    | Show the input template.                                 | `None`                                                                                                                                                            | `.in`                                                                                                                                                  |
+| `.out`   | Show the current state of the template.                  | `[<jsonPtr>]`                                                                                                                                                     | `.out` <br>`.out /data/accounts`                                                                                                                       |
+| `.state` | Show the current state of the template metadata.         | `None`                                                                                                                                                            | `.state`                                                                                                                                               |
+| `.plan`  | Show the execution plan for rendering the template.      | `None`                                                                                                                                                            | `.plan`                                                                                                                                                |
+| `.note`  | Show a separator line with a comment in the REPL output. | `<comment>`                                                                                                                                                       | `.note "Example 8"`                                                                                                                                    |
+| `.log`   | Set the logging level                                    | `[silent, error, warn, info, verbose, debug]`                                                                                                                     | `.log silent`                                                                                                                                          |
+| `.color` | Enable Colors                                            | `[on,off]`                                                                                                                                                        | `.color on`                                                                                                                                            |
+| `.tail`  | Tail part of the document for changes                    | `<jsonPointer>` <n>?                                                                                                                                              | `.tail /count 100`                                                                                                                                     |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -281,6 +283,18 @@ parses the input, builds an execution plan, and executes the result. To see the 
     1,
     1
   ]
+}
+```
+## Color
+```json
+> .note color does not appear in this markdown file
+"============================================================="
+> .color on
+> .init -f "example/ex01.json"
+{
+  "a": 42,
+  "b": "${a}",
+  "c": "${'the answer is: '& b}"
 }
 ```
 ## Error Handling
@@ -518,8 +532,20 @@ expression are also tagged.
 }
 
 ```
-
-
+## Liveness
+Templates can contain generative expressions that cause their content to change over time. The `tail` command can be
+used to watch changes on a particular field. Below we use `--tail "/counter 5` to tail up to 5 changes to the `/counter`
+field:
+```json
+> .init -f "example/tail.json"
+{
+  "incr": "${function(){$set('/counter',counter+1)}}",
+  "counter": 0,
+  "upCount": "${  $setInterval(incr, 10)  }"
+}
+> .init -f "example/tail.json" --tail "/counter 5"
+"Started tailing... Press Ctrl+C to stop."
+```
 ## Reactive Behavior
 Stated is naturally reactive. In the example below, `story` will evaluate when the promises for `partI` and `partII` have both
 resolved, simply because `story` has references to `partI` and `partII`, each of which respectively is triggered by the 
