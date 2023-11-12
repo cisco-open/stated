@@ -50,7 +50,10 @@ test("test 1", async () => {
             "jsonPtr": "/b"
         },
         {
-            "data": null,
+            "data": {
+                "a": 42,
+                "b": 42
+            },
             "jsonPtr": [
                 "/a",
                 "/b"

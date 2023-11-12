@@ -255,29 +255,59 @@ export default class CliCore {
         return this.templateProcessor.errorReport;
     }
 
-    tail(args:string):string {
+    public tail(args: string): string {
+        const [jsonPointer, changeCountArg] = args.split(' ');
+        let changeCount = changeCountArg!==undefined ? parseInt(changeCountArg, 10) : undefined;
 
-        const [jsonPointer, linesArg] = args.split(' '); // Assuming it's called with '.tail 10' for 10 lines
-        const lineCount = parseInt(linesArg, 10) || -1; // Default to unlimited if not specified
-
-        if(this.replServer) { //in unit test REPL server won't be present
-            let printedLines = 0;
-
-            const sigListener = () => { // Listen for the interrupt signal (Ctrl+C) in REPL
-                this.templateProcessor.removeDataChangeCallback(jsonPointer)
-                this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
-            }
-            this.replServer.on('SIGINT', sigListener);
-            const listener = (data) => {
-                this.replServer.output.write(StatedREPL.stringify(data) + "\n"); // Write data to the REPL's output stream
-                if (lineCount !== -1 && ++printedLines >= lineCount) {
-                    this.templateProcessor.removeDataChangeCallback(jsonPointer); // Stop listening after 'n' lines
-                    this.replServer.removeListener('SIGINT', sigListener); // Clean up the SIGINT listener
-                }
-            };
-            this.templateProcessor.setDataChangeCallback(jsonPointer, listener);
+        // Determine if we are in overwrite mode based on changeCount being 0
+        const overwriteMode = changeCount === 0;
+        let currentOutputLines = 0;
+        // SIGINT listener to handle Ctrl+C press in REPL
+        const onSigInt = () => {
+            unplug();
+        };
+        if(this.replServer) { //tests would not provide replServer
+            this.replServer.on('SIGINT', onSigInt);
         }
+        const unplug = ()=>{
+            // Stop tailing without clearing the screen to keep the exit message
+            this.templateProcessor.removeDataChangeCallback(jsonPointer);
+            currentOutputLines = 0;
+            if(this.replServer){
+                this.replServer.displayPrompt();
+                this.replServer.removeListener('SIGINT', onSigInt);
+            }
+        }
+
+        // Data change callback
+        const onDataChanged = (data: any) => {
+            const output = StatedREPL.stringify(data); // Use the actual implementation of stringify
+            const outputLines = output.split('\n');
+            if (overwriteMode && currentOutputLines > 0) {
+                // Move cursor up by the number of lines previously outputted
+                for (let i = 0; i < currentOutputLines; i++) {
+                    this.replServer.output.write('\x1B[1A\x1B[K'); // Clear the line
+                }
+            }
+
+            // Write new data
+            this.replServer.output.write(output + '\n');
+
+            // Update the current output lines count for the next change
+            currentOutputLines = overwriteMode ? outputLines.length : 0;
+            //if we are in regularTail mode, and we counted down to zero the number of changes
+            //then unplug
+            if(!overwriteMode && --changeCount==0){
+                unplug();
+            }
+
+        };
+
+        // Register the onDataChanged callback with the templateProcessor
+        this.templateProcessor.setDataChangeCallback(jsonPointer, onDataChanged);
         return "Started tailing... Press Ctrl+C to stop.";
     }
+
+
 }
 

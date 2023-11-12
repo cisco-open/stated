@@ -827,7 +827,7 @@ export default class TemplateProcessor {
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            this.commonCallback && this.commonCallback(null, thoseThatUpdated); //we don't pass
+            this.commonCallback && this.commonCallback(this.output, thoseThatUpdated); //we don't pass
         }
         return thoseThatUpdated;
     }

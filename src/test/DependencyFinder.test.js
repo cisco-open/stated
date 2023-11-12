@@ -642,6 +642,60 @@ test("$string(data.pD.data)", () => {
 });
 
 
+test("matrix1", () => {
+    const program = `function(){$set('/matrix$/0',matrix$[0].($+1))}`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "matrix$",
+            0
+        ]
+    ]);
+});
+
+test("matrix2", () => {
+    const program = `matrix$[0][0]%4`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "matrix$",
+            0,
+            0
+        ]
+    ]);
+});
+
+test("matrix3", () => {
+    const program = "function(){ $set('/i', i+1 % $count(chars)) }";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "i"
+        ],
+        [
+            "chars"
+        ]
+    ]);
+});
+
+test("matrix4", () => {
+    const program = "chars[[0..$$.i]]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "$",
+            "i"
+        ],
+        [
+            "chars"
+        ]
+    ]);
+});
+
+
+
+
+
 
 
 
