@@ -20,17 +20,18 @@ import {parseArgsStringToArgv} from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
-import {template} from "@babel/core";
 
 
 export default class CliCore {
     private templateProcessor: TemplateProcessor;
     private logLevel: keyof typeof LOG_LEVELS;
+    private currentDirectory:string;
     replServer:repl.REPLServer;
 
     constructor() {
         this.templateProcessor = null;
         this.logLevel = "info";
+        this.currentDirectory = path.join(process.cwd(), 'example'); // Default to cwd/example
     }
     public close(){
         if(this.templateProcessor){
@@ -120,6 +121,10 @@ export default class CliCore {
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        if(this.replServer){
+            //make variable called 'template' accessible in REPL
+            this.replServer.context.template = this.templateProcessor;
+        }
         this.templateProcessor.onInitialize = this.onInit;
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
         this.templateProcessor.logger.level = this.logLevel;
@@ -307,6 +312,76 @@ export default class CliCore {
         this.templateProcessor.setDataChangeCallback(jsonPointer, onDataChanged);
         return "Started tailing... Press Ctrl+C to stop.";
     }
+
+
+
+public async open(directory: string = this.currentDirectory) {
+    if(directory === ""){
+        directory = this.currentDirectory;
+    }
+    // Read all files from the directory
+    const files = await fs.promises.readdir(directory);
+    // Filter out only .json and .yaml files
+    const templateFiles = files.filter(file => file.endsWith('.json') || file.endsWith('.yaml'));
+
+    // Display the list of files to the user
+    templateFiles.forEach((file, index) => {
+        console.log(`${index + 1}: ${file}`);
+    });
+
+    // Create an instance of AbortController
+    const ac = new AbortController();
+    const { signal } = ac; // Get the AbortSignal from the controller
+
+    // Ask the user to choose a file
+    this.replServer.question('Enter the number of the file to open (or type "abort" to cancel): ', { signal }, async (answer) => {
+        // Check if the operation was aborted
+        if (signal.aborted) {
+            console.log('File open operation was aborted.');
+            this.replServer.displayPrompt();
+            return;
+        }
+
+        const fileIndex = parseInt(answer, 10) - 1; // Convert to zero-based index
+        if (fileIndex >= 0 && fileIndex < templateFiles.length) {
+            // User has entered a valid file number; initialize with this file
+            const filepath = path.join(directory, templateFiles[fileIndex]);
+            try {
+                const result = await this.init(`-f "${filepath}"`); // Adjust this call as per your init method's expected format
+                console.log(StatedREPL.stringify(result));
+                console.log("...try '.out' or 'template.output' to see evaluated template")
+            } catch (error) {
+                console.log('Error loading file:', error);
+            }
+        } else {
+            console.log('Invalid file number.');
+        }
+
+        this.replServer.displayPrompt();
+    });
+
+    // Allow the user to type "abort" to cancel the file open operation
+    this.replServer.once('SIGINT', () => {
+        ac.abort();
+    });
+
+    return "open... (type 'abort' to cancel)";
+}
+
+
+    public cd(newDirectory: string) {
+        // Resolve the new path against the current directory to support relative paths
+        const resolvedNewDirectory = path.resolve(this.currentDirectory, newDirectory);
+
+        // Check if the resolved new directory path is valid
+        if (fs.existsSync(resolvedNewDirectory) && fs.lstatSync(resolvedNewDirectory).isDirectory()) {
+            this.currentDirectory = resolvedNewDirectory;
+            return `Current directory changed to: ${this.currentDirectory}`;
+        } else {
+            return `Invalid directory: ${newDirectory}`;
+        }
+    }
+
 
 
 }

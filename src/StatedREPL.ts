@@ -37,6 +37,8 @@ export default class StatedREPL {
         //crank up the interactive REPL
         this.r = repl.start({
             prompt: '> ',
+            useColors:true,
+            useGlobal:true
         });
         this.cliCore.replServer = this.r;
         this.registerCommands();
@@ -49,6 +51,8 @@ export default class StatedREPL {
 
     registerCommands() {
         [ //these are CLICore commands
+            ["open", 'interactive command to open select and open a template'],
+            ["cd", "change directory for example 'cd ..' "],
             ["init", '-f <fname> to Initialize the template'],
             ["set", 'Set data to a JSON pointer path and show the executed output'],
             ["in", 'Show the input template'],
@@ -102,20 +106,22 @@ export default class StatedREPL {
         });
     }
 
-    async cli(cliCoreMethod, args){
+    async cli(cliCoreMethodName, args){
         let result;
         try{
-            const method = this.cliCore[cliCoreMethod].bind(this.cliCore);
+            const method = this.cliCore[cliCoreMethodName].bind(this.cliCore);
             result = await method(args);
             let stringify = StatedREPL.stringify(result);
             if(this.isColorized === true){
                 stringify = StatedREPL.colorize(stringify);
             }
-            console.log(stringify);
+            if (!this.tookOverIO(cliCoreMethodName)){ //.open presents an interactive prompt. It taked over the I/O so we should not print anything
+                console.log(stringify);
+            }
         } catch (e) {
             console.error(e);
         }
-        if(!result.toString().startsWith("Started tailing...")){
+        if(!result.toString().startsWith("Started tailing...") || this.tookOverIO(cliCoreMethodName)){
             this.r.displayPrompt(); //all commands except tail or those that support --tail should throw the prompt up after they return
         }
     }
@@ -163,6 +169,9 @@ export default class StatedREPL {
             });
     }
 
+    private tookOverIO(method) {
+        return method === 'open';
+    }
 }
 
 
