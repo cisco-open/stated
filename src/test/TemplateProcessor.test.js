@@ -1572,12 +1572,19 @@ test("parallel TemplateProcessors", () => {
     });
 });
 
-
-
-
-
-
-
-
-
-
+test("context functions binding", async () => {
+    TemplateProcessor.DEFAULT_FUNCTIONS = {...TemplateProcessor.DEFAULT_FUNCTIONS, ...{
+        testFunc: async function(){
+            // 'this' is bound to the TemplateProcessor instance on tp.initialize()
+            await this.setData("/test", "test");
+            return "complete";
+        }}};
+    const tp = new TemplateProcessor({
+        "a": "${$testFunc()}"
+    });
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "a": "complete",
+        "test": "test" // this ensures that the context function was bound correctly
+    });
+});

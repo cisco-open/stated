@@ -155,16 +155,18 @@ export default class TemplateProcessor {
             }
 
             // Return an instance of TemplateProcessor with the parsed object
+
             return new TemplateProcessor(parsedObject, context, options);
     }
 
-    constructor(template={}, context = {}, options={}) {
+
+    constructor(template: {} = {}, context = {}, options={} ) {
+        this.context = context;
         this.timerManager = new TimerManager(); //prevent leaks from $setTimeout and $setInterval
         this.uniqueId = Math.random()*1e6;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
-        this.setupContext(context);
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
         this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to `initialize the templateMeta
@@ -179,11 +181,11 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
     }
 
-    private setupContext(context: {}) {
+    private setupContext() {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
-            context,
+            this.context,
             {"set": this.setData}
         );
         const safe = this.withErrorHandling.bind(this);
@@ -193,13 +195,14 @@ export default class TemplateProcessor {
                     //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
                     this.context[key] = this.timerManager[key].bind(this.timerManager);
                 } else {
-                    this.context[key] = safe(this.context[key]);
+                    this.context[key] = safe(this.context[key].bind(this));
                 }
             }
         }
     }
 
     public async initialize(template = this.input, jsonPtr = "/") {
+        this.setupContext();
         this.timerManager.clearAll();
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
