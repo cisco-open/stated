@@ -1,0 +1,38 @@
+svgson: "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/animateLines.json').json()}"
+data: {
+  bandwidth: {
+    data:{
+      replica1: 2000,
+      replica2: 500
+    }
+  }
+}
+computeDurationOfAnimation: "${function($bandwidth){$string(1000/$bandwidth) & 's' }}" #produces '2s' for instance
+setLineAnimationDuration: |
+  ${ 
+    function($svg, $lineId, $duration ){ 
+      $svg ~> |$.[children[name='line' 
+                           and 
+                           attributes[id=$lineId]]
+              .children[name='animate']]
+              .attributes
+              |{'dur':$duration}|  /*sets the svg animate tag's 'dur' attribute like dur="0.5s"*/
+    } 
+  }
+setBandwidthBoxText: |
+  ${ 
+    function($svg, $id, $bw ){ 
+      $svg ~> |$.children[name='text' and attributes[id=$id]]
+               .children[type='text'].attributes|{'value':$string($bw)&' Mbps'}|  /*sets the text inside the box to like 1000 Mps'*/
+    } 
+  }
+dur1: "${ computeDurationOfAnimation($$.data.bandwidth.data.replica1)}"
+dur2: "${ computeDurationOfAnimation($$.data.bandwidth.data.replica2)}"
+content: |
+  ${
+     svgson
+     ~> setLineAnimationDuration('line1', $$.dur1)
+     ~> setLineAnimationDuration('line2', $$.dur2)
+     ~> setBandwidthBoxText('text1', $$.data.bandwidth.data.replica1)
+     ~> setBandwidthBoxText('text2', $$.data.bandwidth.data.replica2)
+  }

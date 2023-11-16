@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import JSONPointer, { default as jp } from './JsonPointer.js';
+import { default as jp } from './JsonPointer.js';
 import isEqual from "lodash-es/isEqual.js";
 import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
@@ -113,6 +113,16 @@ export default class TemplateProcessor {
 
     /** Common callback function used within the template processor. */
     commonCallback: any;
+
+    /** function generators can be provided by a caller when functions need to be
+     *  created in such a way that they are somehow 'responsive' or dependent on their
+     *  location inside the template. $import is an example of this kind of behavior.
+     *  When $import('http://mytemplate.com/foo.json') is called, the import function
+     *  is actually genrated on the fly, using knowledge of the json path that it was
+     *  called at, to replace the cotnent of the template at that path with the downloaded
+     *  content.*/
+    functionGenerators:Map<string, (MetaInfo,TemplateProcessor)=>(any)=>any >
+
     private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString, removed:boolean)=>void>;
 
     /** Flag indicating if the template processor is currently initializing. */
@@ -129,6 +139,8 @@ export default class TemplateProcessor {
     public onInitialize: () => Promise<void>;
     /** Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are removed*/
     public postInitialize: ()=> Promise<void>;
+
+
 
 
     public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
@@ -177,6 +189,7 @@ export default class TemplateProcessor {
         this.isInitializing = false;
         this.tempVars = [];
         this.changeCallbacks = new Map();
+        this.functionGenerators = new Map();
     }
 
     private setupContext(context: {}) {
@@ -754,7 +767,7 @@ export default class TemplateProcessor {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy
-        const plan = {sortedJsonPtrs, data};
+        const plan = {sortedJsonPtrs, data, op:'set'};
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
@@ -766,8 +779,8 @@ export default class TemplateProcessor {
 
         async function drainQueue() {
             while (this.executionQueue.length > 0) {
-                const {sortedJsonPtrs, data} = this.executionQueue[0];
-                await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data);
+                const {sortedJsonPtrs, data, op} = this.executionQueue[0];
+                await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data, op);
                 this.executionQueue.shift();
             }
         }
@@ -790,13 +803,13 @@ export default class TemplateProcessor {
         }
     }
 
-    private async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP) {
+    private async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP, op:"set"|"delete"="set") {
         const resp = [];
         let first;
         if (data !== TemplateProcessor.NOOP) {
             first = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
             if (!jp.has(this.output, first)) { //node doesn't exist yet, so just create it
-                const didUpdate = await this.evaluateNode(first, data);
+                const didUpdate = await this.evaluateNode(first, data, op);
                 jp.get(this.templateMeta, first).didUpdate__ = didUpdate;
             } else {
                 // Check if the node contains an expression. If so, print a warning and return.
@@ -832,7 +845,7 @@ export default class TemplateProcessor {
         return thoseThatUpdated;
     }
 
-    private async evaluateNode(jsonPtr, data?) {
+    private async evaluateNode(jsonPtr, data=undefined, op:"set"|"delete"="set") {
         const {output, templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
@@ -844,7 +857,7 @@ export default class TemplateProcessor {
 
         const hasDataToSet = data !== undefined && data !== TemplateProcessor.NOOP;
         if (hasDataToSet) {
-            return this.setDataIntoTrackedLocation(templateMeta, jsonPtr, data);
+            return this.setDataIntoTrackedLocation(templateMeta, jsonPtr, data, op);
         }
 
         return this._evaluateExpression(jsonPtr);
@@ -908,13 +921,13 @@ export default class TemplateProcessor {
         }
     }
 
-    private setDataIntoTrackedLocation(templateMeta, jsonPtr, data) {
+    private setDataIntoTrackedLocation(templateMeta, jsonPtr, data=undefined,op:"set"|"delete"="set" ) {
         const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr);
         if (treeHasExpressions__) {
             this.logger.log('warn', `nodes containing expressions cannot be overwritten: ${jsonPtr}`);
             return false;
         }
-        let didSet = this._setData(jsonPtr, data);
+        let didSet = this._setData(jsonPtr, data, op);
         if (didSet) {
             jp.set(templateMeta, jsonPtr + "/data__", data); //saving the data__ in the templateMeta is just for debugging
             jp.set(templateMeta, jsonPtr + "/materialized__", true);
@@ -939,14 +952,25 @@ export default class TemplateProcessor {
 
     private async _evaluateExprNode(jsonPtr) {
         let evaluated;
-        const {compiledExpr__, exprTargetJsonPointer__, jsonPointer__, expr__} = jp.get(this.templateMeta, jsonPtr);
+        const metaInfo = jp.get(this.templateMeta, jsonPtr);
+        const {compiledExpr__, exprTargetJsonPointer__, jsonPointer__, expr__} = metaInfo;
         let target;
         try {
             target = jp.get(this.output, exprTargetJsonPointer__); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
+            const jittedFunctions = {};
+            for (const k of this.functionGenerators.keys()) {
+                const generator = this.functionGenerators.get(k);
+                jittedFunctions[k] = safe(generator(metaInfo, this));
+            }
+
             evaluated = await compiledExpr__.evaluate(
                 target,
-                merge(this.context, {"import": safe(this.getImport(jsonPointer__))}));
+                {...this.context,
+                    ...{"import": safe(this.getImport(jsonPointer__))},
+                    ...jittedFunctions
+                }
+            );
         } catch (error) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
@@ -968,11 +992,18 @@ export default class TemplateProcessor {
         return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
     }
 
-    private _setData(jsonPtr, data) {
+    private _setData(jsonPtr:JsonPointerString, data:any=undefined, op:"set"|"delete" ="set"):boolean {
         if (data === TemplateProcessor.NOOP) { //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
             return false;
         }
         const {output} = this;
+        if(op === 'delete'){
+            if(jp.has(output, jsonPtr)) {
+                jp.remove(output, jsonPtr);
+                return true;
+            }
+            return false;
+        }
         let existingData;
         if (jp.has(output, jsonPtr)) {
             existingData = jp.get(output, jsonPtr);
@@ -989,7 +1020,7 @@ export default class TemplateProcessor {
         }
 
     }
-//    getDependentsTransitiveExecutionPlan(jsonPtr) {
+
     from(jsonPtr) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {

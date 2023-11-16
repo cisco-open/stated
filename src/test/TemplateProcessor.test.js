@@ -1572,6 +1572,20 @@ test("parallel TemplateProcessors", () => {
     });
 });
 
+test("function generators",async () => {
+    let template = {  a: "${ $jit() }" };
+
+    let tp = new TemplateProcessor(template);
+    const jit = (metaInf, tp)=>{
+        return ()=>{
+            return `path was: ${metaInf.jsonPointer__}`;
+        }
+    }
+    tp.functionGenerators.set("jit", jit);
+    await tp.initialize();
+    expect(tp.output.a).toBe("path was: /a");
+});
+
 
 
 
