@@ -181,11 +181,11 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
     }
 
-    private setupContext(): void {
+    private setupContext(context: {}): void {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
-            this.context,
+            context,
             {"set": this.setData}
         );
         const safe = this.withErrorHandling.bind(this);
@@ -202,7 +202,7 @@ export default class TemplateProcessor {
     }
 
     public async initialize(template = this.input, jsonPtr = "/") {
-        this.setupContext();
+        this.setupContext(this.context);
         this.timerManager.clearAll();
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
