@@ -19,8 +19,7 @@ import fs from 'fs';
 import yaml from 'js-yaml';
 import {fileURLToPath} from 'url';
 import {dirname} from 'path';
-import MetaInfoProducer from "../../dist/src/MetaInfoProducer.js";
-import jsonata from "jsonata";
+import DependencyFinder from "../../dist/src/DependencyFinder.js";
 
 
 test("test 1", async () => {
@@ -1573,7 +1572,13 @@ test("parallel TemplateProcessors", () => {
 });
 
 test("function generators",async () => {
-    let template = {  a: "${ $jit() }" };
+    let template = {
+        a: "${ $jit() }",
+        b: "${ $jit() }",
+        c: "${ $oops() }",
+        d:{e:"${ $jit() }"},
+        e: "${ $serial([foo,bar,baz])}"
+    };
 
     let tp = new TemplateProcessor(template);
     const jit = (metaInf, tp)=>{
@@ -1582,8 +1587,39 @@ test("function generators",async () => {
         }
     }
     tp.functionGenerators.set("jit", jit);
+    const serial = (metaInf, tp)=>{
+        return (input, steps, context)=>{
+            const ast = metaInf.compiledExpr__.ast();
+            const depFinder = new DependencyFinder(ast);
+            return depFinder.findDependencies()
+        }
+    }
+    tp.functionGenerators.set('serial', serial);
     await tp.initialize();
-    expect(tp.output.a).toBe("path was: /a");
+    expect(tp.output).toStrictEqual({
+        "a": "path was: /a",
+        "b": "path was: /b",
+        "c": {
+            "error": {
+                "message": "Attempted to invoke a non-function",
+                "name": "JSONata evaluation exception"
+            }
+        },
+        "d": {
+            "e": "path was: /d/e"
+        },
+        "e": [
+            [
+                "foo"
+            ],
+            [
+                "bar"
+            ],
+            [
+                "baz"
+            ]
+        ]
+    });
 });
 
 

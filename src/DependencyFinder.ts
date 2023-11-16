@@ -13,7 +13,7 @@
 // limitations under the License.
 
 import last from 'lodash/last.js';
-import {default as jsonata} from "jsonata";
+import {default as jsonata, ExprNode} from "jsonata";
 
 /*
   There are cases where we need to generate some AST nodes the JSONata does not generate. Instead of referring to
@@ -40,10 +40,19 @@ export default class DependencyFinder {
     private nodeStack: GeneratedExprNode[];
     private readonly dependencies: string[][]; //during tree walking we collect these dependencies like [["a", "b", "c"], ["foo", "bar"]] which means the dependencies are a.b.c and foo.bar
 
+    /**
+     * program can be either a string to be compiled, or an already-compiled AST
+     * @param program
+     */
+    constructor(program: string | ExprNode) {
+        if (typeof program === 'string') {
+            // Handle the case where program is a string
+            this.compiledExpression = jsonata(program);
+            this.ast = this.compiledExpression.ast();
+        } else {
+            this.ast = program;
+        }
 
-    constructor(program: string) {
-        this.compiledExpression = jsonata(program);
-        this.ast = this.compiledExpression.ast();
         this.currentSteps = [];
         this.dependencies = [];
         this.nodeStack = [];
