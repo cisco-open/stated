@@ -181,7 +181,7 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
     }
 
-    private setupContext() {
+    private setupContext(): void {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
