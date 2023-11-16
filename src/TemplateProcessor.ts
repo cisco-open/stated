@@ -181,28 +181,29 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
     }
 
-    private setupContext(context: {}): void {
-        this.context = merge(
+    private setupContext(context: {}): {} {
+        context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
             context,
             {"set": this.setData}
         );
         const safe = this.withErrorHandling.bind(this);
-        for (const key in this.context) {
-            if (typeof this.context[key] === 'function') {
+        for (const key in context) {
+            if (typeof context[key] === 'function') {
                 if (key === "setTimeout" || key === "setInterval") {
                     //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
-                    this.context[key] = this.timerManager[key].bind(this.timerManager);
+                    context[key] = this.timerManager[key].bind(this.timerManager);
                 } else {
-                    this.context[key] = safe(this.context[key].bind(this));
+                    context[key] = safe(context[key].bind(this));
                 }
             }
         }
+        return context;
     }
 
     public async initialize(template = this.input, jsonPtr = "/") {
-        this.setupContext(this.context);
+        this.context = this.setupContext(this.context);
         this.timerManager.clearAll();
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
