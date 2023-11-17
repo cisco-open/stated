@@ -20,6 +20,8 @@ import yaml from 'js-yaml';
 import {fileURLToPath} from 'url';
 import {dirname} from 'path';
 import DependencyFinder from "../../dist/src/DependencyFinder.js";
+import jsonata from "jsonata";
+import { default as jp } from "../../dist/src/JsonPointer.js";
 
 
 test("test 1", async () => {
@@ -1575,9 +1577,8 @@ test("function generators",async () => {
     let template = {
         a: "${ $jit() }",
         b: "${ $jit() }",
-        c: "${ $oops() }",
         d:{e:"${ $jit() }"},
-        e: "${ $serial([foo,bar,baz])}"
+        e: "${ (koink; $serial([foo.zing.zap,bar,baz]))}"
     };
 
     let tp = new TemplateProcessor(template);
@@ -1587,11 +1588,16 @@ test("function generators",async () => {
         }
     }
     tp.functionGenerators.set("jit", jit);
+    let serialDeps;
     const serial = (metaInf, tp)=>{
-        return (input, steps, context)=>{
+        //we need to pick out just the AST subtree for the $serial([...]) function call
+        const searchForSerialFunction = jsonata("**[procedure.value='serial']");
+        return async (input, steps, context)=>{
             const ast = metaInf.compiledExpr__.ast();
-            const depFinder = new DependencyFinder(ast);
-            return depFinder.findDependencies()
+            const astOfSerialFunction = await searchForSerialFunction.evaluate(ast);
+            const depFinder = new DependencyFinder(astOfSerialFunction);
+            serialDeps = depFinder.findDependencies();
+            return "nothing to see here"
         }
     }
     tp.functionGenerators.set('serial', serial);
@@ -1599,27 +1605,27 @@ test("function generators",async () => {
     expect(tp.output).toStrictEqual({
         "a": "path was: /a",
         "b": "path was: /b",
-        "c": {
-            "error": {
-                "message": "Attempted to invoke a non-function",
-                "name": "JSONata evaluation exception"
-            }
-        },
         "d": {
             "e": "path was: /d/e"
         },
-        "e": [
-            [
-                "foo"
-            ],
-            [
-                "bar"
-            ],
-            [
-                "baz"
-            ]
-        ]
+        "e": "nothing to see here"
     });
+    expect(serialDeps).toStrictEqual([
+        [
+            "foo",
+            "zing",
+            "zap"
+        ],
+        [
+            "bar"
+        ],
+        [
+            "baz"
+        ]
+    ]);
+    const jsonPointers = serialDeps.map(jp.compile);
+    expect(jsonPointers).toStrictEqual(["/foo/zing/zap", "/bar", "/baz"]);
+
 });
 
 
