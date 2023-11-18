@@ -39,7 +39,6 @@ export default class DependencyFinder {
     private readonly currentSteps: StepRecord[][]; //logically, [[a,b,c],[d,e,f]]
     private nodeStack: GeneratedExprNode[];
     private readonly dependencies: string[][]; //during tree walking we collect these dependencies like [["a", "b", "c"], ["foo", "bar"]] which means the dependencies are a.b.c and foo.bar
-
     /**
      * program can be either a string to be compiled, or an already-compiled AST
      * @param program
@@ -56,6 +55,19 @@ export default class DependencyFinder {
         this.currentSteps = [];
         this.dependencies = [];
         this.nodeStack = [];
+    }
+
+    /**
+     * If we are looking to analyze only a portion of the jsonata program we can provide another jsonata expression
+     * such as '**[procedure.value='serial']' which will filter the AST down to what is defined. In the case of
+     * '**[procedure.value='serial']' the expression will extract the AST for $serial(...) as it may exist in the
+     * original program.
+     * @param jsonatExpr
+     */
+    async withAstFilterExpression(jsonatExpr:string):Promise<DependencyFinder>{
+        const filter = jsonata(jsonatExpr);
+        this.ast = await filter.evaluate(this.ast);
+        return this;
     }
 
     /*

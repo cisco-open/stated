@@ -1590,13 +1590,12 @@ test("function generators",async () => {
     tp.functionGenerators.set("jit", jit);
     let serialDeps;
     const serial = (metaInf, tp)=>{
-        //we need to pick out just the AST subtree for the $serial([...]) function call
-        const searchForSerialFunction = jsonata("**[procedure.value='serial']");
         return async (input, steps, context)=>{
             const ast = metaInf.compiledExpr__.ast();
-            const astOfSerialFunction = await searchForSerialFunction.evaluate(ast);
-            const depFinder = new DependencyFinder(astOfSerialFunction);
-            serialDeps = depFinder.findDependencies();
+            let depFinder = new DependencyFinder(ast);
+            depFinder = await depFinder.withAstFilterExpression("**[procedure.value='serial']");
+            //this is just an example of how we can find the dependencies of $serial([foo, bar]) and cache them for later use
+            serialDeps =  depFinder.findDependencies();
             return "nothing to see here"
         }
     }
