@@ -818,7 +818,7 @@ export default class TemplateProcessor {
                     this.logger.log('warn', `Attempted to replace expressions with data under ${first}. This operation is ignored.`);
                     return false; //fixme - although not used, returning false here is inconsistent. we need to return [firstMeta]
                 }
-                firstMeta.didUpdate__ = await this.evaluateNode(first, data); // Evaluate the node provided with the data provided
+                firstMeta.didUpdate__ = await this.evaluateNode(first, data, op); // Evaluate the node provided with the data provided
                 if (!firstMeta.didUpdate__) {
                     this.logger.verbose(`data did not change for ${first}, short circuiting dependents.`);
                     return false;
