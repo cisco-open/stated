@@ -14,7 +14,8 @@
     "./dist/src/CliCore.js": "./dist/src/CliCore.js",
     "./dist/src/StatedREPL.js": "./dist/src/StatedREPL.js",
     "./dist/src/TestUtils.js": "./dist/src/TestUtils.js",
-    "./dist/src/DependencyFinder.js": "./dist/src/DependencyFinder.js"
+    "./dist/src/DependencyFinder.js": "./dist/src/DependencyFinder.js",
+    "./dist/src/JsonPointer.js": "./dist/src/JsonPointer.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
