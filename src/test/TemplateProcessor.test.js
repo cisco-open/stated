@@ -1622,6 +1622,7 @@ test("function generators",async () => {
     }
     tp.functionGenerators.set('serial', serial);
     await tp.initialize();
+
     expect(tp.output).toStrictEqual({
         "a": "path was: /a",
         "b": "path was: /b",
@@ -1668,7 +1669,6 @@ test("function generators",async () => {
             "/f/steps"
         ]
     });
-
 });
 
 test("apply", async () => {
