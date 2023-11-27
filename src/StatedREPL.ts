@@ -130,7 +130,7 @@ export default class StatedREPL {
         if(value === undefined){
             return null;
         }
-        if (value?._jsonata_lambda) {
+        if (value?._jsonata_lambda || value?._stated_function__) {
             return "{function:}";
         }
         if (key === 'compiledExpr__') {

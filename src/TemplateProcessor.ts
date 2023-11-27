@@ -971,6 +971,10 @@ export default class TemplateProcessor {
                     ...jittedFunctions
                 }
             );
+            if(evaluated?._jsonata_lambda){
+                evaluated = this.wrapInOrdinaryFunction(evaluated);
+                metaInfo.isFunction__ = true;
+            }
         } catch (error) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
@@ -1097,8 +1101,7 @@ export default class TemplateProcessor {
                 continue;
             }
             const metaInf = jp.get(this.templateMeta, currentPtr);
-            const isFunction = metaInf.data__?._jsonata_lambda;
-            if(isFunction){
+            if(metaInf.isFunction__){
                 continue; //function never gets re-evaluated
             }
             if(currentPtr !== origin && metaInf.expr__ !== undefined){
@@ -1192,6 +1195,21 @@ export default class TemplateProcessor {
             this.logger.debug('import was not a local file');
         }
         return content;
+    }
+
+    private wrapInOrdinaryFunction(jsonataLambda) {
+        const wrappedFunction = (...args)=> {
+            // Call the 'apply' method of jsonataLambda with the captured arguments
+            return jsonataLambda.apply(jsonataLambda, args);
+        };
+        //mark so it will get properly handled by StatedRepl.printFunc
+        wrappedFunction._stated_function__ = true;
+
+        //preserve backward compatibility with code that may be expecting to call the jsonata apply function
+        wrappedFunction.apply = (_this, args)=>{
+            return jsonataLambda.apply(_this, args);
+        }
+        return wrappedFunction;
     }
 
 }

@@ -15,8 +15,9 @@ export interface MetaInfo{
     expr__?: string;
     compiledExpr__?: jsonata.Expression;
     temp__?:boolean; //temp field indicates this field is !${...} and will be removed after template is processed
-    exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString
+    exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString //the pointer to the object that this expression executes on
     data__?:any
+    isFunction__?:boolean
 }
 
 export type JsonPointerStructureArray = (string|number)[];

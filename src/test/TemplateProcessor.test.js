@@ -1344,42 +1344,42 @@ test("ex14.yaml", async () => {
     try {
         tp = new TemplateProcessor(template);
         await tp.initialize();
-        expect(await tp.getEvaluationPlan()).toEqual([
+        expect(await tp.getEvaluationPlan()).toStrictEqual([
             "/incr$",
             "/upCount$",
             "/status$"
         ]);
-        expect(tp.to('/status$')).toEqual([
+        expect(tp.to('/status$')).toStrictEqual([
             "/counter",
             "/incr$",
             "/upCount$",
             "/status$"
         ]);
-        expect(tp.to('/upCount$')).toEqual([
+        expect(tp.to('/upCount$')).toStrictEqual([
             "/counter",
             "/incr$",
             "/upCount$"
         ]);
-        expect(tp.from('/incr$')).toEqual([
+        expect(tp.from('/incr$')).toStrictEqual([
             "/incr$"
         ]);
-        expect(tp.from('/counter')).toEqual([
+        expect(tp.from('/counter')).toStrictEqual([
                 "/counter",
                 "/status$"
             ]
         );
-        expect(tp.from('/upCount$')).toEqual([
+        expect(tp.from('/upCount$')).toStrictEqual([
             "/upCount$",
             "/status$"
         ]);
-        expect(tp.from('/status$')).toEqual([
+        expect(tp.from('/status$')).toStrictEqual([
             "/status$"
         ]);
-        expect(tp.to('/incr$')).toEqual([
+        expect(tp.to('/incr$')).toStrictEqual([
             "/counter",
             "/incr$"
         ]);
-        expect(tp.to('/counter')).toEqual([
+        expect(tp.to('/counter')).toStrictEqual([
             "/counter"
         ]);
     }finally {
@@ -1578,7 +1578,26 @@ test("function generators",async () => {
         a: "${ $jit() }",
         b: "${ $jit() }",
         d:{e:"${ $jit() }"},
-        e: "${ (koink; $serial([foo.zing.zap,bar,baz]))}"
+        e: "${ (koink; $serial([foo.zing.zap,bar,baz]))}",
+        f:{
+            g:"/${$serial(steps)}",
+            h:"../${$serial(steps)}",
+            i:{
+                j:"../../${$serial(steps)}",
+                k:"../${$serial(steps)}",
+            }
+        },
+        steps:{
+            a:{},
+            b:{}
+        },
+        foo:{
+            zing:{
+                zap:{}
+            }
+        },
+        bar:{},
+        baz:{}
     };
 
     let tp = new TemplateProcessor(template);
@@ -1588,14 +1607,16 @@ test("function generators",async () => {
         }
     }
     tp.functionGenerators.set("jit", jit);
-    let serialDeps;
+    let serialDeps = {};
     const serial = (metaInf, tp)=>{
         return async (input, steps, context)=>{
             const ast = metaInf.compiledExpr__.ast();
             let depFinder = new DependencyFinder(ast);
             depFinder = await depFinder.withAstFilterExpression("**[procedure.value='serial']");
             //this is just an example of how we can find the dependencies of $serial([foo, bar]) and cache them for later use
-            serialDeps =  depFinder.findDependencies();
+            const absDeps = depFinder.findDependencies().map(d=>[...jp.parse(metaInf.exprTargetJsonPointer__), ...d]);
+            serialDeps[metaInf.jsonPointer__] = absDeps.map(jp.compile);
+
             return "nothing to see here"
         }
     }
@@ -1604,27 +1625,60 @@ test("function generators",async () => {
     expect(tp.output).toStrictEqual({
         "a": "path was: /a",
         "b": "path was: /b",
+        "bar": {},
+        "baz": {},
         "d": {
             "e": "path was: /d/e"
         },
-        "e": "nothing to see here"
+        "e": "nothing to see here",
+        "f": {
+            "g": "nothing to see here",
+            "h": "nothing to see here",
+            "i": {
+                "j": "nothing to see here",
+                "k": "nothing to see here"
+            }
+        },
+        "foo": {
+            "zing": {
+                "zap": {}
+            }
+        },
+        "steps": {
+            "a": {},
+            "b": {}
+        }
     });
-    expect(serialDeps).toStrictEqual([
-        [
-            "foo",
-            "zing",
-            "zap"
+    expect(serialDeps).toStrictEqual({
+        "/e": [
+            "/foo/zing/zap",
+            "/bar",
+            "/baz"
         ],
-        [
-            "bar"
+        "/f/g": [
+            "/steps"
         ],
-        [
-            "baz"
+        "/f/h": [
+            "/steps"
+        ],
+        "/f/i/j": [
+            "/steps"
+        ],
+        "/f/i/k": [
+            "/f/steps"
         ]
-    ]);
-    const jsonPointers = serialDeps.map(jp.compile);
-    expect(jsonPointers).toStrictEqual(["/foo/zing/zap", "/bar", "/baz"]);
+    });
 
+});
+
+test("apply", async () => {
+    let template = {"f":"${function($p){$p&'hello'}}", "g":"${f('hi ')}"};
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    const hello = await tp.output.f('well ');
+    expect(hello).toBe("well hello");
+    expect(await tp.output.f.apply(null, ['yo '])).toBe('yo hello');
+    expect(tp.output.g).toBe('hi hello');
 });
 
 
