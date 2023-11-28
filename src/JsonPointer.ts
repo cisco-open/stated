@@ -1,4 +1,4 @@
-export default class JSONPointer {
+export default class JsonPointer {
     /**
      * Convenience wrapper around jp.
      * Calls `.get` when called with an `object` and a `pointer`.
@@ -13,19 +13,19 @@ export default class JSONPointer {
     static api(obj, pointer, value) {
         // .set()
         if (arguments.length === 3) {
-            return JSONPointer.set(obj, pointer, value);
+            return JsonPointer.set(obj, pointer, value);
         }
         // .get()
         if (arguments.length === 2) {
-            return JSONPointer.get(obj, pointer);
+            return JsonPointer.get(obj, pointer);
         }
         // Return a partially applied function on `obj`.
-        const wrapped = JSONPointer.api.bind(JSONPointer, obj);
+        const wrapped = JsonPointer.api.bind(JsonPointer, obj);
 
         // Support for oo style
-        for (const name in JSONPointer) {
-            if (JSONPointer.hasOwnProperty(name)) {
-                wrapped[name] = JSONPointer[name].bind(wrapped, obj);
+        for (const name in JsonPointer) {
+            if (JsonPointer.hasOwnProperty(name)) {
+                wrapped[name] = JsonPointer[name].bind(wrapped, obj);
             }
         }
         return wrapped;
@@ -39,7 +39,7 @@ export default class JSONPointer {
      * @returns {*}
      */
     static get(obj, pointer) {
-        const refTokens = Array.isArray(pointer) ? pointer : JSONPointer.parse(pointer);
+        const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
 
         for (let i = 0; i < refTokens.length; ++i) {
             const tok = refTokens[i];
@@ -59,7 +59,7 @@ export default class JSONPointer {
      * @param value
      */
     static set(obj, pointer, value) {
-        const refTokens = Array.isArray(pointer) ? pointer : JSONPointer.parse(pointer);
+        const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         let nextTok = refTokens[0];
 
         if (refTokens.length === 0) {
@@ -102,13 +102,13 @@ export default class JSONPointer {
      * @param {String|Array} pointer
      */
     static remove(obj, pointer) {
-        const refTokens = Array.isArray(pointer) ? pointer : JSONPointer.parse(pointer);
+        const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         const finalToken = refTokens[refTokens.length - 1];
         if (finalToken === undefined) {
             throw new Error('Invalid JSON pointer for remove: "' + pointer + '"');
         }
 
-        const parent = JSONPointer.get(obj, refTokens.slice(0, -1));
+        const parent = JsonPointer.get(obj, refTokens.slice(0, -1));
         if (Array.isArray(parent)) {
             const index = +finalToken;
             if (finalToken === '' && isNaN(index)) {
@@ -130,7 +130,7 @@ export default class JSONPointer {
      */
     static dict(obj, descend) {
         const results = {};
-        JSONPointer.walk(obj, function (value, pointer) {
+        JsonPointer.walk(obj, function (value, pointer) {
             results[pointer] = value;
         }, descend);
         return results;
@@ -158,7 +158,7 @@ export default class JSONPointer {
                 if (descend(value)) {
                     next(value);
                 } else {
-                    iterator(value, JSONPointer.compile(refTokens));
+                    iterator(value, JsonPointer.compile(refTokens));
                 }
                 refTokens.pop();
             }
@@ -174,7 +174,7 @@ export default class JSONPointer {
      */
     static has(obj, pointer) {
         try {
-            JSONPointer.get(obj, pointer);
+            JsonPointer.get(obj, pointer);
         } catch (e) {
             return false;
         }
@@ -210,7 +210,7 @@ export default class JSONPointer {
     static parse(pointer) {
         if (pointer === '') { return []; }
         if (pointer.charAt(0) !== '/') { throw new Error('Invalid JSON pointer: ' + pointer); }
-        return pointer.substring(1).split(/\//).map(JSONPointer.unescape);
+        return pointer.substring(1).split(/\//).map(JsonPointer.unescape);
     }
 
     /**
@@ -221,12 +221,12 @@ export default class JSONPointer {
      */
     static compile(refTokens) {
         if (refTokens.length === 0) { return ''; }
-        return '/' + refTokens.map(JSONPointer.escape).join('/');
+        return '/' + refTokens.map(JsonPointer.escape).join('/');
     }
 
     static parent(pointer){
         const asArray = Array.isArray(pointer);
-        const refTokens =  Array.isArray(pointer) ? pointer : JSONPointer.parse(pointer);
+        const refTokens =  Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         return asArray?refTokens.slice(0,-1):this.compile(refTokens.slice(0,-1));
     }
 }
