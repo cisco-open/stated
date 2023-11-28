@@ -1671,6 +1671,28 @@ test("function generators",async () => {
     });
 });
 
+test("broken function generator",async () => {
+    let template = {
+        a: "${ $jit() }"};
+
+    let tp = new TemplateProcessor(template);
+    const jit = async (metaInf, tp)=>{
+        throw new Error("oops");
+    }
+    tp.functionGenerators.set("jit", jit);
+    let serialDeps = {};
+    await tp.initialize();
+
+    expect(tp.output).toStrictEqual({
+        "a": {
+            "error": {
+                "message": "Function generator 'jit' failed to generate a function and erred with:\"oops\"",
+                "name": "JSONata evaluation exception"
+            }
+        }
+    });
+});
+
 test("apply", async () => {
     let template = {"f":"${function($p){$p&'hello'}}", "g":"${f('hi ')}"};
     const tp = new TemplateProcessor(template);

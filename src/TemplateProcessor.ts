@@ -966,7 +966,7 @@ export default class TemplateProcessor {
                 try {
                     jittedFunctions[k] = safe(await generator(metaInfo, this));
                 }catch(error){
-                    throw new error(`Function generator '${k}' failed to generate a function: ${error.message}`)
+                    throw new Error(`Function generator '${k}' failed to generate a function and erred with:"${error.message}"`);
                 }
             }
 
