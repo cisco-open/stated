@@ -1608,7 +1608,7 @@ test("function generators",async () => {
     }
     tp.functionGenerators.set("jit", jit);
     let serialDeps = {};
-    const serial = (metaInf, tp)=>{
+    const serial = async (metaInf, tp)=>{
         return async (input, steps, context)=>{
             const ast = metaInf.compiledExpr__.ast();
             let depFinder = new DependencyFinder(ast);

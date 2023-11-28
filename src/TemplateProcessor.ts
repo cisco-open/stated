@@ -116,12 +116,14 @@ export default class TemplateProcessor {
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
-     *  location inside the template. $import is an example of this kind of behavior.
+     *  location inside the template. Both the generator function, and the function
+     *  it generates are asynchronous functions (ie they return a promise).
+     *  $import is an example of this kind of behavior.
      *  When $import('http://mytemplate.com/foo.json') is called, the import function
      *  is actually genrated on the fly, using knowledge of the json path that it was
      *  called at, to replace the cotnent of the template at that path with the downloaded
      *  content.*/
-    functionGenerators:Map<string, (MetaInfo,TemplateProcessor)=>(any)=>any >
+    functionGenerators: Map<string, (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => Promise<(arg: any) => Promise<any>>> = new Map();
 
     private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString, removed:boolean)=>void>;
 
@@ -961,7 +963,11 @@ export default class TemplateProcessor {
             const jittedFunctions = {};
             for (const k of this.functionGenerators.keys()) {
                 const generator = this.functionGenerators.get(k);
-                jittedFunctions[k] = safe(generator(metaInfo, this));
+                try {
+                    jittedFunctions[k] = safe(await generator(metaInfo, this));
+                }catch(error){
+                    throw new error(`Function generator '${k}' failed to generate a function: ${error.message}`)
+                }
             }
 
             evaluated = await compiledExpr__.evaluate(
