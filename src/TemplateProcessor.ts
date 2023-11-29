@@ -179,19 +179,23 @@ export default class TemplateProcessor {
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
         this.setupContext(context);
+        this.resetTemplate(template);
+        this.options = options;
+        this.debugger = new Debugger(this.templateMeta, this.logger);
+        this.isInitializing = false;
+        this.changeCallbacks = new Map();
+        this.functionGenerators = new Map();
+    }
+
+    private resetTemplate(template) {
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
-        this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to `initialize the templateMeta
+        this.templateMeta = JSON.parse(JSON.stringify(template));// Copy the given template to `initialize the templateMeta
         this.warnings = [];
         this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
         this.tagSet = new Set();
-        this.options = options;
-        this.debugger = new Debugger(this.templateMeta, this.logger);
         this.errorReport = {}
-        this.isInitializing = false;
         this.tempVars = [];
-        this.changeCallbacks = new Map();
-        this.functionGenerators = new Map();
     }
 
     private setupContext(context: {}) {
@@ -216,6 +220,7 @@ export default class TemplateProcessor {
 
     public async initialize(template = this.input, jsonPtr = "/") {
         this.timerManager.clearAll();
+        this.resetTemplate(template)
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");

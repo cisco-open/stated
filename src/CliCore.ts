@@ -120,7 +120,9 @@ export default class CliCore {
         const input = await this.readFileAndParse(filepath, importPath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
-        this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        if (!this.templateProcessor) {
+            this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        }
         if(this.replServer){
             //make variable called 'template' accessible in REPL
             this.replServer.context.template = this.templateProcessor;
@@ -131,7 +133,7 @@ export default class CliCore {
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
 
         try {
-            await this.templateProcessor.initialize();
+            await this.templateProcessor.initialize(input);
             if (oneshot === true) {
                 return this.templateProcessor.output;
             }
