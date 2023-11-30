@@ -218,9 +218,11 @@ export default class TemplateProcessor {
         }
     }
 
-    public async initialize(template = this.input, jsonPtr = "/") {
+    public async initialize(template: {} = undefined, jsonPtr = "/") {
         this.timerManager.clearAll();
-        this.resetTemplate(template)
+        if (template !== undefined) {
+            this.resetTemplate(template)
+        }
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
@@ -245,7 +247,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(this.input, parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
