@@ -187,6 +187,7 @@ export default class TemplateProcessor {
         this.functionGenerators = new Map();
     }
 
+    // resetting template means that we are resetting all data holders and set up new template
     private resetTemplate(template) {
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
@@ -218,9 +219,15 @@ export default class TemplateProcessor {
         }
     }
 
+    // initialize can be called in a few cases
+    // 1. From CLI when init command is called
+    // 2. from code, which creates a template processor and initialize the template passed in constructor
+    // 3. when template processor is created earlier and we want to re-initialize it with new template
+    // 4. during import, when we
     public async initialize(template: {} = undefined, jsonPtr = "/") {
         this.timerManager.clearAll();
-        if (template !== undefined) {
+        // we need to reset template only if the template is passed with non-root json pointer
+        if (template !== undefined && jsonPtr === "/") {
             this.resetTemplate(template)
         }
         this.onInitialize && await this.onInitialize();
@@ -247,7 +254,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(this.input, parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
