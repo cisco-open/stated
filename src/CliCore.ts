@@ -122,6 +122,12 @@ export default class CliCore {
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         if (!this.templateProcessor) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        } else {
+            this.templateProcessor.tagSet = new Set();
+            this.templateProcessor.options = options;
+            if (contextData) {
+                this.templateProcessor.setupContext(contextData);
+            }
         }
         if(this.replServer){
             //make variable called 'template' accessible in REPL
@@ -129,6 +135,7 @@ export default class CliCore {
         }
         this.templateProcessor.onInitialize = this.onInit;
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
+        // set options
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
 
@@ -194,7 +201,7 @@ export default class CliCore {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        const parsed = CliCore.minimistArgs(replCmdInputStr)
+        const parsed = CliCore.minimistArgs(replCmdInputStr === undefined ? "" : replCmdInputStr)
         let {_:jsonPointer=""} = parsed;
         if(Array.isArray(jsonPointer)){
             jsonPointer = jsonPointer[0];
@@ -202,7 +209,7 @@ export default class CliCore {
                 jsonPointer = "";
             }
         }
-        return this.templateProcessor.out(jsonPointer);
+         return this.templateProcessor.out(jsonPointer);
     }
 
     state() {

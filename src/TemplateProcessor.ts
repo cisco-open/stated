@@ -185,6 +185,7 @@ export default class TemplateProcessor {
         this.isInitializing = false;
         this.changeCallbacks = new Map();
         this.functionGenerators = new Map();
+        this.tagSet = new Set();
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -194,12 +195,11 @@ export default class TemplateProcessor {
         this.templateMeta = JSON.parse(JSON.stringify(template));// Copy the given template to `initialize the templateMeta
         this.warnings = [];
         this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
-        this.tagSet = new Set();
         this.errorReport = {}
         this.tempVars = [];
     }
 
-    private setupContext(context: {}) {
+    setupContext(context: {}) {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
@@ -254,7 +254,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template ? template : this.output, parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
