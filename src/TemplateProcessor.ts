@@ -179,22 +179,27 @@ export default class TemplateProcessor {
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
         this.setupContext(context);
-        this.input = JSON.parse(JSON.stringify(template));
-        this.output = template; //initial output is input template
-        this.templateMeta = JSON.parse(JSON.stringify(this.output));// Copy the given template to `initialize the templateMeta
-        this.warnings = [];
-        this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
-        this.tagSet = new Set();
+        this.resetTemplate(template);
         this.options = options;
         this.debugger = new Debugger(this.templateMeta, this.logger);
-        this.errorReport = {}
         this.isInitializing = false;
-        this.tempVars = [];
         this.changeCallbacks = new Map();
         this.functionGenerators = new Map();
+        this.tagSet = new Set();
     }
 
-    private setupContext(context: {}) {
+    // resetting template means that we are resetting all data holders and set up new template
+    private resetTemplate(template) {
+        this.input = JSON.parse(JSON.stringify(template));
+        this.output = template; //initial output is input template
+        this.templateMeta = JSON.parse(JSON.stringify(template));// Copy the given template to `initialize the templateMeta
+        this.warnings = [];
+        this.metaInfoByJsonPointer = {}; //there will be one key "/" for the root and one additional key for each import statement in the template
+        this.errorReport = {}
+        this.tempVars = [];
+    }
+
+    setupContext(context: {}) {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
@@ -214,8 +219,18 @@ export default class TemplateProcessor {
         }
     }
 
-    public async initialize(template = this.input, jsonPtr = "/") {
+    // Template processor initialize can be called from 2 major use cases
+    // 1. initialize a new template processor template
+    // 2. initialize a new template for an existing template processor
+    // in the second case we need to reset the template processor data holders
+    public async initialize(template: {} = undefined, jsonPtr = "/") {
         this.timerManager.clearAll();
+
+        // if initialize is called with a template and root json pointer (which is "/" b default)
+        // we need to reset the template. Otherwise, we rely on the one provided in the constructor
+        if (template !== undefined && jsonPtr === "/") {
+            this.resetTemplate(template)
+        }
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
@@ -240,7 +255,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template, parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);

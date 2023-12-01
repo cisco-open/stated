@@ -120,18 +120,28 @@ export default class CliCore {
         const input = await this.readFileAndParse(filepath, importPath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
-        this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        // if we initialize for the first time, we need to create a new instance of TemplateProcessor
+        if (!this.templateProcessor) {
+            this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
+            this.templateProcessor.tagSet = new Set();
+            this.templateProcessor.options = options;
+            if (contextData) {
+                this.templateProcessor.setupContext(contextData);
+            }
+        }
         if(this.replServer){
             //make variable called 'template' accessible in REPL
             this.replServer.context.template = this.templateProcessor;
         }
         this.templateProcessor.onInitialize = this.onInit;
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
+        // set options
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
 
         try {
-            await this.templateProcessor.initialize();
+            await this.templateProcessor.initialize(input);
             if (oneshot === true) {
                 return this.templateProcessor.output;
             }
@@ -192,7 +202,7 @@ export default class CliCore {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        const parsed = CliCore.minimistArgs(replCmdInputStr)
+        const parsed = CliCore.minimistArgs(replCmdInputStr === undefined ? "" : replCmdInputStr)
         let {_:jsonPointer=""} = parsed;
         if(Array.isArray(jsonPointer)){
             jsonPointer = jsonPointer[0];
@@ -200,7 +210,7 @@ export default class CliCore {
                 jsonPointer = "";
             }
         }
-        return this.templateProcessor.out(jsonPointer);
+         return this.templateProcessor.out(jsonPointer);
     }
 
     state() {
