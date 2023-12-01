@@ -219,14 +219,15 @@ export default class TemplateProcessor {
         }
     }
 
-    // initialize can be called in a few cases
-    // 1. From CLI when init command is called
-    // 2. from code, which creates a template processor and initialize the template passed in constructor
-    // 3. when template processor is created earlier and we want to re-initialize it with new template
-    // 4. during import, when we
+    // Template processor initialize can be called from 2 major use cases
+    // 1. initialize a new template processor template
+    // 2. initialize a new template for an existing template processor
+    // in the second case we need to reset the template processor data holders
     public async initialize(template: {} = undefined, jsonPtr = "/") {
         this.timerManager.clearAll();
-        // we need to reset template only if the template is passed with non-root json pointer
+
+        // if initialize is called with a template and root json pointer (which is "/" b default)
+        // we need to reset the template. Otherwise, we rely on the one provided in the constructor
         if (template !== undefined && jsonPtr === "/") {
             this.resetTemplate(template)
         }

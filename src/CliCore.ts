@@ -120,9 +120,10 @@ export default class CliCore {
         const input = await this.readFileAndParse(filepath, importPath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
+        // if we initialize for the first time, we need to create a new instance of TemplateProcessor
         if (!this.templateProcessor) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
-        } else {
+        } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
             this.templateProcessor.options = options;
             if (contextData) {
