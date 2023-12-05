@@ -1812,6 +1812,23 @@ test('generateDeferFunction produces correct exception when path is wrong', asyn
 
 });
 
+test("import where location of import uses rerooting", async () => {
+    let template = {
+        viz:{props:{x:'not hello'}},
+        replacementProp: "hello",
+        b:{
+            c:{
+                d:"../../${ viz ~> |props|{'x':'${$$.replacementProp}'}| ~> $import}"
+            }
+        }
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.output.b.c.d).toStrictEqual({props:{x:"hello"}});
+});
+
+
+
 
 
 

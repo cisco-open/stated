@@ -17,7 +17,7 @@ import isEqual from "lodash-es/isEqual.js";
 import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
 import Debugger from './Debugger.js';
-import MetaInfoProducer, {JsonPointerString, MetaInfo} from './MetaInfoProducer.js';
+import MetaInfoProducer, {JsonPointerString, JsonPointerStructureArray, MetaInfo} from './MetaInfoProducer.js';
 import DependencyFinder from './DependencyFinder.js';
 import path from 'path';
 import fs from 'fs';
@@ -76,7 +76,8 @@ export default class TemplateProcessor {
         clearInterval,
         setTimeout,
         console,
-        debounce
+        debounce,
+        Date
     }
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
@@ -231,12 +232,19 @@ export default class TemplateProcessor {
         }
     }
 
-    // Template processor initialize can be called from 2 major use cases
-    // 1. initialize a new template processor template
-    // 2. initialize a new template for an existing template processor
-    // in the second case we need to reset the template processor data holders
-    public async initialize(template: {} = undefined, jsonPtr = "/") {
-        this.timerManager.clearAll();
+
+    /**
+     * Template processor initialize can be called from 2 major use cases
+     *   1. initialize a new template processor template
+     *   2. $import a new template for an existing template processor
+     *   in the second case we need to reset the template processor data holders
+     * @param template - the object representing the template
+     * @param jsonPtr - defaults to "/" which is to say, this template is the root template. When we $import a template inside an existing template, then we must provide a path other than root to import into. Typically, we would use the json pointer of the expression where the $import function is used.
+     * @param templateExprRerooting - When we $import a template may look like `"foo":"../../${x~>|props|{foo:bar}|~>$import}"`. It has `../../` (rerooting) that needs to be pushed into the imported template
+     *
+     */
+    public async initialize(template: {} = undefined, jsonPtr = "/", reRooting?:JsonPointerStructureArray):Promise<void> {
+        //this.timerManager.clearAll(); FIXME TODO you can't sweep this under the rug
 
         // if initialize is called with a template and root json pointer (which is "/" b default)
         // we need to reset the template. Otherwise, we rely on the one provided in the constructor
@@ -267,7 +275,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr);
+            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr, reRooting);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
@@ -356,7 +364,7 @@ export default class TemplateProcessor {
 
     private static NOOP = Symbol('NOOP');
 
-    private getImport(jsonPtrIntoTemplate) { //we provide the JSON Pointer that targets where the imported content will go
+    private getImport(metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
         return async (importMe) => {
             let resp;
@@ -381,9 +389,9 @@ export default class TemplateProcessor {
                 }
             }
             if(resp === undefined){
-                throw new Error(`Import failed for '${importMe}' at '${jsonPtrIntoTemplate}'`);
+                throw new Error(`Import failed for '${importMe}' at '${metaInfo.jsonPointer__}'`);
             }
-            await this.setContentInTemplate(resp, jsonPtrIntoTemplate);
+            await this.setContentInTemplate(resp, metaInfo);
             return TemplateProcessor.NOOP;
         }
     }
@@ -464,17 +472,23 @@ export default class TemplateProcessor {
         }
     }
 
-    private async setContentInTemplate(response, jsonPtrIntoTemplate) {
-        jp.set(this.output, jsonPtrIntoTemplate, response);
-        await this.initialize(response, jsonPtrIntoTemplate);
+    private async setContentInTemplate(literalTemplateToImport, metaInfo: MetaInfo):Promise<void> {
+        const jsonPtrIntoTemplate:string = metaInfo.jsonPointer__ as string;
+        jp.set(this.output, jsonPtrIntoTemplate, literalTemplateToImport);
+        await this.initialize(literalTemplateToImport, jsonPtrIntoTemplate, jp.parse(metaInfo.exprTargetJsonPointer__));
     }
 
-    private async createMetaInfos(template, rootJsonPtr = []) {
+    private async createMetaInfos(template, rootJsonPtr = [], rootTargetJsonPointer:JsonPointerStructureArray) {
         let initialMetaInfos = await MetaInfoProducer.getMetaInfos(template);
 
         let metaInfos = initialMetaInfos.reduce((acc, metaInfo) => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
-            metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
+
+            if(rootTargetJsonPointer){
+                metaInfo.exprTargetJsonPointer__ = rootTargetJsonPointer;
+            }else{
+                metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
+            }
             const cdUpPath = metaInfo.exprRootPath__;
 
             if (cdUpPath) {
@@ -482,7 +496,7 @@ export default class TemplateProcessor {
                 if (cdUpParts) {
                     metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
                 } else if (cdUpPath.match(/^\/$/g)) {
-                    metaInfo.exprTargetJsonPointer__ = [];
+                    metaInfo.exprTargetJsonPointer__ = rootJsonPtr;
                 } else {
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;
@@ -1004,7 +1018,7 @@ export default class TemplateProcessor {
     private async _evaluateExprNode(jsonPtr) {
         let evaluated;
         const metaInfo = jp.get(this.templateMeta, jsonPtr);
-        const {compiledExpr__, exprTargetJsonPointer__, jsonPointer__, expr__} = metaInfo;
+        const {compiledExpr__, exprTargetJsonPointer__, expr__} = metaInfo;
         let target;
         try {
             target = jp.get(this.output, exprTargetJsonPointer__); //an expression is always relative to a target
@@ -1022,9 +1036,9 @@ export default class TemplateProcessor {
             evaluated = await compiledExpr__.evaluate(
                 target,
                 {...this.context,
-                    ...{"import": safe(this.getImport(jsonPointer__))},
                     ...{"errorReport": this.generateErrorReportFunction(metaInfo)},
                     ...{"defer": safe(this.generateDeferFunction(metaInfo))},
+                    ...{"import": safe(this.getImport(metaInfo))},
                     ...jittedFunctions
                 }
             );
