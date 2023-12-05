@@ -23,9 +23,9 @@ import path from 'path';
 import fs from 'fs';
 import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
-import {LOG_LEVELS} from "./ConsoleLogger.js";
-import StatedREPL from "./StatedREPL.js";
+import { LOG_LEVELS } from "./ConsoleLogger.js";
 import {TimerManager} from "./TimerManager.js";
+import { stringifyTemplateJSON } from './utils/stringify.js';
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
@@ -816,7 +816,7 @@ export default class TemplateProcessor {
     private logOutput() {
         if (this.isEnabled("debug")) {
             this.logger.debug(`----------------TEMPLATE OUTPUT (${this.uniqueId})-----------------`)
-            this.logger.debug(StatedREPL.stringify(this.output));
+            this.logger.debug(stringifyTemplateJSON(this.output));
         }
     }
 
@@ -1000,9 +1000,9 @@ export default class TemplateProcessor {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
-            this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
-            this.logger.debug(`Target: ${StatedREPL.stringify(target)}`);
-            this.logger.debug(`Result: ${StatedREPL.stringify(evaluated)}`);
+            this.logger.debug(`Target: ${stringifyTemplateJSON(target)}`);
+            this.logger.debug(`Target: ${stringifyTemplateJSON(target)}`);
+            this.logger.debug(`Result: ${stringifyTemplateJSON(evaluated)}`);
             const _error = new Error(error.message);
             _error.name = "JSONata evaluation exception";
             throw _error;

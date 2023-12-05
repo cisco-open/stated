@@ -15,6 +15,7 @@ import repl from 'repl';
 import CliCore from './CliCore.js';
 import colorizeJson from "json-colorizer";
 import chalk from 'chalk';
+import { circularReplacer, stringifyTemplateJSON } from './utils/stringify.js';
 
 
 export default class StatedREPL {
@@ -127,29 +128,11 @@ export default class StatedREPL {
     }
 
     static printFunc(key, value) {
-        if(value === undefined){
-            return null;
-        }
-        if (value?._jsonata_lambda || value?._stated_function__) {
-            return "{function:}";
-        }
-        if (key === 'compiledExpr__') {
-            return "--compiled expression--";
-        }
-        if(null !== value) {
-            const {_idleTimeout, _onTimeout} = value;
-            if (_idleTimeout !== undefined && _onTimeout !== undefined) {
-                return "--interval/timeout--";
-            }
-            if(value instanceof Set){
-                return Array.from(value);
-            }
-        }
-        return value;
+        return circularReplacer(key, value);
     }
 
-    static stringify(o:any, printFunction:(k:any,v:any)=>any=StatedREPL.printFunc){
-        return JSON.stringify(o, printFunction, 2);
+    static stringify(o: any, printFunction?: (k: any, v: any) => any) {
+        return stringifyTemplateJSON(o, printFunction)
     }
 
     static colorize(s:string):string{
