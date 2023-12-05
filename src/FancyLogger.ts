@@ -1,5 +1,4 @@
-import ConsoleLogger, {LOG_LEVELS} from "./ConsoleLogger.js";
-import TemplateProcessor from "./TemplateProcessor.js";
+import { LOG_LEVELS } from "./ConsoleLogger.js";
 
 export default class FancyLogger {
     static async getLogger() {
