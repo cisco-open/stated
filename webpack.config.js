@@ -26,7 +26,7 @@ export default {
         rules: [
             {
                 test: /\.js$/,
-                exclude: [/node_modules/, `${__dirname}/dist/src/FancyLogger.js`],
+                exclude: [/node_modules/, `${__dirname}/dist/src/FancyLogger.js`, `${__dirname}/dist/src/StatedREPL.js`, `${__dirname}/dist/src/CliCore.js`],
                 use: {
                     loader: 'babel-loader', // You can add Babel or other loaders here
                 },
