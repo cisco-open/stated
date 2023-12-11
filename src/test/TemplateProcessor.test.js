@@ -1694,13 +1694,20 @@ test("broken function generator",async () => {
 });
 
 test("apply", async () => {
-    let template = {"f":"${function($p){$p&'hello'}}", "g":"${f('hi ')}"};
+    let template = {
+        "f":"${function($p){$p&'hello'}}",
+        "g":"${f('hi ')}",
+        "a": "--",
+        "b": "${function($e){$set('/a', $e)}}"
+    };
     const tp = new TemplateProcessor(template);
     await tp.initialize();
     const hello = await tp.output.f('well ');
     expect(hello).toBe("well hello");
     expect(await tp.output.f.apply(null, ['yo '])).toBe('yo hello');
     expect(tp.output.g).toBe('hi hello');
+    await tp.output.b('xxx');
+    expect(tp.output.a).toBe('xxx');
 });
 
 
