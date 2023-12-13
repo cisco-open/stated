@@ -28,8 +28,8 @@ export default class CliCore {
     private currentDirectory:string;
     replServer:repl.REPLServer;
 
-    constructor() {
-        this.templateProcessor = null;
+    constructor(templateProcessor: TemplateProcessor = null) {
+        this.templateProcessor = templateProcessor;
         this.logLevel = "info";
         this.currentDirectory = path.join(process.cwd(), 'example'); // Default to cwd/example
     }

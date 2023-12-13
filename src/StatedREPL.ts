@@ -16,14 +16,15 @@ import CliCore from './CliCore.js';
 import colorizeJson from "json-colorizer";
 import chalk from 'chalk';
 import { circularReplacer, stringifyTemplateJSON } from './utils/stringify.js';
+import TemplateProcessor from "./TemplateProcessor.js";
 
 
 export default class StatedREPL {
     private readonly cliCore: CliCore;
     r: repl.REPLServer;
     private isColorized:boolean;
-    constructor() {
-        this.cliCore = new CliCore();
+    constructor(temaplateProcessor: TemplateProcessor = null) {
+        this.cliCore = new CliCore(temaplateProcessor);
     }
 
     async initialize() {
