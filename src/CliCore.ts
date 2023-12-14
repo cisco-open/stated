@@ -329,10 +329,19 @@ public async open(directory: string = this.currentDirectory) {
     if(directory === ""){
         directory = this.currentDirectory;
     }
-    // Read all files from the directory
-    const files = await fs.promises.readdir(directory);
+
+    let files: string[] = undefined;
+    try {
+        // Read all files from the directory
+        files = await fs.promises.readdir(directory);
+    } catch (error) {
+        console.log(`Error reading directory ${directory}: ${error}`);
+        console.log('Changed directory with .cd or .open an/existing/directory');
+        this.replServer.displayPrompt();
+        return {error: `Error reading directory ${directory}: ${error}`};
+    }
     // Filter out only .json and .yaml files
-    const templateFiles = files.filter(file => file.endsWith('.json') || file.endsWith('.yaml'));
+    const templateFiles: string[] = files.filter(file => file.endsWith('.json') || file.endsWith('.yaml'));
 
     // Display the list of files to the user
     templateFiles.forEach((file, index) => {
