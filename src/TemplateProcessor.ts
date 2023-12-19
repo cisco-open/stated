@@ -29,6 +29,13 @@ import { stringifyTemplateJSON } from './utils/stringify.js';
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
+export type StatedError = {
+    error: {
+        message: string;
+        name?: string;
+        stack?: string | null;
+    };
+};
 
 export default class TemplateProcessor {
     /**
@@ -121,9 +128,9 @@ export default class TemplateProcessor {
      *  $import is an example of this kind of behavior.
      *  When $import('http://mytemplate.com/foo.json') is called, the import function
      *  is actually genrated on the fly, using knowledge of the json path that it was
-     *  called at, to replace the cotnent of the template at that path with the downloaded
+     *  called at, to replace the content of the template at that path with the downloaded
      *  content.*/
-    functionGenerators: Map<string, (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => Promise<(arg: any) => Promise<any>>> = new Map();
+    functionGenerators: Map<string, (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => Promise<(arg: any) => Promise<any>>>;
 
     private changeCallbacks:Map<JsonPointerString, (data:any, jsonPointer: JsonPointerString, removed:boolean)=>void>;
 
@@ -989,6 +996,7 @@ export default class TemplateProcessor {
                 target,
                 {...this.context,
                     ...{"import": safe(this.getImport(jsonPointer__))},
+                    ...{"errorReport": this.generateErrorReportFunction(metaInfo)},
                     ...jittedFunctions
                 }
             );
@@ -1232,6 +1240,31 @@ export default class TemplateProcessor {
         }
         return wrappedFunction;
     }
+
+    private async generateErrorReportFunction(metaInfo: MetaInfo){
+        return async (message:string, name?:string, stack?:any)=>{
+            const error =  {
+                error: {
+                    message,
+                    ...(name !== undefined && { name }), // Include 'name' property conditionally,
+                    ...(stack !== undefined && { stack }), // Include 'name' property conditionally
+                }
+            }
+            const key = metaInfo.jsonPointer__ as string;
+            if(this.errorReport[key] === undefined){
+                this.errorReport[key] = error;
+            }else if (Array.isArray(this.errorReport[key])){
+                this.errorReport[key].push(error);
+            }else{ //if here, we have to take the single existing error and replace it with an array having the existing error and the new one
+                const tmp = this.errorReport[key];
+                this.errorReport[key] = [tmp]; //stuff tmp into array
+                this.errorReport[key].push(error); //append error to array
+            }
+
+            return error;
+        }
+    }
+
 
 }
 

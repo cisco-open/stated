@@ -1288,6 +1288,49 @@ test("plunked expression", async () => {
     });
 });
 
+test("errorReport function", async () => {
+    let template = {
+        a: "${ [0..2]~>$map(function($i){$errorReport('oops I goofed ' & $i, 'BARFERROR')})  }",
+        b: "${!*plunked}", //broken on purpose
+        c: "${$errorReport('noname error occured')}"
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.errorReport).toEqual({
+        "/a": [
+            {
+                "error": {
+                    "message": "oops I goofed 0",
+                    "name": "BARFERROR"
+                }
+            },
+            {
+                "error": {
+                    "message": "oops I goofed 1",
+                    "name": "BARFERROR"
+                }
+            },
+            {
+                "error": {
+                    "message": "oops I goofed 2",
+                    "name": "BARFERROR"
+                }
+            }
+        ],
+        "/b": {
+            "error": {
+                "message": "problem analysing expression : !*plunked",
+                "name": "badJSONata"
+            }
+        },
+        "/c": {
+            "error": {
+                "message": "noname error occured"
+            }
+        }
+    });
+});
+
 test("example from README explaining plans", async () => {
     let template = {
         a: {
