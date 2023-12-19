@@ -1242,12 +1242,12 @@ export default class TemplateProcessor {
     }
 
     private async generateErrorReportFunction(metaInfo: MetaInfo){
-        return async (message:string, name?:string, stack?:any)=>{
-            const error =  {
+        return async (message:string, name?:string, stack?:any):Promise<StatedError>=>{
+            const error:StatedError =  {
                 error: {
                     message,
                     ...(name !== undefined && { name }), // Include 'name' property conditionally,
-                    ...(stack !== undefined && { stack }), // Include 'name' property conditionally
+                    ...(stack !== undefined && { stack }), // Include 'stack' property conditionally
                 }
             }
             const key = metaInfo.jsonPointer__ as string;
