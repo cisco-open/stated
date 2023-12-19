@@ -31,7 +31,7 @@ export default class CliCore {
     constructor(templateProcessor: TemplateProcessor = null) {
         this.templateProcessor = templateProcessor;
         this.logLevel = "info";
-        this.currentDirectory = path.join(process.cwd(), 'example'); // Default to cwd/example
+        this.currentDirectory = process.cwd();
     }
     public close(){
         if(this.templateProcessor){
@@ -117,7 +117,11 @@ export default class CliCore {
         if(filepath===undefined){
             return undefined;
         }
-        const input = await this.readFileAndParse(filepath, importPath);
+        let _filepath = filepath;
+        if(this.currentDirectory){
+            _filepath = path.join(this.currentDirectory, _filepath);
+        }
+        const input = await this.readFileAndParse(_filepath, importPath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
@@ -364,9 +368,9 @@ public async open(directory: string = this.currentDirectory) {
         const fileIndex = parseInt(answer, 10) - 1; // Convert to zero-based index
         if (fileIndex >= 0 && fileIndex < templateFiles.length) {
             // User has entered a valid file number; initialize with this file
-            const filepath = path.join(directory, templateFiles[fileIndex]);
+            const filepath = templateFiles[fileIndex];
             try {
-                const result = await this.init(`-f "${filepath}"`); // Adjust this call as per your init method's expected format
+                const result = await this.init(`-f "${filepath}"`);
                 console.log(StatedREPL.stringify(result));
                 console.log("...try '.out' or 'template.output' to see evaluated template")
             } catch (error) {

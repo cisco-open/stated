@@ -109,7 +109,7 @@ export default class StatedREPL {
     }
 
     async cli(cliCoreMethodName, args){
-        let result;
+        let result="";
         try{
             const method = this.cliCore[cliCoreMethodName].bind(this.cliCore);
             result = await method(args);
