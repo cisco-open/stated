@@ -1,0 +1,11 @@
+{
+  "a": [
+    0,
+    1,
+    2,
+    "${$errorReport('oops', 'my_custom_error')}",
+    4,
+    5
+  ],
+  "b": "${($errorReport('e0');$errorReport('e1');$errorReport('e2'))}"
+}

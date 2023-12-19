@@ -377,6 +377,73 @@ The `.errors` command will produce a report of all errors in the template
   }
 }
 ```
+## $errorReport function
+JSONata does not have a `throw/catch` syntax. However, JSONata has a `$error` function that you can use 
+to throw an error. However, doing so will end the execution of the JSONata expression. If you wish to 
+simply record the fact that an error occured without exiting the expression, use the `$errorReport` function
+which returns an error object but does not throw.
+```json
+> .init -f example/errorReport.json
+{
+   "a": [
+      0,
+      1,
+      2,
+      "${$errorReport('oops', 'my_custom_error')}",
+      4,
+      5
+   ],
+   "b": "${($errorReport('e0');$errorReport('e1');$errorReport('e2'))}"
+}
+> .out
+{
+   "a": [
+      0,
+      1,
+      2,
+      {
+         "error": {
+            "message": "oops",
+            "name": "my_custom_error"
+         }
+      },
+      4,
+      5
+   ],
+   "b": {
+      "error": {
+         "message": "e2"
+      }
+   }
+}
+> .errors
+{
+   "/a/3": {
+      "error": {
+         "message": "oops",
+         "name": "my_custom_error"
+      }
+   },
+   "/b": [
+      {
+         "error": {
+            "message": "e0"
+         }
+      },
+      {
+         "error": {
+            "message": "e1"
+         }
+      },
+      {
+         "error": {
+            "message": "e2"
+         }
+      }
+   ]
+}
+
+```
 ## Expressions and Variables
 What makes a Stated template different from an ordinary JSON file? JSONata Expressions of course! Stated analyzes the 
 Abstract Syntax Tree of every JSONata expression in the file, and learns what _references_ are made by each expression
