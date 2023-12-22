@@ -65,7 +65,7 @@ export default class CliCore {
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
 
-    async readFileAndParse(filepath, importPath) {
+    async readFileAndParse(filepath, importPath?) {
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
         if (fileExtension === 'js' || fileExtension === 'mjs') {
             return await import(CliCore.resolveImportPath(filepath, importPath));
@@ -117,11 +117,7 @@ export default class CliCore {
         if(filepath===undefined){
             return undefined;
         }
-        let _filepath = filepath;
-        if(this.currentDirectory){
-            _filepath = path.join(this.currentDirectory, _filepath);
-        }
-        const input = await this.readFileAndParse(_filepath, importPath);
+        const input = await this.openFile(filepath);
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
@@ -143,7 +139,7 @@ export default class CliCore {
         // set options
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
-
+        this.templateProcessor.context["open"] = this.openFile.bind(this); //$open('foo.json') is supported by the CLI adding $open function. It is not part of core TemplateProcessor as that would be security hole
         try {
             await this.templateProcessor.initialize(input);
             if (oneshot === true) {
@@ -161,6 +157,14 @@ export default class CliCore {
             };
         }
 
+    }
+
+    private async openFile(fname:string){
+        let _filepath = fname;
+        if(this.currentDirectory){
+            _filepath = path.join(this.currentDirectory, _filepath);
+        }
+        return await this.readFileAndParse(_filepath);
     }
 
 

@@ -1,0 +1,4 @@
+{
+  "a": "${'ex01.json'~>$open~>$import}",
+  "b": "${$import($open('ex01.json'))}"
+}
