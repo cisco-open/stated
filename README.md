@@ -91,6 +91,7 @@ Stated templates are modular and can be imported from a URL:
 }
 ```
 
+
 ## Why Do We Need stated?
 
 Consider this ordinary program:
@@ -1718,6 +1719,38 @@ This can be combined with the `--importPath` option to import files relative to 
 {
   "res": "bar: foo"
 }
+```
+## The $open function
+Allowing expressions to open local files is a security risk. For this reason the core TemplateProcessor does 
+not support the $open function. However, the CLI/REPL which are for local usage allow the $open function. Additionally,
+programs that want to allow properly guarded `$open` operations may inject a `$open` function of their choosing
+into the TemplateProcessor contexet. $open accepts a relative path, and parses the JSON or YAML file on that path into
+an object.
+```json [false, "true", false, "a.c='the answer is: 42' and b.c='the answer is: 42'", "true"]
+> .note This shows two equivalent ways to open a json or yaml file using $open
+"============================================================="
+> .cd example
+"Current directory changed to: /Users/falken/proj/jsonataexperiments/example"
+> .init -f "importLocal.json"
+{
+   "a": "${'ex01.json'~>$open~>$import}",
+   "b": "${$import($open('ex01.json'))}"
+}
+> .out
+{
+   "a": {
+      "a": 42,
+      "b": 42,
+      "c": "the answer is: 42"
+   },
+   "b": {
+      "a": 42,
+      "b": 42,
+      "c": "the answer is: 42"
+   }
+}
+> .cd ..
+"Current directory changed to: /Users/falken/proj/jsonataexperiments"
 ```
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how

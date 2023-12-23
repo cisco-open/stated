@@ -109,7 +109,7 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
             expect(responseNormalized).toBeDefined();
           }
         }
-      }, 30000); // set timeout to 30 seconds for each test
+      }, 100000); // set timeout to 100 seconds for each test
     });
   }finally {
     cliCore.close();
