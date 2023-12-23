@@ -1726,11 +1726,11 @@ not support the $open function. However, the CLI/REPL which are for local usage 
 programs that want to allow properly guarded `$open` operations may inject a `$open` function of their choosing
 into the TemplateProcessor contexet. $open accepts a relative path, and parses the JSON or YAML file on that path into
 an object.
-```json [false, false, false, "a.c='the answer is: 42' and b.c='the answer is: 42'", false]
+```json [false, "true", false, "a.c='the answer is: 42' and b.c='the answer is: 42'", "true"]
 > .note This shows two equivalent ways to open a json or yaml file using $open
 "============================================================="
 > .cd example
-"Current directory changed to: /Users/ghendrey/proj/jsonataexperiments/example"
+"Current directory changed to: /Users/falken/proj/jsonataexperiments/example"
 > .init -f "importLocal.json"
 {
    "a": "${'ex01.json'~>$open~>$import}",
@@ -1750,9 +1750,7 @@ an object.
    }
 }
 > .cd ..
-"Current directory changed to: /Users/ghendrey/proj/jsonataexperiments"
-
-
+"Current directory changed to: /Users/falken/proj/jsonataexperiments"
 ```
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
