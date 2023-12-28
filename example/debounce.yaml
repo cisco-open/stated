@@ -1,0 +1,7 @@
+#try running this in REPL with: .init -f example/debounce.yaml --tail "/acc/- 0"
+acc: []
+appendAcc: "${ function($v){$set('/acc/-', $v)} ~> $debounce(15)}" #function to append $v to acc array, debounced to 15 ms
+counter: "${   function(){($set('/count', $$.count+1); $$.count)}    }" #function to increment a count
+count: 0
+rapidCaller: "${$setInterval(counter~>appendAcc, 10)}" #increment the count every 10 ms, and send result to appendAcc function which is debounced to 15 ms
+stop: "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }" #stop when we reached count of 100. Only 100 should wind up in acc array

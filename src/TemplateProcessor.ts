@@ -26,6 +26,7 @@ import FancyLogger from "./FancyLogger.js";
 import { LOG_LEVELS } from "./ConsoleLogger.js";
 import {TimerManager} from "./TimerManager.js";
 import { stringifyTemplateJSON } from './utils/stringify.js';
+import {debounce} from "./utils/debounce.js"
 
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
@@ -70,11 +71,12 @@ export default class TemplateProcessor {
      * }}
      */
     static DEFAULT_FUNCTIONS = {
-        "fetch": fetch,
-        "setInterval": setInterval,
-        "clearInterval": clearInterval,
-        "setTimeout": setTimeout,
-        "console": console
+        fetch,
+        setInterval,
+        clearInterval,
+        setTimeout,
+        console,
+        debounce
     }
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
@@ -864,7 +866,7 @@ export default class TemplateProcessor {
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            this.commonCallback && this.commonCallback(this.output, thoseThatUpdated); //we don't pass
+            this.commonCallback && await this.commonCallback(this.output, thoseThatUpdated); //we don't pass
         }
         return thoseThatUpdated;
     }
@@ -959,7 +961,7 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    private setUntrackedLocation(output, jsonPtr, data) {
+    private async setUntrackedLocation(output, jsonPtr, data) {
         jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         jp.set(this.templateMeta, jsonPtr, {
                 "materialized__": true,
@@ -971,6 +973,8 @@ export default class TemplateProcessor {
                 "materialized": true
             }
         );
+        const callback = this.changeCallbacks.get(jsonPtr);
+        callback && await callback(data, jsonPtr, false);
         return true;
     }
 
@@ -1162,6 +1166,7 @@ export default class TemplateProcessor {
     }
 
     setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString, removed?:boolean)=>void) {
+        this.logger.debug(`data change callback set on ${jsonPtr} `)
         if(jsonPtr === "/"){
             this.commonCallback = cbFn;
         }else{
@@ -1170,6 +1175,7 @@ export default class TemplateProcessor {
     }
 
     removeDataChangeCallback(jsonPtr:JsonPointerString) {
+        this.logger.debug(`data change callback removed on ${jsonPtr} `)
         if(jsonPtr==="/"){
             this.commonCallback = undefined;
         }else {

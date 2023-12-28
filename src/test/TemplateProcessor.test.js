@@ -1753,6 +1753,24 @@ test("apply", async () => {
     expect(tp.output.a).toBe('xxx');
 });
 
+test("debounce", async () => {
+    let template = {
+        "acc": [],
+        "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $debounce(15)}",
+        "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+        "count": 0,
+        "rapidCaller": "${ $setInterval(counter~>appendAcc, 10)}",
+        "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done' }"
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    // Wait for a few seconds (adjust the time as needed)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    expect(tp.output.acc).toStrictEqual([100]); //debouncing causes only the final value to append to the array
+
+});
+
 
 
 
