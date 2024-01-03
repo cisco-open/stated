@@ -228,6 +228,12 @@ export default class TemplateProcessor {
         }
     }
 
+    private setupFunctionGenerators(){
+        const debouncer = async (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => {
+
+        }
+    }
+
     // Template processor initialize can be called from 2 major use cases
     // 1. initialize a new template processor template
     // 2. initialize a new template for an existing template processor
@@ -591,7 +597,7 @@ export default class TemplateProcessor {
 
     private async evaluateDependencies(metaInfos) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        return await this.evaluateJsonPointersInOrder(evaluationPlan);
+        return await this.executePlan(evaluationPlan);
     }
 
     private makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
@@ -624,7 +630,7 @@ export default class TemplateProcessor {
             // Iterate through the node's dependencies
             node.absoluteDependencies__?.forEach(jsonPtr => {
                 const dependency = jp.get(this.templateMeta, jsonPtr);
-                // Recurse on the dependency first to ensure we collect all its tags
+                // Recurse on the dependency startPlanExecution to ensure we collect all its tags
                 dfs(dependency);
                 // Propagate tags from the dependency to the node
                 dependency.tags__?.forEach(tag => node.tags__.add(tag));
@@ -806,7 +812,7 @@ export default class TemplateProcessor {
         async function drainQueue() {
             while (this.executionQueue.length > 0) {
                 const {sortedJsonPtrs, data, op} = this.executionQueue[0];
-                await this.evaluateJsonPointersInOrder(sortedJsonPtrs, data, op);
+                await this.executePlan(sortedJsonPtrs, data, op);
                 this.executionQueue.shift();
             }
         }
@@ -829,46 +835,98 @@ export default class TemplateProcessor {
         }
     }
 
-    private async evaluateJsonPointersInOrder(jsonPtrList, data = TemplateProcessor.NOOP, op:"set"|"delete"="set") {
+    private async executePlan(plan:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"delete"="set"):Promise<void> {
         const resp = [];
-        let first;
-        if (data !== TemplateProcessor.NOOP) {
-            first = jsonPtrList.shift(); //first jsonPtr is the target of the change, the rest are dependents
-            if (!jp.has(this.output, first)) { //node doesn't exist yet, so just create it
-                const didUpdate = await this.evaluateNode(first, data, op);
-                jp.get(this.templateMeta, first).didUpdate__ = didUpdate;
-            } else {
-                // Check if the node contains an expression. If so, print a warning and return.
-                const firstMeta = jp.get(this.templateMeta, first);
-                if (firstMeta.expr__ !== undefined) {
-                    this.logger.log('warn', `Attempted to replace expressions with data under ${first}. This operation is ignored.`);
-                    return false; //fixme - although not used, returning false here is inconsistent. we need to return [firstMeta]
+        let dependencies = plan;
+        if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
+            await this.applyMutationToFirstJsonPointerOfPlan(plan, data, op);
+            dependencies = plan.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
+        }
+        await this.executeDependentExpressions(dependencies);
+        await this.executeDataChangeCallbacks(plan);
+    }
+
+    private async executeDependentExpressions(dependencies: JsonPointerString[]) {
+        //for (const jsonPtr of dependencies) {
+        for(let i=0;i<dependencies.length;i++){
+            const jsonPtr = dependencies[i];
+            let didUpdate;
+            try {
+                didUpdate = await this.evaluateNode(jsonPtr);
+                jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
+            }catch(error){
+                //the $defer() call can throw a special error that causes the remaining unexecuted portion of the plan
+                //to get rescheduled later.
+                if(error.deferred__){
+                    console.log("caught deferred_");
+                    this.logger.debug(error.message);
+                    this.deferExecution(jsonPtr, dependencies.slice(i));
+                    break; //remainder of plan has been deferred to later; we can bail now
                 }
-                firstMeta.didUpdate__ = await this.evaluateNode(first, data, op); // Evaluate the node provided with the data provided
-                if (!firstMeta.didUpdate__) {
-                    this.logger.verbose(`data did not change for ${first}, short circuiting dependents.`);
-                    return false;
-                }
+                throw error;
             }
         }
-        for (const jsonPtr of jsonPtrList) {
-            const didUpdate = await this.evaluateNode(jsonPtr);
-            jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
+    }
+
+    private deferExecution(jsonPtr: string, remainingPartOfPlan: JsonPointerString[]) {
+        const meta = jp.get(this.templateMeta, jsonPtr);
+        if (meta.debouncedRescheduleFunc__ === undefined) {
+            console.debug("creating rescheduleFunc");
+            //create a function that will execute the remainder of the plan when eventually called
+            const rescheduleFunc = async () => {
+                console.log("reschduling function INVOKED");
+                meta.ignoreDefer__ = true; //cause the $defer() function NOT to throw, because we have reached the point where we actually want the rest of the plan to execute
+                await this.executeDependentExpressions(remainingPartOfPlan);
+                meta.ignoreDefer__ = false;
+            }
+            console.log("debouncing it.");
+            //wrap the rescheduleFunc in a debouncer tied to this specific expression's meta
+            meta.debouncedRescheduleFunc__ = debounce(rescheduleFunc);
         }
-        first && jsonPtrList.unshift(first);
+        console.log("calling debounced function");
+        meta.debouncedRescheduleFunc__();
+    }
+
+    private getExclusiveDeferredSubtree(){
+
+    }
+
+    private async executeDataChangeCallbacks(plan: JsonPointerString[]) {
         let anyUpdates = false;
-        const thoseThatUpdated =  jsonPtrList.filter(jptr => {
+        const thoseThatUpdated = plan.filter(jptr => {
             const meta = jp.get(this.templateMeta, jptr);
             anyUpdates ||= meta.didUpdate__;
             return meta.didUpdate__
         });
-        if(anyUpdates){
+        if (anyUpdates) {
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            this.commonCallback && await this.commonCallback(this.output, thoseThatUpdated); //we don't pass
+            this.commonCallback && await this.commonCallback(this.output, thoseThatUpdated);
         }
-        return thoseThatUpdated;
+    }
+
+    private async applyMutationToFirstJsonPointerOfPlan(plan: JsonPointerString[], data: any, op: "set" | "delete") {
+        const entryPoint = plan[0];
+        await this.startPlanExecution(entryPoint, data, op);
+    }
+
+    private async startPlanExecution(entryPoint:JsonPointerString, data: any, op: "set" | "delete"):Promise<void> {
+        if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
+            const didUpdate = await this.evaluateNode(entryPoint, data, op);
+            jp.get(this.templateMeta, entryPoint).didUpdate__ = didUpdate;
+        } else {
+            // Check if the node contains an expression. If so, print a warning and return.
+            const firstMeta = jp.get(this.templateMeta, entryPoint);
+            if (firstMeta.expr__ !== undefined) {
+                this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
+            } else {
+                firstMeta.didUpdate__ = await this.evaluateNode(entryPoint, data, op); // Evaluate the node provided with the data provided
+                if (!firstMeta.didUpdate__) {
+                    this.logger.verbose(`data did not change for ${entryPoint}, short circuiting dependents.`);
+                }
+            }
+        }
     }
 
     private async evaluateNode(jsonPtr, data=undefined, op:"set"|"delete"="set") {
@@ -891,6 +949,7 @@ export default class TemplateProcessor {
     }
 
     private async _evaluateExpression(jsonPtr) {
+        console.log(`starting eval expression at ${jsonPtr}`);
         const startTime = Date.now(); // Capture start time
 
         const {templateMeta, output} = this;
@@ -905,6 +964,9 @@ export default class TemplateProcessor {
                     data = await this._evaluateExprNode(jsonPtr); //run the jsonata expression
                     success = true;
                 }catch(error){
+                    if(error.deferred__){
+                        throw error;
+                    }
                     const errorObject = {name:error.name, message: error.message}
                     data = {error:errorObject}; //errors get placed into the template output
                     this.errorReport[jsonPtr] = errorObject;
@@ -928,6 +990,7 @@ export default class TemplateProcessor {
 
         const endTime = Date.now(); // Capture end time
         this.logger.verbose(`_evaluateExpression at ${jsonPtr} completed in ${endTime - startTime} ms.`);  // Log the time taken
+        console.log(`value was ${data}`);
 
         return success; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
@@ -1001,6 +1064,7 @@ export default class TemplateProcessor {
                 {...this.context,
                     ...{"import": safe(this.getImport(jsonPointer__))},
                     ...{"errorReport": this.generateErrorReportFunction(metaInfo)},
+                    ...{"defer": this.generateDeferFunction(metaInfo)},
                     ...jittedFunctions
                 }
             );
@@ -1009,6 +1073,9 @@ export default class TemplateProcessor {
                 metaInfo.isFunction__ = true;
             }
         } catch (error) {
+            if(error.deferred__){
+                throw error; //deferred__ is a special error from $defer() designed to be caught higher in the stack
+            }
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
@@ -1272,5 +1339,24 @@ export default class TemplateProcessor {
     }
 
 
+    private generateDeferFunction(metaInfo: any) {
+        //the deferFunc__ is held inside metaInfo as there is no reason to generate a new function every time an expression is evaluated
+        if(metaInfo.deferFunc__){
+            return metaInfo.deferFunc__;
+        }
+        const deferFunc =  ()=>{
+            console.log(`defer() is invoked. metaInfo.ignoreDefer__ is ${metaInfo.ignoreDefer__}`);
+            if(metaInfo.ignoreDefer__){
+                console.log("YAY NOT DEFERRED");
+                return "not deferred"; //do nothing if we have reached the place where a deferred function actually SHOULD execute
+            }
+            const error = new Error(`Execution deferred at ${metaInfo.jsonPointer__}`);
+            console.log(`new Error created w message ${error.message}`);
+            error["deferred__"] = true;
+            throw error;
+        }
+        metaInfo.deferFunc__ = deferFunc;
+        return deferFunc;
+    }
 }
 

@@ -1,3 +1,7 @@
+import {JsonPointerString, MetaInfo} from "../MetaInfoProducer.js";
+import TemplateProcessor from "../TemplateProcessor.js";
+import jsonata from "jsonata";
+
 /**
  * Debounces a function, ensuring that it is only called once after a specified
  * time has elapsed since the last call.
@@ -19,12 +23,12 @@
  * debouncedFunction('Third call');
  *
  */
-export function debounce<T extends AnyFunction>(func: T, wait: number): T {
+export function debounce<T extends AnyFunction>(func: T, wait: number=200): T {
     let timeout: ReturnType<typeof setTimeout>;
 
     return function (this: ThisParameterType<T>, ...args: Parameters<T>): void {
         const context = this as ThisParameterType<T>;
-
+        console.log("clear timeout");
         clearTimeout(timeout);
 
         timeout = setTimeout(() => {
@@ -33,3 +37,4 @@ export function debounce<T extends AnyFunction>(func: T, wait: number): T {
     } as T;
 }
 type AnyFunction = (...args: any[]) => void;
+

@@ -1771,6 +1771,30 @@ test("debounce", async () => {
 
 });
 
+/*
+        "deferredCount": "${($defer(); $console.error('count is ' & $$.count);$$.count)}",
+        "accumulator": "${$set('/acc',$$.acc~>$append($$.deferredCount))}",
+        "acc":[],
+                "deferredCount": "${($defer();count)}",
+ */
+
+test("defer", async () => {
+    let template = {
+        "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+        "count": 0,
+        "deferredCount": "${($defer();$$.count)}",
+        "rapidCaller": "${ $setInterval(counter, 10)}",
+        "stop": "${ count=3?($clearInterval($$.rapidCaller);'done'):'not done' }"
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    // Wait for a few seconds (adjust the time as needed)
+    await new Promise(resolve => setTimeout(resolve, 3000));
+
+    expect(tp.output.deferredCount).toStrictEqual(3); //debouncing causes only the final value to append to the array
+
+});
+
 
 
 
