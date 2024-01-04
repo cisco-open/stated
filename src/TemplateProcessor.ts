@@ -230,7 +230,7 @@ export default class TemplateProcessor {
             }
         }
     }
-    
+
     // Template processor initialize can be called from 2 major use cases
     // 1. initialize a new template processor template
     // 2. initialize a new template for an existing template processor
@@ -627,7 +627,7 @@ export default class TemplateProcessor {
             // Iterate through the node's dependencies
             node.absoluteDependencies__?.forEach(jsonPtr => {
                 const dependency = jp.get(this.templateMeta, jsonPtr);
-                // Recurse on the dependency startPlanExecution to ensure we collect all its tags
+                // Recurse on the dependency to ensure we collect all its tags
                 dfs(dependency);
                 // Propagate tags from the dependency to the node
                 dependency.tags__?.forEach(tag => node.tags__.add(tag));
