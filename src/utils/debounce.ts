@@ -28,7 +28,6 @@ export function debounce<T extends AnyFunction>(func: T, wait: number=200): T {
 
     return function (this: ThisParameterType<T>, ...args: Parameters<T>): void {
         const context = this as ThisParameterType<T>;
-        console.log("clear timeout");
         clearTimeout(timeout);
 
         timeout = setTimeout(() => {

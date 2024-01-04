@@ -22,6 +22,7 @@ import {dirname} from 'path';
 import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
+import StatedREPL from "../../dist/src/StatedREPL.js";
 
 
 test("test 1", async () => {
@@ -1782,18 +1783,45 @@ test("defer", async () => {
     let template = {
         "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
         "count": 0,
-        "deferredCount": "${($defer();$$.count)}",
+        "deferredCount": "${$defer('/count', 500)}",
         "rapidCaller": "${ $setInterval(counter, 10)}",
-        "stop": "${ count=3?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
     };
     const tp = new TemplateProcessor(template);
+    let done;
+    const latch = new Promise(resolve => done = resolve);
+    let deferredCountNumChanges = 0;
+    tp.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
+        deferredCountNumChanges++;
+        if(deferredCountNumChanges === 2){ //will call once for initial value, then again on debounced/defer
+            done();
+        }
+    })
     await tp.initialize();
-    // Wait for a few seconds (adjust the time as needed)
-    await new Promise(resolve => setTimeout(resolve, 3000));
+    await latch;
+    expect(tp.output.count).toBe(10);
+    expect(tp.output.deferredCount).toBe(10); //defering causes only the final value to be captured
+    expect(deferredCountNumChanges).toBe(2); //once for initial value, and again on debounce
+});
 
-    expect(tp.output.deferredCount).toStrictEqual(3); //debouncing causes only the final value to append to the array
+test('generateDeferFunction produces correct exception when path is wrong', async () => {
+
+    const tp = new TemplateProcessor({
+        some:{path: "hello"},
+        deferred: "${$defer('/whoops')}"
+    });
+    await tp.initialize();
+    expect(tp.output.deferred).toMatchObject({
+        "error":{
+            "message":"$defer called on non-existant field: /whoops"
+        }
+    })
 
 });
+
+
+
+
 
 
 
