@@ -1792,8 +1792,40 @@ Started tailing... Press Ctrl+C to stop.
   "rapidCaller": "--interval/timeout--",
   "stop": "done"
 }
-
-
+```
+## $defer function
+While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
+"slowed down" version of a rapidly changing variable. For example, suppose you are collecting a query string from a user
+input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
+pauses or stops typing characters. In the example below, an `$interval` is used to simulate a user entering
+the characters of a `sampleQuery`. The `deferredQuery` will remain empty until the `sampleQuery` is fully entered into
+the query.
+```json
+> .init -f "example/defer.yaml"
+{
+  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+  "query": "",
+  "deferredQuery": "${ $defer('/query') }",
+  "appendQuery": "${function(){$set('/query', sampleQuery~>$substring(0,$$.count))}}",
+  "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
+  "count": 0,
+  "rapidCaller": "${$setInterval(counter~>appendQuery, 75)}",
+  "stop": "${ count=$length(sampleQuery)?($clearInterval($$.rapidCaller);'done'):'not done'  }"
+}
+```
+```json ["data.deferredQuery=data.sampleQuery"]
+> .init -f example/defer.yaml --tail "/ until deferredQuery != ''"
+Started tailing... Press Ctrl+C to stop.
+{
+  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+  "query": "Would you like to play a game? How about a nice game of chess?",
+  "deferredQuery": "Would you like to play a game? How about a nice game of chess?",
+  "appendQuery": "{function:}",
+  "counter": "{function:}",
+  "count": 62,
+  "rapidCaller": "--interval/timeout--",
+  "stop": "done"
+}
 
 ```
 
