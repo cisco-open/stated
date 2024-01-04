@@ -1772,13 +1772,6 @@ test("debounce", async () => {
 
 });
 
-/*
-        "deferredCount": "${($defer(); $console.error('count is ' & $$.count);$$.count)}",
-        "accumulator": "${$set('/acc',$$.acc~>$append($$.deferredCount))}",
-        "acc":[],
-                "deferredCount": "${($defer();count)}",
- */
-
 test("defer", async () => {
     let template = {
         "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",

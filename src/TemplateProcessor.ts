@@ -230,13 +230,7 @@ export default class TemplateProcessor {
             }
         }
     }
-
-    private setupFunctionGenerators(){
-        const debouncer = async (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => {
-
-        }
-    }
-
+    
     // Template processor initialize can be called from 2 major use cases
     // 1. initialize a new template processor template
     // 2. initialize a new template for an existing template processor
