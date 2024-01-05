@@ -1,8 +1,11 @@
 sampleQuery: Would you like to play a game? How about a nice game of chess?
 query: ""
-deferredQuery: "${ $defer('/query') }"
-appendQuery: "${function(){$set('/query', sampleQuery~>$substring(0,$$.count))}}"
-counter: "${   function(){($set('/count', $$.count+1); $$.count)}    }" #function to increment a count
+deferredQuery$: $defer('/query', 100)
+counter$: function(){  $set('/count', count+1)}
 count: 0
-rapidCaller: "${$setInterval(counter~>appendQuery, 75)}" #increment the count every 250 ms, and send result to appendAcc function which is debounced to 15 ms
-stop: "${ count=$length(sampleQuery)?($clearInterval($$.rapidCaller);'done'):'not done'  }" #stop when we reached count of 100. Only 100 should wind up in acc array
+appendQuery$: $set('/query', sampleQuery~>$substring(0,count))
+rapidCaller$: $setInterval(counter$, 25)
+stop$: |
+    count=$length(sampleQuery)
+      ?($clearInterval(rapidCaller$);'done')
+      :'simulating typing'  

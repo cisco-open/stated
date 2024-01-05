@@ -1797,38 +1797,38 @@ Started tailing... Press Ctrl+C to stop.
 While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
 "slowed down" version of a rapidly changing variable. For example, suppose you are collecting a query string from a user
 input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
-pauses or stops typing characters. In the example below, an `$interval` is used to simulate a user entering
-the characters of a `sampleQuery`. The `deferredQuery` will remain empty until the `sampleQuery` is fully entered into
+pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
+the characters of a `sampleQuery`. The `deferredQuery$` will remain empty until the `sampleQuery` is fully entered into
 the query.
 ```json
 > .init -f "example/defer.yaml"
 {
-  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
-  "query": "",
-  "deferredQuery": "${ $defer('/query') }",
-  "appendQuery": "${function(){$set('/query', sampleQuery~>$substring(0,$$.count))}}",
-  "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
-  "count": 0,
-  "rapidCaller": "${$setInterval(counter~>appendQuery, 75)}",
-  "stop": "${ count=$length(sampleQuery)?($clearInterval($$.rapidCaller);'done'):'not done'  }"
+   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+   "query": "",
+   "deferredQuery$": "$defer('/query', 100)",
+   "counter$": "function(){  $set('/count', count+1)}",
+   "count": 0,
+   "appendQuery$": "$set('/query', sampleQuery~>$substring(0,count))",
+   "rapidCaller$": "$setInterval(counter$, 25)",
+   "stop$": "count=$length(sampleQuery)\n  ?($clearInterval(rapidCaller$);'done')\n  :'simulating typing'  \n"
 }
 ```
-```json ["data.deferredQuery=data.sampleQuery"]
-> .init -f example/defer.yaml --tail "/ until deferredQuery != ''"
+```json ["data.deferredQuery$ = data.sampleQuery"]
+> .init -f example/defer.yaml --tail "/ until deferredQuery$ != ''"
 Started tailing... Press Ctrl+C to stop.
 {
   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
   "query": "Would you like to play a game? How about a nice game of chess?",
-  "deferredQuery": "Would you like to play a game? How about a nice game of chess?",
-  "appendQuery": "{function:}",
-  "counter": "{function:}",
+  "deferredQuery$": "Would you like to play a game? How about a nice game of chess?",
+  "counter$": "{function:}",
   "count": 62,
-  "rapidCaller": "--interval/timeout--",
-  "stop": "done"
+  "appendQuery$": [
+    "/query"
+  ] ,
+  "rapidCaller$": "--interval/timeout--",
+  "stop$": "done"
 }
-
 ```
-
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
 Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 
