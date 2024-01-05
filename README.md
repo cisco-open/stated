@@ -1795,11 +1795,17 @@ Started tailing... Press Ctrl+C to stop.
 ```
 ## $defer function
 While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
-"slowed down" version of a rapidly changing variable. For example, suppose you are collecting a query string from a user
+"slowed down" version of a rapidly changing variable. $defer takes two arguments:
+1. The json pointer to the field you wish to defer (or "slow down")
+2. An optional number of milliseconds, T. 
+
+$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a 
+subsequent value until the deferred field has remained unchanges for T ms.
+For example, suppose you are collecting a query string from a user
 input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
 pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
-the characters of a `sampleQuery`. The `deferredQuery$` will remain empty until the `sampleQuery` is fully entered into
-the query.
+the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer!. The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged 
+until the `query`stops receiving changes and reaches its final state of "Would you like to play a game? How about a nice game of chess?"
 ```json
 > .init -f "example/defer.yaml"
 {
@@ -1814,7 +1820,7 @@ the query.
 }
 ```
 ```json ["data.deferredQuery$ = data.sampleQuery"]
-> .init -f example/defer.yaml --tail "/ until deferredQuery$ != ''"
+> .init -f example/defer.yaml --tail "/ until deferredQuery$ = 'Would you like to play a game? How about a nice game of chess?'"
 Started tailing... Press Ctrl+C to stop.
 {
   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
