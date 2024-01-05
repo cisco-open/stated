@@ -1799,13 +1799,14 @@ While `$debounce` is used to create a debounced function, `$defer` can be a more
 1. The json pointer to the field you wish to defer (or "slow down")
 2. An optional number of milliseconds, T. 
 
-$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a 
+`$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a 
 subsequent value until the deferred field has remained unchanges for T ms.
 For example, suppose you are collecting a query string from a user
 input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
 pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
-the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer!. The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged 
+the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer! The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged 
 until the `query`stops receiving changes and reaches its final state of "Would you like to play a game? How about a nice game of chess?"
+
 ```json
 > .init -f "example/defer.yaml"
 {
@@ -1819,6 +1820,7 @@ until the `query`stops receiving changes and reaches its final state of "Would y
    "stop$": "count=$length(sampleQuery)\n  ?($clearInterval(rapidCaller$);'done')\n  :'simulating typing'  \n"
 }
 ```
+To watch the data changing we can use the `--tail until` to tail the changing template output until it reaches the final state.
 ```json ["data.deferredQuery$ = data.sampleQuery"]
 > .init -f example/defer.yaml --tail "/ until deferredQuery$ = 'Would you like to play a game? How about a nice game of chess?'"
 Started tailing... Press Ctrl+C to stop.
@@ -1835,6 +1837,7 @@ Started tailing... Press Ctrl+C to stop.
   "stop$": "done"
 }
 ```
+![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
 Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 
