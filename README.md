@@ -1837,6 +1837,7 @@ Started tailing... Press Ctrl+C to stop.
   "stop$": "done"
 }
 ```
+Here is a screencapture showing the two commands above executed in the REPL. 
 ![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
