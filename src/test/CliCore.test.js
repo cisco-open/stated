@@ -103,7 +103,10 @@ test("should return filepath as is when not in Node environment", () => {
 test("tail", async () => {
   const cliCore = new CliCore();
   const res = await cliCore.init('-f example/tail.json --tail "/counter 5"');
-  expect(res).toBe("Started tailing... Press Ctrl+C to stop.")
+  expect(res).toStrictEqual({
+    "__tailed": true,
+    "data": 5
+  })
   cliCore.close();
 });
 

@@ -20,6 +20,7 @@ import {parseArgsStringToArgv} from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
+import jsonata from "jsonata";
 
 
 export default class CliCore {
@@ -141,12 +142,16 @@ export default class CliCore {
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
         this.templateProcessor.context["open"] = this.openFile.bind(this); //$open('foo.json') is supported by the CLI adding $open function. It is not part of core TemplateProcessor as that would be security hole
         try {
+            let tailPromise;
+            if(tail !== undefined){
+                tailPromise = this.tail(tail);
+            }
             await this.templateProcessor.initialize(input);
+            if(tail !== undefined){
+                return tailPromise;
+            }
             if (oneshot === true) {
                 return this.templateProcessor.output;
-            }
-            if(tail !== undefined){
-                return this.tail(tail);
             }
             return this.templateProcessor.input;
 
@@ -278,62 +283,123 @@ export default class CliCore {
         return this.templateProcessor.errorReport;
     }
 
-    public tail(args: string): string {
-        const [jsonPointer, changeCountArg] = args.split(' ');
-        let changeCount = changeCountArg!==undefined ? parseInt(changeCountArg, 10) : undefined;
+    private extractArgsInfo(args) {
+        // Define the regex patterns
+        const jsonPointerNumberPattern = /^(?<jsonPointer>\/[^\s]*)(?:\s+(?<number>\d+))?$/;
+        const untilJsonataPattern = /^(?<jsonPointer>\/[^\s]*)\s+until\s+(?<jsonataExpression>[^\n]+)$/;
 
-        // Determine if we are in overwrite mode based on changeCount being 0
-        const overwriteMode = changeCount === 0;
-        let currentOutputLines = 0;
-        // SIGINT listener to handle Ctrl+C press in REPL
-        const onSigInt = () => {
-            unplug();
-        };
-        if(this.replServer) { //tests would not provide replServer
-            this.replServer.on('SIGINT', onSigInt);
-        }
-        const unplug = ()=>{
-            // Stop tailing without clearing the screen to keep the exit message
-            this.templateProcessor.removeDataChangeCallback(jsonPointer);
-            currentOutputLines = 0;
-            if(this.replServer){
-                this.replServer.displayPrompt();
-                this.replServer.removeListener('SIGINT', onSigInt);
+        // Try to match the args string against both patterns
+        const matchNumberFormat = args.match(jsonPointerNumberPattern);
+        const matchUntilJsonataFormat = args.match(untilJsonataPattern);
+
+        // Check which format was matched
+        if (matchNumberFormat) {
+            // Extracted information for <jsonPointer><spaces><integer> format
+            const { jsonPointer, number } = matchNumberFormat.groups || {};
+            if (jsonPointer) {
+                return { format: "Number", jsonPointer, number: parseInt(number, 10) };
+            }
+        } else if (matchUntilJsonataFormat) {
+            // Extracted information for <jsonPointer><spaces><until><spaces><jsonataExpression> format
+            const { jsonPointer, jsonataExpression } = matchUntilJsonataFormat.groups || {};
+            if (jsonPointer) {
+                return { format: "UntilJsonata", jsonPointer, jsonataExpression };
             }
         }
 
-        // Data change callback
-        const onDataChanged = (data: any) => {
-            const output = StatedREPL.stringify(data); // Use the actual implementation of stringify
-            const outputLines = output.split('\n');
-            if (overwriteMode && currentOutputLines > 0) {
-                // Move cursor up by the number of lines previously outputted
-                for (let i = 0; i < currentOutputLines; i++) {
-                    this.replServer.output.write('\x1B[1A\x1B[K'); // Clear the line
-                }
-            }
-
-            // Write new data
-            this.replServer.output.write(output + '\n');
-
-            // Update the current output lines count for the next change
-            currentOutputLines = overwriteMode ? outputLines.length : 0;
-            //if we are in regularTail mode, and we counted down to zero the number of changes
-            //then unplug
-            if(!overwriteMode && --changeCount==0){
-                unplug();
-            }
-
-        };
-
-        // Register the onDataChanged callback with the templateProcessor
-        this.templateProcessor.setDataChangeCallback(jsonPointer, onDataChanged);
-        return "Started tailing... Press Ctrl+C to stop.";
+        throw new Error(`invalid --tail args: ${args}`);
     }
 
 
 
-public async open(directory: string = this.currentDirectory) {
+    public async tail(args: string): Promise<any> {
+        console.log("Started tailing... Press Ctrl+C to stop.")
+        let {format, jsonPointer, number:countDown=NaN, jsonataExpression="false"} = this.extractArgsInfo(args);
+        const compiledExpr = jsonata(jsonataExpression);
+
+        let currentOutputLines = 0;
+
+        // SIGINT listener to handle Ctrl+C press in REPL
+        const onSigInt = () => {
+            unplug();
+        };
+
+        // If this.replServer is defined (not in tests), register the SIGINT listener
+        if (this.replServer) {
+            this.replServer.on('SIGINT', onSigInt);
+        }
+
+        let resolve; //resolve function that will act as a latch to cause tail to return when the 'until' criterion is met
+        // Function to stop tailing
+        const unplug = () => {
+            // Stop tailing without clearing the screen to keep the exit message
+            this.templateProcessor.removeDataChangeCallback(jsonPointer);
+
+            // If this.replServer is defined (not in tests), display the prompt and remove the SIGINT listener
+            if (this.replServer) {
+                this.replServer.removeListener('SIGINT', onSigInt);
+            }
+        };
+
+        let _data;
+        let done = false;
+        // Data change callback
+        const onDataChanged = async (data: any) => {
+            if(done){
+                return; //just ignore any latent callbacks
+            }
+            // Convert data to a string
+            const output = StatedREPL.stringify(data);
+            _data = JSON.parse(output); //save data so we can return the final value from the promise. It is important to return a snapshot via reparsing from string so that returned objects don't continue to 'evolve' and make testing impossible
+            const outputLines = output.split('\n');
+
+
+            // If in overwrite mode and output lines exist, move cursor up to clear previous lines
+            for (let i = 0; i < currentOutputLines; i++) {
+                //when we are running tests like from README.md autogenerated tests, there is no repl server
+                //so we must check to make sure it exists before we write it
+                this.replServer && this.replServer.output.write('\x1B[1A\x1B[K'); // Clear the line
+            }
+
+
+            if(isNaN(countDown) || countDown > 0) { //since the last value will be returned from this method and written by the REPL, we should not print it to screen
+                // Write new data to the output
+                this.replServer && this.replServer.output.write(output + '\n');
+                // Update the current output lines count for the next change
+                currentOutputLines = outputLines.length;
+            }
+
+            if(!isNaN(countDown)){
+                countDown--;
+            }
+
+            if(countDown === 0 || await compiledExpr.evaluate(data)===true){
+                done = true;
+                unplug();
+                resolve(); //resolve the latch promise
+            }
+        };
+
+
+        // If countDown is greater than zero, return the Promise that resolves when countDown is zero
+        const latch = new Promise<void>((_resolve) => {
+                resolve = _resolve; //we assign our resolve variable that is declared outside this promise so that our onDataChange callbacks can use  it
+        });
+
+        // Register the onDataChanged callback with the templateProcessor
+        this.templateProcessor.setDataChangeCallback(jsonPointer, onDataChanged);
+
+        await latch; //waits for a onDataChanged callback to resolve the latch.
+
+        return {
+            "__tailed": true,
+            "data":_data
+        }; //the last result tailed to the screen is what this command returns
+    }
+
+
+
+    public async open(directory: string = this.currentDirectory) {
     if(directory === ""){
         directory = this.currentDirectory;
     }

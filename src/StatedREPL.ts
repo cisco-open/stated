@@ -67,7 +67,7 @@ export default class StatedREPL {
             ["log", "set the log level [debug, info, warn, error]"],
             ["debug", "set debug commands (WIP)"],
             ["errors", "return an error report"],
-            ["tail", "tail /count 100' will tail 100 changes to the /count"],
+            ["tail", 'tail "/ until count=100" will tail the template root until its count field is 100'],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
@@ -113,19 +113,17 @@ export default class StatedREPL {
         try{
             const method = this.cliCore[cliCoreMethodName].bind(this.cliCore);
             result = await method(args);
-            let stringify = StatedREPL.stringify(result);
-            if(this.isColorized === true){
-                stringify = StatedREPL.colorize(stringify);
-            }
-            if (!this.tookOverIO(cliCoreMethodName)){ //.open presents an interactive prompt. It taked over the I/O so we should not print anything
+            if(!this.tookOverIO(cliCoreMethodName, result)){
+                let stringify = StatedREPL.stringify(result);
+                if(this.isColorized === true){
+                    stringify = StatedREPL.colorize(stringify);
+                }
                 console.log(stringify);
             }
         } catch (e) {
             console.error(e);
         }
-        if(!result.toString().startsWith("Started tailing...") || this.tookOverIO(cliCoreMethodName)){
-            this.r.displayPrompt(); //all commands except tail or those that support --tail should throw the prompt up after they return
-        }
+        this.r.displayPrompt();
     }
 
     static printFunc(key, value) {
@@ -153,8 +151,8 @@ export default class StatedREPL {
             });
     }
 
-    private tookOverIO(method) {
-        return method === 'open';
+    private tookOverIO(methodName, result) {
+        return methodName === 'open' || result.__tailed
     }
 }
 

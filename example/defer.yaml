@@ -1,0 +1,11 @@
+sampleQuery: Would you like to play a game? How about a nice game of chess?
+query: ""
+deferredQuery$: $defer('/query', 100)
+counter$: function(){  $set('/count', count+1)}
+count: 0
+appendQuery$: $set('/query', sampleQuery~>$substring(0,count))
+rapidCaller$: $setInterval(counter$, 25)
+stop$: |
+    count=$length(sampleQuery)
+      ?($clearInterval(rapidCaller$);'done')
+      :'simulating typing'  

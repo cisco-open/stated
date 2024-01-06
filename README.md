@@ -253,22 +253,22 @@ opening an example template:
 
 <img width="1000" src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnl6NDgzdnE0bWlwbzU0NjBlOTNtMmE0OHJ1NjRpdmJxYTdtb3FleiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/0kmQtLaWvuthTU1f2o/giphy.gif"/>
 
-| Command  | Description                                                          | flags & args                                                                                                                                                      | Example                                                                                                                                                |
-|----------|----------------------------------------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `.open`  | Interactive command to open a template (defaults to examples folder) |                                                                                                                                                                   | `.open`                                                                                                                                                 |
-| `.cd`    | Change directory (then use .open command)                            |                                                                                                                                                                   | `.cd ..`                                                                                                                                               |
-| `.init`  | Initialize the template from a JSON file.                            | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` <br> &bull; `--tail=<n>` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates --tail=10` |
-| `.set`   | Set data to a JSON pointer path.                                     | `<path> <data>`                                                                                                                                                   | `.set /to "jsonata"`                                                                                                                                   |
-| `.from`  | Show the dependents of a given JSON pointer.                         | `<path>`                                                                                                                                                          | `.from /a`                                                                                                                                             |
-| `.to`    | Show the dependencies of a given JSON pointer.                       | `<path>`                                                                                                                                                          | `.to /b`                                                                                                                                               |
-| `.in`    | Show the input template.                                             | `None`                                                                                                                                                            | `.in`                                                                                                                                                  |
-| `.out`   | Show the current state of the template.                              | `[<jsonPtr>]`                                                                                                                                                     | `.out` <br>`.out /data/accounts`                                                                                                                       |
-| `.state` | Show the current state of the template metadata.                     | `None`                                                                                                                                                            | `.state`                                                                                                                                               |
-| `.plan`  | Show the execution plan for rendering the template.                  | `None`                                                                                                                                                            | `.plan`                                                                                                                                                |
-| `.note`  | Show a separator line with a comment in the REPL output.             | `<comment>`                                                                                                                                                       | `.note "Example 8"`                                                                                                                                    |
-| `.log`   | Set the logging level                                                | `[silent, error, warn, info, verbose, debug]`                                                                                                                     | `.log silent`                                                                                                                                          |
-| `.color` | Enable Colors                                                        | `[on,off]`                                                                                                                                                        | `.color on`                                                                                                                                            |
-| `.tail`  | Tail part of the document for changes                                | `<jsonPointer>` <n>?                                                                                                                                              | `.tail /count 100`                                                                                                                                     |
+| Command  | Description                                                          | flags & args                                                                                                                                                               | Example                                                                                                                                                                         |
+|----------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `.open`  | Interactive command to open a template (defaults to examples folder) |                                                                                                                                                                            | `.open`                                                                                                                                                                         |
+| `.cd`    | Change directory (then use .open command)                            |                                                                                                                                                                            | `.cd ..`                                                                                                                                                                        |
+| `.init`  | Initialize the template from a JSON file.                            | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull;`--options=<json>` <br> &bull; `--xf=<path>`<br> &bull; `--importPath=<path>` <br> &bull; `--tail "<tailargs>"` | `.init -f "example/hello.json" --tags=FOO,BAR --xf=~/falken/myEnv.json --options={"strict":{"refs":true}} --importPath=~/falken/mytemplates --tail "/ until msg='hello world'"` |
+| `.set`   | Set data to a JSON pointer path.                                     | `<path> <data>`                                                                                                                                                            | `.set /to "jsonata"`                                                                                                                                                            |
+| `.from`  | Show the dependents of a given JSON pointer.                         | `<path>`                                                                                                                                                                   | `.from /a`                                                                                                                                                                      |
+| `.to`    | Show the dependencies of a given JSON pointer.                       | `<path>`                                                                                                                                                                   | `.to /b`                                                                                                                                                                        |
+| `.in`    | Show the input template.                                             | `None`                                                                                                                                                                     | `.in`                                                                                                                                                                           |
+| `.out`   | Show the current state of the template.                              | `[<jsonPtr>]`                                                                                                                                                              | `.out` <br>`.out /data/accounts`                                                                                                                                                |
+| `.state` | Show the current state of the template metadata.                     | `None`                                                                                                                                                                     | `.state`                                                                                                                                                                        |
+| `.plan`  | Show the execution plan for rendering the template.                  | `None`                                                                                                                                                                     | `.plan`                                                                                                                                                                         |
+| `.note`  | Show a separator line with a comment in the REPL output.             | `<comment>`                                                                                                                                                                | `.note "Example 8"`                                                                                                                                                             |
+| `.log`   | Set the logging level                                                | `[silent, error, warn, info, verbose, debug]`                                                                                                                              | `.log silent`                                                                                                                                                                   |
+| `.color` | Enable Colors                                                        | `[on,off]`                                                                                                                                                                 | `.color on`                                                                                                                                                                     |
+| `.tail`  | Tail part of the document for changes                                | `<jsonPointer> (until <jsonata_expr>)?`                                                                                                                                    | `.tail /` <br> `.tail "/ until foo='bar'"`                                                                                                                                       |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -606,9 +606,9 @@ expression are also tagged.
 
 ```
 ## Liveness
-Templates can contain generative expressions that cause their content to change over time. The `tail` command can be
-used to watch changes on a particular field. Below we use `--tail "/counter 5` to tail up to 5 changes to the `/counter`
-field:
+Templates can contain generative expressions that cause their content to change over time. 
+For instance the $setInterval function behaves exactyl as it does in Javascript. Below, 
+it causes the `incr` function to be called forever, every 10 ms.
 ```json
 > .init -f "example/tail.json"
 {
@@ -616,17 +616,22 @@ field:
   "counter": 0,
   "upCount": "${  $setInterval(incr, 10)  }"
 }
-> .init -f "example/tail.json" --tail "/counter 5"
-"Started tailing... Press Ctrl+C to stop."
 ```
-```json
-1
-2
-3
-4
-5
->
+The `tail` command can be used to watch changes on a particular field. Below we use `--tail "/ until counter=5"` to tail 
+the document root until the value of counter reaches 5, at which point `--tail` stops
+producing output, though the `incr` function is still being called every 10 ms.
+field:
+```json ["data.counter = 5"]
+> .init -f "example/tail.json" --tail "/ until counter=5"
+Started tailing... Press Ctrl+C to stop.
+{
+"incr": "{function:}",
+"counter": 5,
+"upCount": "--interval/timeout--"
+}
 ```
+Here was have a more complex example, again using $setInterval to increment a counter
+that drives rotation and scrolling of arrays and strings.
 ```json
 > .init -f "example/tailgraphs.yaml"
 {
@@ -688,11 +693,11 @@ field:
    "moveBars": "${ (i;scroll(chart))}"
 }
 ```
-Setting `--tail "/ 0"` instructs the REPL to tail the root of the
+Setting `--tail /` instructs the REPL to tail the root of the
 document "in place" so the screen does not scroll and you can observe
 live changes to the json document.
 
-`> .init -f "example/tailgraphs.yaml" --tail "/ 0"`
+`> .init -f "example/tailgraphs.yaml" --tail /`
 <img src="https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/tailgraphs.gif" width="800" height="400" alt="Alt text for the GIF" />
 
 ## Reactive Behavior
@@ -1752,6 +1757,88 @@ an object.
 > .cd ..
 "Current directory changed to: /Users/falken/proj/jsonataexperiments"
 ```
+## $debounce function
+Debouncing is a technique used in software development, particularly in web development and event handling, 
+to control or limit the frequency of a particular action or event when it occurs rapidly or frequently. 
+It helps prevent excessive or redundant executions of the action, making applications more efficient and 
+responsive.
+
+In this example we rapidly change a counter and feed it into a debounced function that appends the count to 
+an accumulator array, `acc`. The `interval` is terminated when `count` reaches 100, and due to debouncing, 
+only a single value, 100, is written into `acc`. We use the `--tail "/ until acc[0]=100"` to tail the 
+root document (`/`) until a jsonata expression condition is met. The condition we check is 
+`acc[0]=100` which is the expected debounced value.
+ 
+```json
+> .init -f "example/debounce.yaml"
+{
+   "acc": [],
+   "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $debounce(15)}",
+   "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
+   "count": 0,
+   "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
+   "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }"
+}
+```
+```json ["data.acc=[100] and data.stop='done' and data.count=100"]
+> .init -f "example/debounce.yaml" --tail "/ until acc[0]=100"
+Started tailing... Press Ctrl+C to stop.
+{
+  "acc": [
+    100
+  ],
+  "counter": "{function:}",
+  "count": 100,
+  "rapidCaller": "--interval/timeout--",
+  "stop": "done"
+}
+```
+## $defer function
+While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
+"slowed down" version of a rapidly changing variable. $defer takes two arguments:
+1. The json pointer to the field you wish to defer (or "slow down")
+2. An optional number of milliseconds, T. 
+
+`$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a 
+subsequent value until the deferred field has remained unchanges for T ms.
+For example, suppose you are collecting a query string from a user
+input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
+pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
+the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer! The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged 
+until the `query`stops receiving changes and reaches its final state of "Would you like to play a game? How about a nice game of chess?"
+
+```json
+> .init -f "example/defer.yaml"
+{
+   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+   "query": "",
+   "deferredQuery$": "$defer('/query', 100)",
+   "counter$": "function(){  $set('/count', count+1)}",
+   "count": 0,
+   "appendQuery$": "$set('/query', sampleQuery~>$substring(0,count))",
+   "rapidCaller$": "$setInterval(counter$, 25)",
+   "stop$": "count=$length(sampleQuery)\n  ?($clearInterval(rapidCaller$);'done')\n  :'simulating typing'  \n"
+}
+```
+To watch the data changing we can use the `--tail until` to tail the changing template output until it reaches the final state.
+```json ["data.deferredQuery$ = data.sampleQuery"]
+> .init -f example/defer.yaml --tail "/ until deferredQuery$ = 'Would you like to play a game? How about a nice game of chess?'"
+Started tailing... Press Ctrl+C to stop.
+{
+  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+  "query": "Would you like to play a game? How about a nice game of chess?",
+  "deferredQuery$": "Would you like to play a game? How about a nice game of chess?",
+  "counter$": "{function:}",
+  "count": 62,
+  "appendQuery$": [
+    "/query"
+  ] ,
+  "rapidCaller$": "--interval/timeout--",
+  "stop$": "done"
+}
+```
+Here is a screencapture showing the two commands above executed in the REPL. 
+![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
 Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 
