@@ -692,6 +692,41 @@ test("matrix4", () => {
     ]);
 });
 
+test("filter variable", () => {
+    const program = `$expected[$i]`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+    ]);
+});
+
+test("big test expression", () => {
+    const program = `function($actual, $expected, $path) {(
+       $actual != $expected ? (
+           $type($actual) != $type($expected) ?
+               {'diff': {'path': $path, 'diff': 'type', 'expected': $type($expected), 'actual': $type($actual) }} :
+               $type($actual) = 'array' ?
+               (
+                   $count($actual) != $count($expected) ?
+                       {'diff': {'path': $path, 'diff': 'count', 'expected': $count($expected), 'actual': $count($actual)}}
+                       : $map($actual, function($item, $i) {
+                           compare($item, $expected[$i], $path & '[' & $i & ']' )
+                       })~>$reduce($append);
+               ) :
+               $type($actual) = 'object' ? compare($actual, $expected, $path) :
+               {'diff': {'path': $path, 'diff': 'value', 'expected': $expected, 'actual': $actual}}
+       )
+     )}`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "compare"
+        ],
+        [
+            "compare"
+        ]
+    ]);
+});
+
 
 
 

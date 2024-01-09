@@ -286,7 +286,9 @@ export default class DependencyFinder {
     }
 
     emitPaths() {
-
+        if(this.currentSteps.length === 0){
+            return;
+        }
         const emitted: string[] = [];
         const steps: StepRecord[] = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
         const lastStepsArray = last(this.currentSteps);
