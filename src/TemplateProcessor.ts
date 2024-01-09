@@ -499,6 +499,7 @@ export default class TemplateProcessor {
                     metaInfo.dependencies__ = depFinder.findDependencies();
                     acc.push(metaInfo);
                 } catch(e) {
+                    this.logger.error(JSON.stringify(e));
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `problem analysing expression : ${metaInfo.expr__}`;
                     const errorObject = {name:"badJSONata", message: msg}

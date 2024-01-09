@@ -727,6 +727,22 @@ test("big test expression", () => {
     ]);
 });
 
+test("rando", () => {
+    const program = `function($name, $function, $input, $expected) { (
+       $actual := $eval($function, $input);
+       ($actual != $expected) ? (
+         $errorReport($name & '] failed');
+        compare($actual, $expected)
+       )
+       : $name & '] passed';
+     )}`;
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([
+        [
+            "compare"
+        ]
+    ]);
+});
 
 
 
