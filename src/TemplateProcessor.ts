@@ -243,7 +243,7 @@ export default class TemplateProcessor {
      * @param templateExprRerooting - When we $import a template may look like `"foo":"../../${x~>|props|{foo:bar}|~>$import}"`. It has `../../` (rerooting) that needs to be pushed into the imported template
      *
      */
-    public async initialize(template: {} = undefined, jsonPtr = "/", reRooting?:JsonPointerStructureArray):Promise<void> {
+    public async initialize(template: {} = undefined, jsonPtr = "/"):Promise<void> {
         //this.timerManager.clearAll(); FIXME TODO you can't sweep this under the rug
 
         // if initialize is called with a template and root json pointer (which is "/" b default)
@@ -275,7 +275,7 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr, reRooting);
+            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr);
             this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
@@ -478,33 +478,19 @@ export default class TemplateProcessor {
         await this.initialize(literalTemplateToImport, jsonPtrIntoTemplate); //, jp.parse(metaInfo.exprTargetJsonPointer__)
     }
 
-    private async createMetaInfos(template, rootJsonPtr = [], enclosingExpressionTargetJsonPointer:JsonPointerStructureArray) {
+    private async createMetaInfos(template, rootJsonPtr = []) {
         let initialMetaInfos = await MetaInfoProducer.getMetaInfos(template);
 
         let metaInfos = initialMetaInfos.reduce((acc, metaInfo) => {
-            if(enclosingExpressionTargetJsonPointer?.length > 0){ //if we have a non-degenerate target json pointer for the enclosing expression...
-                //when we are processing an imported template, the targetJsonPointer of the enclosing expression transfers
-                //onto all expressions in the imported template
-                metaInfo.jsonPointer__ = [...enclosingExpressionTargetJsonPointer, ...metaInfo.jsonPointer__];
-                metaInfo.exprTargetJsonPointer__ = enclosingExpressionTargetJsonPointer;
-            }else{
-                metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
-                metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
-            }
+            metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
+            metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
             const cdUpPath = metaInfo.exprRootPath__;
-
             if (cdUpPath) {
                 const cdUpParts = cdUpPath.match(/\.\.\//g);
                 if (cdUpParts) {
                     metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
                 } else if (cdUpPath.match(/^\/$/g)) {
-                    //here also, we have to honor the fact that the root of an imported template is whatever the target
-                    //was, of the expression that held the import
-                    if(enclosingExpressionTargetJsonPointer?.length > 0){
-                        metaInfo.exprTargetJsonPointer__ = enclosingExpressionTargetJsonPointer;
-                    }else{
-                        metaInfo.exprTargetJsonPointer__ = rootJsonPtr;
-                    }
+                    metaInfo.exprTargetJsonPointer__ = rootJsonPtr;
                 } else {
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;

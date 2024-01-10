@@ -1832,17 +1832,17 @@ test("check root of import", async () => {
         a: "Global A",
         b:{
             c:{
-                //d: "${  {'a':'Local A', 'b':'/${a}'} ~> $import  }",
-                //e: "/${importMe ~> $import}",
-                f: "../../${importMe ~> $import}",
+                d: "${  {'a':'Local A', 'b':'/${a}'} ~> $import  }",
+                e: "/${importMe ~>|$|{'b':'/${a}'}| ~> $import}",
+                f: "../../${importMe ~> |$|{'b':'/${a}'}|~> $import}",
             }
         },
-        importMe: {a:'Local A', b:'/${a}'}
+        importMe: {a:'Local A', b:'SOMETHING TO BE REPLACED'}
     };
     const tp = new TemplateProcessor(template);
     await tp.initialize();
-   // expect(tp.output.b.c.d.b).toBe("Local A");
-   // expect(tp.output.b.c.e.b).toBe("Local A");
+    expect(tp.output.b.c.d.b).toBe("Local A");
+    expect(tp.output.b.c.e.b).toBe("Local A");
     expect(tp.output.b.c.f.b).toBe("Local A");
 });
 
