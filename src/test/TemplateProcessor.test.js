@@ -1818,13 +1818,32 @@ test("import where location of import uses rerooting", async () => {
         replacementProp: "hello",
         b:{
             c:{
-                d:"../../${ viz ~> |props|{'x':'${$$.replacementProp}'}| ~> $import}"
+                d:"../../${ viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import}"
             }
         }
     };
     const tp = new TemplateProcessor(template);
     await tp.initialize();
     expect(tp.output.b.c.d).toStrictEqual({props:{x:"hello"}});
+});
+
+test("check root of import", async () => {
+    let template = {
+        a: "Global A",
+        b:{
+            c:{
+                //d: "${  {'a':'Local A', 'b':'/${a}'} ~> $import  }",
+                //e: "/${importMe ~> $import}",
+                f: "../../${importMe ~> $import}",
+            }
+        },
+        importMe: {a:'Local A', b:'/${a}'}
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+   // expect(tp.output.b.c.d.b).toBe("Local A");
+   // expect(tp.output.b.c.e.b).toBe("Local A");
+    expect(tp.output.b.c.f.b).toBe("Local A");
 });
 
 
