@@ -1,6 +1,6 @@
 {
   "name": "stated-js",
-  "version": "0.0.103",
+  "version": "0.0.104",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "./dist/src/TemplateProcessor.js",
@@ -15,7 +15,8 @@
     "./dist/src/StatedREPL.js": "./dist/src/StatedREPL.js",
     "./dist/src/TestUtils.js": "./dist/src/TestUtils.js",
     "./dist/src/DependencyFinder.js": "./dist/src/DependencyFinder.js",
-    "./dist/src/JsonPointer.js": "./dist/src/JsonPointer.js"
+    "./dist/src/JsonPointer.js": "./dist/src/JsonPointer.js",
+    "./dist/src/utils/debounce.js": "./dist/src/utils/debounce.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
