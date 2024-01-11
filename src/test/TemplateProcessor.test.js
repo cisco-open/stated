@@ -1835,6 +1835,9 @@ test("check root of import", async () => {
                 d: "${  {'a':'Local A', 'b':'/${a}'} ~> $import  }",
                 e: "/${importMe ~>|$|{'b':'/${a}'}| ~> $import}",
                 f: "../../${importMe ~> |$|{'b':'/${a}'}|~> $import}",
+                g: "${  {'a':'Local A', 'b':'//${a}'} ~> $import  }",
+                h: "/${importMe ~>|$|{'b':'//${a}'}| ~> $import}",
+                i: "../../${importMe ~> |$|{'b':'//${a}'}|~> $import}",
             }
         },
         importMe: {a:'Local A', b:'SOMETHING TO BE REPLACED'}
@@ -1844,6 +1847,9 @@ test("check root of import", async () => {
     expect(tp.output.b.c.d.b).toBe("Local A");
     expect(tp.output.b.c.e.b).toBe("Local A");
     expect(tp.output.b.c.f.b).toBe("Local A");
+    expect(tp.output.b.c.g.b).toBe("Global A");
+    expect(tp.output.b.c.h.b).toBe("Global A");
+    expect(tp.output.b.c.i.b).toBe("Global A");
 });
 
 
