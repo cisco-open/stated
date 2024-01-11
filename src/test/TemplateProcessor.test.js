@@ -1812,22 +1812,24 @@ test('generateDeferFunction produces correct exception when path is wrong', asyn
 
 });
 
-test("import where location of import uses rerooting", async () => {
+test("relative vs absolute root '//' in import", async () => {
     let template = {
         viz:{props:{x:'not hello'}},
         replacementProp: "hello",
         b:{
             c:{
-                d:"../../${ viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import}"
+                d:"../../${ viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import}",
+                e:"../../${ viz ~> |props|{'x':'//${$$.replacementProp}'}| ~> $import}"
             }
         }
     };
     const tp = new TemplateProcessor(template);
     await tp.initialize();
     expect(tp.output.b.c.d).toStrictEqual({props:{x:"hello"}});
+    expect(tp.output.b.c.e).toStrictEqual({props:{x:"hello"}});
 });
 
-test("check root of import", async () => {
+test("relative root // inside various rooted expressions", async () => {
     let template = {
         a: "Global A",
         b:{
