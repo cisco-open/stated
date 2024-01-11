@@ -1829,7 +1829,7 @@ test("relative vs absolute root '//' in import", async () => {
     expect(tp.output.b.c.e).toStrictEqual({props:{x:"hello"}});
 });
 
-test("relative root // inside various rooted expressions", async () => {
+test("root / vs absolute root // inside various rooted expressions", async () => {
     let template = {
         a: "Global A",
         b:{
