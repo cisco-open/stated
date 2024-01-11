@@ -1,0 +1,4 @@
+{
+  "to": "Joshua",
+  "message": "${$import('example/absoluteRoot.json')}"
+}

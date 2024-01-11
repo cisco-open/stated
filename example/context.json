@@ -1,0 +1,6 @@
+{
+  "a": {
+    "b": "${[c,' and ',$.c,' and ',$$.c,' are the same thing. $ (current context) is /a, the object in which this expression resides']~>$join}",
+    "c": "hello"
+  }
+}

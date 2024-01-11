@@ -377,9 +377,12 @@ export default class TemplateProcessor {
             } else {
                 this.logger.debug(`Attempting local file import of '${importMe}'`);
                 const mightBeAFilename= importMe;
-
-                if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' &&  BUILD_TARGET !== 'web')) {
-                    resp = await this.localImport(mightBeAFilename);
+                try {
+                    if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
+                        resp = await this.localImport(mightBeAFilename);
+                    }
+                }catch (error){
+                    this.logger.debug("argument to import doesn't seem to be a file path");
                 }
 
 
@@ -487,11 +490,13 @@ export default class TemplateProcessor {
             const cdUpPath = metaInfo.exprRootPath__;
             if (cdUpPath) {
                 const cdUpParts = cdUpPath.match(/\.\.\//g);
-                if (cdUpParts) {
+                if (cdUpParts) { // ../../{...}
                     metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
-                } else if (cdUpPath.match(/^\/$/g)) {
+                } else if (cdUpPath.match(/^\/$/g)) { // /${...}
                     metaInfo.exprTargetJsonPointer__ = rootJsonPtr;
-                } else {
+                } else if(cdUpPath.match(/^\/\/$/g)){ // //${...}
+                    metaInfo.exprTargetJsonPointer__ = []; //absolute root
+                } else{
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;
                     const errorObject = {name:'invalidExpRoot', message: msg}

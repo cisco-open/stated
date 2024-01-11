@@ -1,5 +1,5 @@
 {
   "noradCommander": "${ norad.commanderDetails  }",
-  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import('/norad')}",
+  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import}",
   "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
 }
