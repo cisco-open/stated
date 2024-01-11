@@ -244,7 +244,9 @@ export default class TemplateProcessor {
      *
      */
     public async initialize(template: {} = undefined, jsonPtr = "/"):Promise<void> {
-        //this.timerManager.clearAll(); FIXME TODO you can't sweep this under the rug
+        if(jsonPtr === "/"){
+            this.timerManager.clearAll();
+        }
 
         // if initialize is called with a template and root json pointer (which is "/" b default)
         // we need to reset the template. Otherwise, we rely on the one provided in the constructor
