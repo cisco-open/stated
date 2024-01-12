@@ -1,0 +1,12 @@
+name: Main
+SAY_HELLO: "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/sayhello.json').json()}"
+now: "${ function(){$set('/timeString', $Date())} }"
+tick: "${ $setInterval(now , 1000) }"
+timeString: ''
+worldTime: ${ "World! " & timeString }
+universeTime: ${ "Universe! " & timeString }
+galaxyTime: ${ "Galaxy! " & timeString }
+view:
+  - "../${SAY_HELLO ~> |props|{'name':'${$$.worldTime}'}| ~> $import}"
+  - "../${SAY_HELLO ~> |props|{'name':'${$$.universeTime}'}| ~> $import}"
+  - "../${SAY_HELLO ~> |props|{'name':'${$$.galaxyTime}'}| ~> $import}"

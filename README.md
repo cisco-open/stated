@@ -811,12 +811,36 @@ Individual JSONata programs are embedded in JSON files between `${..}`. What is 
 The input, by default, is the object or array that the expression resides in. For instance in the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
 refer to the first element of the array. 
 ## Rerooting Expressions
-In the example below, we want `player1` to refer to `/player1` (the field named 'player1' at the root of the document). 
-But our expression `greeting & ', ' &  player1` is located deep in the document at `/dialog/part1`. So how can we cause 
-the root of the document to be the input to the JSONata expression `greeting & ', ' &  player1`? 
+In Stated templates, one way to declare a JSONata expression is by surrounding it by "dollars moustaches".
+E.g `${...some expression...}`. JSONata expressions always have a [context](https://docs.jsonata.org/programming#built-in-variables).
+The `$` variable always points to the current context. The `$$` variable always points to the input (root context) for an 
+expression.
+In a Stated template, the root context for an expression is the object in which the expression is contained. For
+Example:
+```json
+> .init -f "example/context.json"
+{
+   "a": {
+      "b": "${[c,' and ',$.c,' and ',$$.c,' are the same thing. $ (current context) is /a, the object in which this expression resides']~>$join}",
+      "c": "hello"
+   }
+}
+> .out
+{
+   "a": {
+      "b": "hello and hello and hello are the same thing. $ (current context) is /a, the object in which this expression resides",
+      "c": "hello"
+   }
+}
+```
+Now we will show how we can change the context of an expression using 'rerooting.' Rerooting allows the expression's root
+context to be pointed anywhere in the json document.
+In the example below, consider `greeting & ', ' &  player1'`. We want `player1` to refer to the content at json pointer `/player1` (the field named 'player1' at the root of the document). 
+But our expression `greeting & ', ' &  player1` is located deep in the document at `/dialog/partI`. So how can we cause 
+the root of the document to be the context for the JSONata expression `greeting & ', ' &  player1`? 
 You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
 at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can
-explicitly set their input using the rooting syntax. Both absolute rooting, `/${...}` and relative rooting `../${...}`
+explicitly set their context using the rooting syntax. Both absolute rooting, `/${...}` and relative rooting `../${...}`
 are shown.
 
 ```json
@@ -852,8 +876,37 @@ are shown.
     }
   }
 }
+```
+An advanced rerooting operator is the `//` absolute root operator. The `/` rooting operator, that we showed above,  will never allow the expression
+to 'escape' outside of the template it was defined in. But what if we intend for a template to be imported into another template
+and we expect there to be a variable defined in the other template that we should use? This is where the `//` absolute root
+operator can be used. The `//` operator will set the expression context to the absolute root of whatever the final document is
+after all imports have been performed.
+```json
+> .init -f "example/absoluteRoot.json"
+{
+   "to": "!${'Professor Falken'}",
+   "greeting": "//${'Hello, ' & to}"
+}
+> .out
+{
+   "greeting": "Hello, Professor Falken"
+}
+> .init -f "example/importsAbsoluteRoot.json"
+{
+   "to": "Joshua",
+   "message": "${$import('example/absoluteRoot.json')}"
+}
+> .out
+{
+   "to": "Joshua",
+   "message": {
+      "greeting": "Hello, Joshua"
+   }
+}
 
 ```
+
 ## DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
 expressions. stated is at its core a data flow engine. Stated analyzes the abstract syntax tree (AST) of JSONata 
@@ -1244,41 +1297,41 @@ remote templates (or local literal templates) into the current template
 }
 > .note "Now let's use the import function on the template"
 "============================================================="
-> .init -f "example/ex16.json"
+> .init -f example/ex16.json
 {
-  "noradCommander": "${ norad.commanderDetails  }",
-  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import('/norad')}",
-  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
+   "noradCommander": "${ norad.commanderDetails  }",
+   "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import}",
+   "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
 }
 > .out
 {
-  "noradCommander": {
-    "fullName": "Jack Beringer",
-    "salutation": "General Jack Beringer",
-    "systemsUnderCommand": 4
-  },
-  "norad": {
-    "commanderDetails": {
+   "noradCommander": {
       "fullName": "Jack Beringer",
       "salutation": "General Jack Beringer",
       "systemsUnderCommand": 4
-    },
-    "organization": "NORAD",
-    "location": "Cheyenne Mountain Complex, Colorado",
-    "commander": {
-      "firstName": "Jack",
-      "lastName": "Beringer",
-      "rank": "General"
-    },
-    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-    "systems": [
-      "Ballistic Missile Early Warning System (BMEWS)",
-      "North Warning System (NWS)",
-      "Space-Based Infrared System (SBIRS)",
-      "Cheyenne Mountain Complex"
-    ]
-  },
-  "handleRes": "{function:}"
+   },
+   "norad": {
+      "commanderDetails": {
+         "fullName": "Jack Beringer",
+         "salutation": "General Jack Beringer",
+         "systemsUnderCommand": 4
+      },
+      "organization": "NORAD",
+      "location": "Cheyenne Mountain Complex, Colorado",
+      "commander": {
+         "firstName": "Jack",
+         "lastName": "Beringer",
+         "rank": "General"
+      },
+      "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+      "systems": [
+         "Ballistic Missile Early Warning System (BMEWS)",
+         "North Warning System (NWS)",
+         "Space-Based Infrared System (SBIRS)",
+         "Cheyenne Mountain Complex"
+      ]
+   },
+   "handleRes": "{function:}"
 }
 > .note "You can see above that 'import' makes it behave as a template, not raw JSON."
 "============================================================="

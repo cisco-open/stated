@@ -1812,6 +1812,50 @@ test('generateDeferFunction produces correct exception when path is wrong', asyn
 
 });
 
+test("relative vs absolute root '//' in import", async () => {
+    let template = {
+        viz:{props:{x:'not hello'}},
+        replacementProp: "hello",
+        b:{
+            c:{
+                d:"../../${ viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import}",
+                e:"../../${ viz ~> |props|{'x':'//${$$.replacementProp}'}| ~> $import}"
+            }
+        }
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.output.b.c.d).toStrictEqual({props:{x:"hello"}});
+    expect(tp.output.b.c.e).toStrictEqual({props:{x:"hello"}});
+});
+
+test("root / vs absolute root // inside various rooted expressions", async () => {
+    let template = {
+        a: "Global A",
+        b:{
+            c:{
+                d: "${  {'a':'Local A', 'b':'/${a}'} ~> $import  }",
+                e: "/${importMe ~>|$|{'b':'/${a}'}| ~> $import}",
+                f: "../../${importMe ~> |$|{'b':'/${a}'}|~> $import}",
+                g: "${  {'a':'Local A', 'b':'//${a}'} ~> $import  }",
+                h: "/${importMe ~>|$|{'b':'//${a}'}| ~> $import}",
+                i: "../../${importMe ~> |$|{'b':'//${a}'}|~> $import}",
+            }
+        },
+        importMe: {a:'Local A', b:'SOMETHING TO BE REPLACED'}
+    };
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    expect(tp.output.b.c.d.b).toBe("Local A");
+    expect(tp.output.b.c.e.b).toBe("Local A");
+    expect(tp.output.b.c.f.b).toBe("Local A");
+    expect(tp.output.b.c.g.b).toBe("Global A");
+    expect(tp.output.b.c.h.b).toBe("Global A");
+    expect(tp.output.b.c.i.b).toBe("Global A");
+});
+
+
+
 
 
 

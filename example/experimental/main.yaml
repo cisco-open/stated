@@ -1,0 +1,6 @@
+name: Main
+SAY_HELLO: "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/sayhello.json').json()}"
+view:
+  - "/${SAY_HELLO ~> |props|{'name':'world'}| ~> $import}"
+  - "/${SAY_HELLO ~> |props|{'name':'Universe'}| ~> $import}"
+  - "/${SAY_HELLO ~> |props|{'name':'Galaxy'}| ~> $import}"

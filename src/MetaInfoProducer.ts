@@ -28,7 +28,7 @@ export default class MetaInfoProducer {
         '\\s*' +                    // Match optional whitespace
         '(?:(@(?<tag>\\w+))?\\s*)' +   // Match the 'tag' like @DEV or @TPC on an expression
         '(?:(?<tempVariable>!)?\\s*)' +    // Match the ! symbol which means 'temp variable'
-        '(?:(?<slash>\\/)|(?<relativePath>(\\.\\.\\/)+))?' + // Match a forward slash '/' or '../' to represent relative paths
+        '(?:(?<slashslash>\\/\\/)|(?<slash>\\/)|(?<relativePath>(\\.\\.\\/)+))?' + // Match a forward slash '/' or '../' to represent relative paths
         '\\$\\{' +                 // Match the literal characters '${'
         '(?<jsonataExpression>[\\s\\S]+)' + // Match one or more of any character. This is the JSONata expression/program (including newline, to accommodate multiline JSONata).
         '\\}' +                    // Match the literal character '}'
@@ -74,9 +74,10 @@ export default class MetaInfoProducer {
                 const keyEndsWithDollars = typeof path[path.length - 1] === 'string' && String(path[path.length - 1]).endsWith('$');
                 const tag = getMatchGroup('tag');
                 const exclamationPoint = !!getMatchGroup('tempVariable');
+                const leadingSlashSlash = getMatchGroup('slashslash');
                 const leadingSlash = getMatchGroup('slash');
                 const leadingCdUp = getMatchGroup('relativePath');
-                const slashOrCdUp = leadingSlash || leadingCdUp;
+                const slashOrCdUp = leadingSlashSlash || leadingSlash || leadingCdUp;
                 const expr = keyEndsWithDollars ? o : getMatchGroup('jsonataExpression');
                 const hasExpression = !!match || keyEndsWithDollars;
 
@@ -104,7 +105,7 @@ export default class MetaInfoProducer {
 
         await getPaths(template);
         return emit;
-        /*
+        /* this is an optimization that may eventually be important to get to
         // Prune subtrees with treeHasExpressions__ = false
         const prunedMetaInfos = fullResult.metaInfos.filter(info => info.treeHasExpressions__);
 

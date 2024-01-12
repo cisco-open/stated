@@ -121,7 +121,9 @@ export default class StatedREPL {
                 console.log(stringify);
             }
         } catch (e) {
-            console.error(e);
+            const stringify = StatedREPL.stringify(e.message);
+            console.error(stringify);
+            result = "";
         }
         this.r.displayPrompt();
     }

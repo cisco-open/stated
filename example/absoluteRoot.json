@@ -1,0 +1,4 @@
+{
+  "to": "!${'Professor Falken'}",
+  "greeting": "//${'Hello, ' & to}"
+}
