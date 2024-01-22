@@ -1123,11 +1123,20 @@ export default class TemplateProcessor {
         const origin = jsonPtr;
 
         //----------------- utility functions ----------------//
+
+        const isFunction = (jsonPointer)=>{
+            if(!jp.has(this.templateMeta, jsonPointer)){
+                return false;
+            }
+            const metaInf = jp.get(this.templateMeta, jsonPointer);
+            return !!metaInf.isFunction__;
+        }
+
         const queueParent = (jsonPtr)=>{
             //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
             const parentPointer = jp.parent(jsonPtr);//jp.compile(parts.slice(0, parts.length - 1));
             if (parentPointer !== '' && !visited.has(parentPointer)) {
-                queue.push(parentPointer);
+                !isFunction(parentPointer) && queue.push(parentPointer);
                 visited.add(parentPointer);
             }
         }
@@ -1136,7 +1145,7 @@ export default class TemplateProcessor {
             if (metaInf.dependees__) {
                 metaInf.dependees__.forEach(dependee => {
                     if (!visited.has(dependee)) {
-                        queue.push(dependee);
+                        !isFunction(dependee) && queue.push(dependee);
                         visited.add(dependee);
                     }
                 });
@@ -1153,7 +1162,7 @@ export default class TemplateProcessor {
                 // Generate json pointer for child
                 let childPtr = `${currentPtr}/${key}`;
                 if (!visited.has(childPtr)) {
-                    queue.push(childPtr);
+                    !isFunction(childPtr) && queue.push(childPtr);
                     visited.add(childPtr);
                 }
             }

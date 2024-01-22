@@ -1854,6 +1854,63 @@ test("root / vs absolute root // inside various rooted expressions", async () =>
     expect(tp.output.b.c.i.b).toBe("Global A");
 });
 
+// This test ensures that functions do not have dependencies
+test("functions are immutable and have no 'from'", async () => {
+    const templateYaml = `
+    # producer will be sending some test data
+    produceParams:
+      type: "my-topic"
+      data: ['luke', 'han', 'leia']
+      client:
+        type: test
+    # the subscriber's 'to' function will be called on each received event
+    subscribeParams: #parameters for subscribing to an event
+      source: cloudEvent
+      type: /\${produceParams.type} # subscribe to the same topic as we are publishing to test events
+      to: /\${joinResistance}
+      subscriberId: rebelArmy
+      initialPosition: latest
+      client:
+          type: test
+    joinResistance:  /\${function ($rebel) {$set('/rebelForces', rebelForces ~> $append($rebel))}}
+    # starts producer function
+    send$: $publish(produceParams)
+    # starts consumer function
+    recv$: $subscribe(subscribeParams)
+    # the subscriber's \`to\` function will write the received data here
+    rebelForces: [ ]`
+
+    const template = yaml.load(templateYaml);
+    const tp = new TemplateProcessor(template, {publish: ()=>{'NoOp'}, subscribe: ()=>{'NoOp'}}); //just stub subscribe with a noop
+    await tp.initialize();
+    expect(tp.from("/rebelForces")).toEqual(["/rebelForces"]); // /rebelForces has no fan-out
+    expect(tp.to("/rebelForces")).toEqual(["/rebelForces"]); // /rebelForces has no fan-in
+    expect(tp.from("/subscribeParams/to")).toEqual([
+        "/subscribeParams/to",
+        "/subscribeParams/type", //<--- this is somewhat dubious
+        "/recv$"
+    ]);
+    expect(tp.to("/subscribeParams/to")).toEqual(    [
+        "/rebelForces",
+        "/joinResistance",
+        "/subscribeParams/to"
+    ]);
+
+    expect(tp.to("/subscribeParams/to")).toEqual([
+        "/rebelForces",
+        "/joinResistance",
+        "/subscribeParams/to"
+    ]);
+    
+    expect(await tp.getEvaluationPlan()).toEqual([
+            "/joinResistance",
+            "/subscribeParams/to",
+            "/subscribeParams/type",
+            "/recv$",
+            "/send$"
+        ]
+    );
+});
 
 
 
