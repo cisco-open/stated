@@ -13,6 +13,7 @@
 // limitations under the License.
 
 import StatedREPL from "../../dist/src/StatedREPL.js";
+import TemplateProcessor from "../../dist/src/TemplateProcessor.js";
 
 test("test stringify", async () => {
   expect(StatedREPL.stringify({a: 1, b: 2})).toBe(
@@ -60,6 +61,20 @@ test("test onInit", async () => {
   }
 });
 
-
+// This test validates a bug when running an init command in StatedREPL overwrites context of provided TemplateProcessor
+test("TemplateProcessor keeps context on init", async () => {
+  const nozzle = (something) => "nozzle got some " + something;
+  const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}
+  const tp = new TemplateProcessor({
+    "a": "${$nozzle($ZOINK)}"
+  }, context);
+  const repl = new StatedREPL(tp);
+  await repl.cliCore.init('-f "example/contextFunc.json"');
+  expect(tp.output).toEqual(
+    {
+      "a": "nozzle got some ZOINK",
+    }
+  );
+});
 
 

@@ -127,7 +127,7 @@ export default class CliCore {
         } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
             this.templateProcessor.options = options;
-            if (contextData) {
+            if (contextData && Object.keys(contextData).length > 0) {
                 this.templateProcessor.setupContext(contextData);
             }
         }
