@@ -21,6 +21,9 @@ import {LOG_LEVELS} from "./ConsoleLogger.js";
 import repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
 import jsonata from "jsonata";
+import VizGraph from "./VizGraph.js";
+import { exec } from 'child_process';
+import  http from  'http';
 
 
 export default class CliCore {
@@ -473,6 +476,66 @@ export default class CliCore {
             return `Invalid directory: ${newDirectory}`;
         }
     }
+
+    public svg() {
+        const serverPort = 3000;
+        let server;
+
+        const startServer = () => {
+            server = http.createServer((req, res) => {
+                // Check for a specific URL path or request method if needed
+
+                // Execute 'dot' to convert the DOT code to SVG
+                const dotProcess = exec(`dot -Tsvg`, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`Error converting DOT to SVG: ${error.message}`);
+                        res.writeHead(500, { 'Content-Type': 'text/plain' });
+                        res.end('Internal Server Error');
+                        return;
+                    }
+
+                    if (stderr) {
+                        console.error(`dot stderr: ${stderr}`);
+                    }
+
+                    // Set the response headers for SVG content
+                    res.writeHead(200, {
+                        'Content-Type': 'image/svg+xml',
+                    });
+
+                    // Send the SVG data as the HTTP response
+                    res.end(stdout);
+                });
+
+                const dot = VizGraph.dot(this.templateProcessor);
+                // Pipe the DOT code string to the 'dot' process
+                dotProcess.stdin.write(dot);
+                dotProcess.stdin.end();
+            });
+
+            server.on('error', (error) => {
+                if (error.code === 'EADDRINUSE') {
+                    console.error(`Port ${serverPort} is already in use.`);
+                } else {
+                    console.error(`Server error: ${error.message}`);
+                }
+            });
+
+            server.listen(serverPort, () => {
+                console.log(`Server is running on port ${serverPort}`);
+            });
+        };
+
+        if (server) {
+            // Server is already running, return its URL
+            return `http://localhost:${serverPort}`;
+        } else {
+            // Start the server and return its URL
+            startServer();
+            return `http://localhost:${serverPort}`;
+        }
+    }
+
 
 
 
