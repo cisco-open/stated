@@ -68,6 +68,7 @@ export default class StatedREPL {
             ["debug", "set debug commands (WIP)"],
             ["errors", "return an error report"],
             ["tail", 'tail "/ until count=100" will tail the template root until its count field is 100'],
+            ["svg", 'serve SVG of depedency graph off http://localhost:3000'],
 
         ].map(c=>{
             const [cmdName, helpMsg] = c;
