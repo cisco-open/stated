@@ -1892,6 +1892,48 @@ Started tailing... Press Ctrl+C to stop.
 ```
 Here is a screencapture showing the two commands above executed in the REPL. 
 ![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
+## $rateLimit function
+Rate limiting allows to ensure than no than one function call is executed withing some time. For exameple,
+we want to ensure that a function calling external APIs does not overload it.
+```json
+>.init -f example/rateLimit.yaml
+{
+  "acc": [],
+  "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $rateLimit(100)}",
+  "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
+  "count": 0,
+  "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
+  "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }",
+  "accCount": "${ $count(acc) }"
+}
+```
+Below output demonstrates, that `rateLimit` function calls to to set `acc` to once in no less than 100ms, which will 
+result in only 10 counts added o the `acc` array, the first one, the last one, and 10 in between. 
+```json ["data.accCounter = 12"]
+.init -f example/rateLimit.yaml --tail "/ until accCount=12"
+Started tailing... Press Ctrl+C to stop.
+{
+  "acc": [
+    1,
+    10,
+    19,
+    28,
+    38,
+    48,
+    57,
+    66,
+    75,
+    85,
+    94,
+    100
+  ],
+  "counter": "{function:}",
+  "count": 100,
+  "rapidCaller": "--interval/timeout--",
+  "stop": "done",
+  "accCount": 12
+}
+```
 # Understanding Plans
 This information is to explain the planning algorithms to comitters. As a user you do not need to understand how
 Stated formulates plans. Before explaining how a plan is made, let's show the end-to-end flow of how a plan is used 

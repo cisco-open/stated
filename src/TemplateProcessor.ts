@@ -27,7 +27,7 @@ import { LOG_LEVELS } from "./ConsoleLogger.js";
 import {TimerManager} from "./TimerManager.js";
 import { stringifyTemplateJSON } from './utils/stringify.js';
 import {debounce} from "./utils/debounce.js"
-
+import {rateLimit} from "./utils/rateLimit.js"
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 export type StatedError = {
@@ -77,7 +77,8 @@ export default class TemplateProcessor {
         setTimeout,
         console,
         debounce,
-        Date
+        Date,
+        rateLimit
     }
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
