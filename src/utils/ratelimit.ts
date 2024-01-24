@@ -40,7 +40,7 @@ export function rateLimit<T extends AnyFunction>(func: T, maxWait: number = 1000
             if (deferredCallTimer) clearTimeout(deferredCallTimer);
             deferredCallTimer = setTimeout(() => {
                 executeFunction();
-            }, maxWait - (diff));
+            }, maxWait - diff);
         }
     } as T;
 }
