@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { rateLimit } from "../../../dist/src/utils/ratelimit.js";
+import { rateLimit } from "../../../dist/src/utils/rateLimit.js";
 import {expect, jest} from '@jest/globals'
 
 describe('rateLimit function', () => {
