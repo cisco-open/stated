@@ -16,7 +16,8 @@
     "./dist/src/TestUtils.js": "./dist/src/TestUtils.js",
     "./dist/src/DependencyFinder.js": "./dist/src/DependencyFinder.js",
     "./dist/src/JsonPointer.js": "./dist/src/JsonPointer.js",
-    "./dist/src/utils/debounce.js": "./dist/src/utils/debounce.js"
+    "./dist/src/utils/debounce.js": "./dist/src/utils/debounce.js",
+    "./dist/src/utils/rateLimit.js": "./dist/src/utils/rateLimit.js"
   },
   "scripts": {
     "clean": "rm -rf dist",
