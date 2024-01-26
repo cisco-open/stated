@@ -744,6 +744,22 @@ test("rando", () => {
     ]);
 });
 
+test("navigate into function's return", () => {
+    const program = "call('https://swapi.dev/api/people/?search=luke').results[0].name";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["call"]]);
+});
+
+test("navigate into function's return II", () => {
+    const program = "a([1..10]).b.c()[0]";
+    const df = new DependencyFinder(program);
+    expect(df.findDependencies()).toEqual([["a"]]);
+});
+
+
+
+
+
 
 
 

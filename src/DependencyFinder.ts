@@ -125,9 +125,30 @@ export default class DependencyFinder {
                     this.emitPaths(); //every independent path should be separately emitted
                     break;
             }
-            this.nodeStack.pop();
+            //we are exiting the scope so pop
+            const scopeWeExited = this.nodeStack.pop()
+            this.markScopeWhenFunctionReturnsValue(scopeWeExited);
         }
         return this.dependencies;
+    }
+
+    private markScopeWhenFunctionReturnsValue(scopeWeExited) {
+        if (scopeWeExited?.type === 'function') { //function has returned
+            const currentScope = DependencyFinder.peek(this.nodeStack);
+            if (currentScope !== undefined) {
+                const {type} = currentScope;
+                if (type === 'path') {
+                    currentScope.usesReturnedValueFromFunction = true; //add this flag so subsequent elements of the steps array that followed the function return don't emit a dependency
+                }
+            }
+        }
+    }
+
+    static peek(array){
+        if(array.length > 0){
+            return array[array.length-1];
+        }
+        return undefined;
     }
 
 
@@ -176,7 +197,7 @@ export default class DependencyFinder {
 
     captureArrayIndexes(node):void {
         const {type, expr} = node;
-        if (type === "filter" && expr?.type === "number") {
+        if (type === "filter" && expr?.type === "number" && !this.hasAncestor(node=>node.usesReturnedValueFromFunction)) {
             last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
         }
     }
@@ -207,19 +228,12 @@ export default class DependencyFinder {
             return;
 
         }
-        //if we are here then we are dealing with names, which are identifiers like 'a' which can occur in a.b.c or
-        // just plain a
-        //if the name is an argument to a function, then it should be emitted as a dependency
-        if(this.hasAncestor(n=>n.pseudoType === "arguments")){
-            last(this.currentSteps).push({type, value, "emit": true});
-            return;
-        }
-        /*
-        if (!this.isUnderTreeShape(["path", "function"])) {
-            last(this.currentSteps).push({type, value, "emit": true}); //tree shape like a.$sum(x,y) we cannot count x and y as dependencies because a can be an array that is mapped over
-        }
 
-         */
+        if(this.hasAncestor(node=>node.usesReturnedValueFromFunction)){
+            last(this.currentSteps).push({type, value, "emit": false});
+            return;
+        };
+
         const stepRecord: StepRecord = {type, value, "emit": true};
         last(this.currentSteps).push(stepRecord);
 
@@ -292,15 +306,23 @@ export default class DependencyFinder {
         const emitted: string[] = [];
         const steps: StepRecord[] = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
         const lastStepsArray = last(this.currentSteps);
-        if (lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit)) {
+        this.currentSteps.pop();
+
+        function everyStepShouldBeEmitted() {
+            return lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit);
+        }
+
+        if (everyStepShouldBeEmitted()) {
             if (lastStepsArray[0].value === "$") { //corresponding to '$$' variable
                 //in this case the chain of steps must be broken as '$$' is an absolute reference to root document
                 lastStepsArray.forEach(s => emitted.push(s.value));
             } else {
                 steps.forEach(s => s.emit && emitted.push(s.value));
             }
+        }else{
+            return;
         }
-        this.currentSteps.pop();
+
         if(emitted[emitted.length-1]===""){
             emitted.pop(); //foo.{$} would result in [foo, ""] as dependency. Trailing "" must be removed.
         }

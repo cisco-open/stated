@@ -21,12 +21,16 @@ import {LOG_LEVELS} from "./ConsoleLogger.js";
 import repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
 import jsonata from "jsonata";
+import VizGraph from "./VizGraph.js";
+import { exec } from 'child_process';
+import  http from  'http';
 
 
 export default class CliCore {
     private templateProcessor: TemplateProcessor;
     private logLevel: keyof typeof LOG_LEVELS;
     private currentDirectory:string;
+    private server; //http server to serve SVG images
     replServer:repl.REPLServer;
 
     constructor(templateProcessor: TemplateProcessor = null) {
@@ -37,6 +41,9 @@ export default class CliCore {
     public close(){
         if(this.templateProcessor){
             this.templateProcessor.close();
+        }
+        if(this.server){
+            this.server.close();
         }
     }
     public onInit: () => Promise<void>;
@@ -473,6 +480,66 @@ export default class CliCore {
             return `Invalid directory: ${newDirectory}`;
         }
     }
+
+    public svg(replCmdInputStr) {
+        const {port=3000} = CliCore.minimistArgs(replCmdInputStr);
+
+        const startServer = () => {
+            this.server = http.createServer((req, res) => {
+                // Check for a specific URL path or request method if needed
+
+                // Execute 'dot' to convert the DOT code to SVG
+                const dotProcess = exec(`dot -Tsvg`, (error, stdout, stderr) => {
+                    if (error) {
+                        console.error(`Error converting DOT to SVG: ${error.message}`);
+                        res.writeHead(500, { 'Content-Type': 'text/plain' });
+                        res.end('Internal Server Error');
+                        return;
+                    }
+
+                    if (stderr) {
+                        console.error(`dot stderr: ${stderr}`);
+                    }
+
+                    // Set the response headers for SVG content
+                    res.writeHead(200, {
+                        'Content-Type': 'image/svg+xml',
+                    });
+
+                    // Send the SVG data as the HTTP response
+                    res.end(stdout);
+                });
+                if(this.templateProcessor) {
+                    const dot = VizGraph.dot(this.templateProcessor);
+                    // Pipe the DOT code string to the 'dot' process
+                    dotProcess.stdin.write(dot);
+                    dotProcess.stdin.end();
+                }
+            });
+
+            this.server.on('error', (error) => {
+                if (error.code === 'EADDRINUSE') {
+                    console.error(`Port ${port} is already in use.`);
+                } else {
+                    console.error(`Server error: ${error.message}`);
+                }
+            });
+
+            this.server.listen(port, () => {
+                console.log(`Server is running on port ${port}`);
+            });
+        };
+
+        if (this.server) {
+            // Server is already running, return its URL
+            return `http://localhost:${port}`;
+        } else {
+            // Start the server and return its URL
+            startServer();
+            return `http://localhost:${port}`;
+        }
+    }
+
 
 
 

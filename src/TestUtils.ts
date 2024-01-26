@@ -3,7 +3,7 @@
 import fs from 'fs';
 import jsonata from "jsonata";
 import StatedREPL  from './StatedREPL.js';
-import { test, expect } from '@jest/globals';
+import { test, expect, afterAll } from '@jest/globals';
 import CliCore from "./CliCore.js";
 
 export type CommandAndResponse = {
@@ -78,6 +78,11 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
  */
 function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = StatedREPL.stringify) {
   try {
+    afterAll(async () => {
+      if (cliCore) {
+        await cliCore.close();
+      }
+    });
     testData.forEach(({cmdName, args, expectedResponse, jsonataExpr}) => {
       test(`${cmdName} ${args.join(' ')}`, async () => {
         const method = cliCore[cmdName];
@@ -93,7 +98,7 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
           const compiledExpr = jsonata(jsonataExpr);
           const success = await compiledExpr.evaluate(responseNormalized);
           if (success === false) {
-            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr}`);
+            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr} \n data was: ${responseNormalized}` );
           }
         } else {
           let expected;
