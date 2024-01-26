@@ -5,6 +5,8 @@
  */
 import TemplateProcessor from "./TemplateProcessor.js";
 import {default as jp} from "./JsonPointer.js"
+import {REPLServer} from "repl";
+import StatedREPL from "./StatedREPL.js";
 export default class VizGraph {
     public static dot(tp: TemplateProcessor) {
         const metaInfos = tp.metaInfoByJsonPointer['/'];
@@ -28,11 +30,7 @@ export default class VizGraph {
                 dataPreview = "--REMOVED (! var)--"
             }else if(jp.has(tp.output, metaInfo.jsonPointer__)){
                 data = jp.get(tp.output, metaInfo.jsonPointer__);
-                if (typeof data === 'object' && data !== null) {
-                    dataPreview = Array.isArray(data) ? '[...]' : '{...}';
-                } else if (data !== undefined) {
-                    dataPreview = String(data).substr(0, 10);
-                }
+                dataPreview = VizGraph.escapeSpecialCharacters(StatedREPL.stringify(data));
             }else{
                 dataPreview = "--WARNING: data not found--";
             }
@@ -50,9 +48,9 @@ export default class VizGraph {
             }
 
             // Node label
-            let label = `${sourcePointer}\nData: ${dataPreview}`;
+            let label = `JSONPointer: ${sourcePointer}\nData: ${dataPreview}`;
             if (metaInfo.expr__) {
-                label += `\n$\{${metaInfo.expr__}\}`; // Display expression within ${}
+                label += `\nExpression: $\{${metaInfo.expr__}\}`; // Display expression within ${}
             }
             dotString += `    "${sourcePointer}" [label="${label}", style="${style}", fillcolor="${fillColor}", fontcolor="${fontColor}" ];\n`;
         }
@@ -84,5 +82,19 @@ export default class VizGraph {
 
         dotString += '}\n';
         return dotString;
+    }
+
+    static escapeSpecialCharacters(str) {
+        // Define the characters to escape and their escaped counterparts
+        const specialCharacters = {
+            '&': '&amp;',
+            '"': '&quot;',
+            '\'': '&#39;', // Single quote
+            '<': '&lt;',
+            '>': '&gt;',
+        };
+
+        // Replace special characters with their escaped counterparts
+        return str.replace(/[&"'<>]/g, char => specialCharacters[char]);
     }
 }

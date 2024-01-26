@@ -268,7 +268,8 @@ opening an example template:
 | `.note`  | Show a separator line with a comment in the REPL output.             | `<comment>`                                                                                                                                                                | `.note "Example 8"`                                                                                                                                                             |
 | `.log`   | Set the logging level                                                | `[silent, error, warn, info, verbose, debug]`                                                                                                                              | `.log silent`                                                                                                                                                                   |
 | `.color` | Enable Colors                                                        | `[on,off]`                                                                                                                                                                 | `.color on`                                                                                                                                                                     |
-| `.tail`  | Tail part of the document for changes                                | `<jsonPointer> (until <jsonata_expr>)?`                                                                                                                                    | `.tail /` <br> `.tail "/ until foo='bar'"`                                                                                                                                       |
+| `.tail`  | Tail part of the document for changes                                | `<jsonPointer> (until <jsonata_expr>)?`                                                                                                                                    | `.tail /` <br> `.tail "/ until foo='bar'"`                                                                                                                                      |
+| `.svg`   | Serve an SVG diagram of the DAG                                      | `--port <portnumber>` (defaults to 4242)                                                                                                                                   | `.svg --port 3000`                                                                                                                                                               |
 
 
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
@@ -708,7 +709,7 @@ resolution of the two fetch functions they each depend on.
 > .init -f "example/ex21.json"
 {
   "story": "${ [partI, 'then', partII]~>$join(' ')}",
-  "handleRes": "${ function($res){$res.ok? $res.json():res.status?{'status': $res.status}:$res} }",
+  "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
   "call": "${function($url){$fetch($url) ~> handleRes}}",
   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
@@ -742,6 +743,27 @@ resolution of the two fetch functions they each depend on.
   "falcon": "Millennium Falcon"
 } 
 ```
+## SVG command
+The .svg command serves an SVG diagram of the DAG
+```json [false, "$='http://localhost:4042'"]
+> .init -f "example/ex21.json"
+{
+   "story": "${ [partI, 'then', partII]~>$join(' ')}",
+   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+   "call": "${function($url){$fetch($url) ~> handleRes}}",
+   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
+   "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
+   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+   "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
+   "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+}
+> .svg --port=4042
+Server is running on port 4042
+"http://localhost:4042"
+```
+Access the URL from your web browser to view the SVG diagram.
+![starwars svg](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/df9b46590c28285a06bce7aa4948fe62042345f1/starwarsgraph.svg)
 
 ## YAML
 Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 

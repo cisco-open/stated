@@ -30,6 +30,7 @@ export default class CliCore {
     private templateProcessor: TemplateProcessor;
     private logLevel: keyof typeof LOG_LEVELS;
     private currentDirectory:string;
+    private server; //http server to serve SVG images
     replServer:repl.REPLServer;
 
     constructor(templateProcessor: TemplateProcessor = null) {
@@ -40,6 +41,9 @@ export default class CliCore {
     public close(){
         if(this.templateProcessor){
             this.templateProcessor.close();
+        }
+        if(this.server){
+            this.server.close();
         }
     }
     public onInit: () => Promise<void>;
@@ -477,12 +481,11 @@ export default class CliCore {
         }
     }
 
-    public svg() {
-        const serverPort = 3000;
-        let server;
+    public svg(replCmdInputStr) {
+        const {port=3000} = CliCore.minimistArgs(replCmdInputStr);
 
         const startServer = () => {
-            server = http.createServer((req, res) => {
+            this.server = http.createServer((req, res) => {
                 // Check for a specific URL path or request method if needed
 
                 // Execute 'dot' to convert the DOT code to SVG
@@ -506,33 +509,34 @@ export default class CliCore {
                     // Send the SVG data as the HTTP response
                     res.end(stdout);
                 });
-
-                const dot = VizGraph.dot(this.templateProcessor);
-                // Pipe the DOT code string to the 'dot' process
-                dotProcess.stdin.write(dot);
-                dotProcess.stdin.end();
+                if(this.templateProcessor) {
+                    const dot = VizGraph.dot(this.templateProcessor);
+                    // Pipe the DOT code string to the 'dot' process
+                    dotProcess.stdin.write(dot);
+                    dotProcess.stdin.end();
+                }
             });
 
-            server.on('error', (error) => {
+            this.server.on('error', (error) => {
                 if (error.code === 'EADDRINUSE') {
-                    console.error(`Port ${serverPort} is already in use.`);
+                    console.error(`Port ${port} is already in use.`);
                 } else {
                     console.error(`Server error: ${error.message}`);
                 }
             });
 
-            server.listen(serverPort, () => {
-                console.log(`Server is running on port ${serverPort}`);
+            this.server.listen(port, () => {
+                console.log(`Server is running on port ${port}`);
             });
         };
 
-        if (server) {
+        if (this.server) {
             // Server is already running, return its URL
-            return `http://localhost:${serverPort}`;
+            return `http://localhost:${port}`;
         } else {
             // Start the server and return its URL
             startServer();
-            return `http://localhost:${serverPort}`;
+            return `http://localhost:${port}`;
         }
     }
 

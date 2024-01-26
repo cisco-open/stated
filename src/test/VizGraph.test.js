@@ -25,36 +25,39 @@ test("temp vars 2", async () => {
     const dot = VizGraph.dot(tp);
     expect(dot).toStrictEqual(`digraph MetaInfoGraph {
     node [fontname="Arial", fontsize=12];
-    bgcolor="#282a36";    "/a" [label="/a
+    bgcolor="#282a36";    "/a" [label="JSONPointer: /a
 Data: 42", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
-    "/b" [label="/b
-Data: {...}", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
-    "/b/b1" [label="/b/b1
+    "/b" [label="JSONPointer: /b
+Data: {
+  &quot;b1&quot;: 10,
+  &quot;b4&quot;: {}
+}", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
+    "/b/b1" [label="JSONPointer: /b/b1
 Data: 10", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
-    "/b/b2" [label="/b/b2
+    "/b/b2" [label="JSONPointer: /b/b2
 Data: --REMOVED (! var)--
-\${b1}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b/b3" [label="/b/b3
+Expression: \${b1}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b/b3" [label="JSONPointer: /b/b3
 Data: --REMOVED (! var)--
-\${b2+10}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b/b4" [label="/b/b4
-Data: {...}", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
-    "/b/b4/b5" [label="/b/b4/b5
+Expression: \${b2+10}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b/b4" [label="JSONPointer: /b/b4
+Data: {}", style="filled", fillcolor="#e2dfdf", fontcolor="#44475a" ];
+    "/b/b4/b5" [label="JSONPointer: /b/b4/b5
 Data: --REMOVED (! var)--
-\${b3+b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b/b4/b6" [label="/b/b4/b6
+Expression: \${b3+b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b/b4/b6" [label="JSONPointer: /b/b4/b6
 Data: --REMOVED (! var)--
-\${b.b3+b.b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b/b4/b7" [label="/b/b4/b7
+Expression: \${b.b3+b.b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b/b4/b7" [label="JSONPointer: /b/b4/b7
 Data: --REMOVED (! var)--
-\${b.b3+b.b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b/b4/b8" [label="/b/b4/b8
+Expression: \${b.b3+b.b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b/b4/b8" [label="JSONPointer: /b/b4/b8
 Data: --REMOVED (! var)--
-\${b3+b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/c" [label="/c
-Data: undefined
-\${b4}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
-    "/b4" [label="/b4
+Expression: \${b3+b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/c" [label="JSONPointer: /c
+Data: null
+Expression: \${b4}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
+    "/b4" [label="JSONPointer: /b4
 Data: --WARNING: data not found--", style="filled,dashed", fillcolor="#ffb86c", fontcolor="#44475a" ];
     "/b/b1" -> "/b" [label="parent", color="#8be9fd", fontcolor="#8be9fd"];
     "/b/b2" -> "/b/b1" [label="depends on", color="#bd93f9", fontcolor="#bd93f9" ];
