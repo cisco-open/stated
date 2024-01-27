@@ -58,7 +58,7 @@ Expression: \${b3+b2}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2"
 Data: null
 Expression: \${b4}", style="filled", fillcolor="#87c095", fontcolor="#f8f8f2" ];
     "/b4" [label="JSONPointer: /b4
-Data: --WARNING: data not found--", style="filled,dashed", fillcolor="#ffb86c", fontcolor="#44475a" ];
+Data: ", style="filled,dashed", fillcolor="#ffb86c", fontcolor="#44475a" ];
     "/b/b1" -> "/b" [label="parent", color="#8be9fd", fontcolor="#8be9fd"];
     "/b/b2" -> "/b/b1" [label="depends on", color="#bd93f9", fontcolor="#bd93f9" ];
     "/b/b2" -> "/b" [label="parent", color="#8be9fd", fontcolor="#8be9fd"];

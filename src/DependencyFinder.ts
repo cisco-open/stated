@@ -300,29 +300,19 @@ export default class DependencyFinder {
     }
 
     emitPaths() {
-        if(this.currentSteps.length === 0){
-            return;
+        if(this.currentSteps?.length === 0){
+           return;
         }
-        const emitted: string[] = [];
-        const steps: StepRecord[] = this.currentSteps.flat(); //[[],["a","b"], ["c"]] -> ["a","b","c"]
-        const lastStepsArray = last(this.currentSteps);
-        this.currentSteps.pop();
-
-        function everyStepShouldBeEmitted() {
-            return lastStepsArray.length > 0 && lastStepsArray.every(s => s.emit);
-        }
-
-        if (everyStepShouldBeEmitted()) {
-            if (lastStepsArray[0].value === "$") { //corresponding to '$$' variable
-                //in this case the chain of steps must be broken as '$$' is an absolute reference to root document
-                lastStepsArray.forEach(s => emitted.push(s.value));
-            } else {
-                steps.forEach(s => s.emit && emitted.push(s.value));
-            }
+        const lastStepsArray:StepRecord[] = last(this.currentSteps);
+        let emitted;
+        if(DependencyFinder.isNoOpSteps(lastStepsArray)){
+            emitted = [];
+        }else if(DependencyFinder.stepsRootedIn$(lastStepsArray)){
+            emitted = DependencyFinder.emit(lastStepsArray);
         }else{
-            return;
+            emitted = DependencyFinder.emit(this.currentSteps.flat()); //[[],["a","b"], ["c"]] -> ["a","b","c"]
         }
-
+        this.currentSteps.pop();
         if(emitted[emitted.length-1]===""){
             emitted.pop(); //foo.{$} would result in [foo, ""] as dependency. Trailing "" must be removed.
         }
@@ -333,6 +323,27 @@ export default class DependencyFinder {
             this.dependencies.push(emitted);
         }
 
+    }
+
+    static isNoOpSteps(stepArray:StepRecord[]){
+        return stepArray.length===0 || !stepArray[0].emit; //if a step array starts with a not emitted step, the entire thing is NoOp
+    }
+
+    static stepsRootedIn$(stepArray:StepRecord[]){
+        return stepArray.length > 0 && stepArray[0].value === "$"; // in the actual expression this is $$ which means 'the variable named $'
+    }
+
+    static emit(stepArray:StepRecord[]){
+        const emitted = [];
+        for(let i=0;i<stepArray.length;i++){
+            const {emit, value} = stepArray[i];
+            if(emit){
+                emitted.push(value)
+            }else{
+                break;
+            }
+        }
+        return emitted;
     }
 
 

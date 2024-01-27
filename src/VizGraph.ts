@@ -32,7 +32,7 @@ export default class VizGraph {
                 data = jp.get(tp.output, metaInfo.jsonPointer__);
                 dataPreview = VizGraph.escapeSpecialCharacters(StatedREPL.stringify(data));
             }else{
-                dataPreview = "--WARNING: data not found--";
+                dataPreview = "";
             }
 
             // Color and style logic

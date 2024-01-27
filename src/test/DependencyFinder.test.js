@@ -757,6 +757,14 @@ test("navigate into function's return II", () => {
 });
 
 
+test("homeworldURLs.$fetch($).json()", () => {
+    const program = "homeworldURLs.$fetch($).json()";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(deps).toEqual([["homeworldURLs"]]);
+});
+
+
 
 
 
