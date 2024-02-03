@@ -33,3 +33,12 @@ jobs:
         with:
           name: npm-debug-log
           path: /home/runner/.npm/_logs/*-debug.log
+
+      - name: Generate TypeDocs
+        run: npm run docs
+
+      - name: Deploy TypeDocs
+        uses: peaceiris/actions-gh-pages@v3
+        with:
+          github_token: ${{ secrets.GH_PAT }}
+          publish_dir: ./docs
