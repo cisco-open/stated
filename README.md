@@ -1,4 +1,6 @@
 # stated
+Stated is a cisco-open, Apache 2 Licensed, Open Source project at https://github.com/cisco-open/stated
+
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
 Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions, like 
@@ -198,7 +200,11 @@ falken$ stated example/ex01.json
 "msg": "hello world"
 }
 ```
-### Using the lib
+# state-js lib
+## API documentation
+API documentation is generated in CI and published to the project github page at https://cisco-open.github.io/stated/
+## Basic usage
+Much more detailed progammer usage can be found by perusing https://cisco-open.github.io/stated/classes/TemplateProcessor.default.html
 To use the stated-js library in your own projects, you can require it as a dependency.
 Here's an example of how you can import it into your JavaScript file:
 ```js
@@ -246,7 +252,7 @@ import TemplateProcessor from 'stated-js/dist/src/TemplateProcessor.js';
 When you run Node.js, you must pass `--experimental-vm-modules` flag to the Node.js runtime. This is due to the 
 fact that stated-js is written using ES Module syntax.
 
-### REPL Commands
+# REPL Commands
 
 stated provides a set of REPL commands to interact with the system. The `.open` command is the easiest way to get started
 opening an example template:
