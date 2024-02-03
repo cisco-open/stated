@@ -38,6 +38,111 @@ export type StatedError = {
     };
 };
 
+/**
+ * This is the main TemplateProcessor class.
+ *
+ * @remarks
+ * The TemplateProcessor class is responsible for processing templates and interfacing with your program that may
+ * provide changing inputs over time and react to changes with callbacks. Many examples can be found in
+ * `src/test/TemplateProcessor.test.js`
+ *
+ * @example Initialize a simple template stored in local object 'o'
+ * ```
+ * //initialize a simple template stored in local object 'o'
+ * test("test 6", async () => {
+ *     const o = {
+ *         "a": 10,
+ *         "b": [
+ *             "../${a}",
+ *         ]
+ *     };
+ *     const tp = new TemplateProcessor(o);
+ *     await tp.initialize();
+ *     expect(o).toEqual({
+ *         "a": 10,
+ *         "b": [10]
+ *     });
+ * });
+ * ```
+ * @example Pass the TemplateProcessor a context containing a function named `nozzle` and a variable named `ZOINK`
+ * ```
+ * //Pass the TemplateProcessor a context containing a function named `nozzle` and a variable named `ZOINK`
+ * test("context", async () => {
+ *     const nozzle = (something) => "nozzle got some " + something;
+ *     const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}
+ *     const tp = new TemplateProcessor({
+ *         "a": "${$nozzle($ZOINK)}"
+ *     }, context);
+ *     await tp.initialize();
+ *     expect(tp.output).toEqual(
+ *         {
+ *             "a": "nozzle got some ZOINK",
+ *         }
+ *     );
+ * });
+ * ```
+ * @example Parse template from JSON or YAML
+ * ```
+ *     it('should correctly identify and parse JSON string', async () => {
+ *         const jsonString = '{"key": "value"}';
+ *         const instance = TemplateProcessor.fromString(jsonString);
+ *         await instance.initialize();
+ *         expect(instance).toBeInstanceOf(TemplateProcessor);
+ *         expect(instance.output).toEqual({ key: "value" });  // Assuming parsedObject is publicly accessible
+ *     });
+ *
+ *     it('should correctly identify and parse YAML string using ---', async () => {
+ *         const yamlString = `---
+ * key: value`;
+ *         const instance = TemplateProcessor.fromString(yamlString);
+ *         await instance.initialize();
+ *         expect(instance).toBeInstanceOf(TemplateProcessor);
+ *         expect(instance.output).toEqual({ key: "value" });
+ *     });
+ *  ```
+ *  @example React to changes using data change callbacks on various locations in the template
+ *  ```
+ *  test("test 1", async () => {
+ *     const tp = new TemplateProcessor({
+ *         "a": "aaa",
+ *         "b": "${a}"
+ *     });
+ *     await tp.initialize();
+ *     const received = [];
+ *     tp.setDataChangeCallback("/a", (data, jsonPtr) => {
+ *         received.push({data, jsonPtr})
+ *     });
+ *     tp.setDataChangeCallback("/b", (data, jsonPtr) => {
+ *         received.push({data, jsonPtr})
+ *     });
+ *     tp.setDataChangeCallback("/", (data, jsonPtr) => {
+ *         received.push({data, jsonPtr})
+ *     });
+ *     await tp.setData("/a", 42);
+ *     expect(received).toEqual([
+ *         {
+ *             "data": 42,
+ *             "jsonPtr": "/a"
+ *         },
+ *         {
+ *             "data": 42,
+ *             "jsonPtr": "/b"
+ *         },
+ *         {
+ *             "data": {
+ *                 "a": 42,
+ *                 "b": 42
+ *             },
+ *             "jsonPtr": [
+ *                 "/a",
+ *                 "/b"
+ *             ]
+ *         }
+ *     ]);
+ * });
+ * ```
+ */
+
 export default class TemplateProcessor {
     /**
      * Loads a template and initializes a new template processor instance.

@@ -21,11 +21,12 @@
   },
   "scripts": {
     "clean": "rm -rf dist",
-    "build": "tsc && npm run webpack",
+    "build": "tsc && npm run webpack && npm run docs",
     "webpack": "webpack && webpack --config webpack.config.cjs.js",
     "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "test-fast": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
-    "stated": "node --experimental-vm-modules dist/stated.js"
+    "stated": "node --experimental-vm-modules dist/stated.js",
+    "docs": "typedoc --out docs src/*"
   },
   "bin": {
     "stated": "./dist/stated.js"
@@ -65,7 +66,7 @@
     "copy-webpack-plugin": "^11.0.0",
     "jest": "^29.7.0",
     "path-browserify": "^1.0.1",
-    "typedoc": "^0.25.1",
+    "typedoc": "^0.25.7",
     "typescript": "^5.2.2",
     "webpack": "^5.88.2",
     "webpack-cli": "^5.1.4"
