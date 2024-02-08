@@ -1916,6 +1916,38 @@ test("functions are immutable and have no 'from'", async () => {
     );
 });
 
+test("expected function call behavior", async () => {
+    let context = {
+        "a":42,
+        "echo": (echoMe)=>echoMe
+    };
+    let expr = "echo(a)";
+    let answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBe(42);
+    context = {
+        "someRootValue":'xxx',
+        "nested": {
+            "a":42,
+            "echo": (echoMe)=>echoMe
+        },
+    };
+    expr = "nested.echo(nested.a)";
+    answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBeUndefined(); // jsonata will not 'see' 'nested.a'
+    expr = "nested.echo($$.nested.a)";
+    answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBe(42); //jsonata *will* 'see' $$.nested.a since it is an absolute reference
+    expr = "nested.echo(a)";
+    answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBe(42);//jsonata *will* 'see' a since it's 'scope' is `nested` at the point that `echo` is invoked
+    expr = "nested.echo(someRootValue)";
+    answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBeUndefined();//jsonata won't see 'someRootValue' because scope is 'nested' but someRootValue is outside the nested scope
+    expr = "nested.echo($$.someRootValue)";
+    answer = await jsonata(expr).evaluate(context);
+    expect(answer).toBe('xxx');//jsonata will see '$$.someRootValue' because the reference is absolute
+});
+
 
 
 
