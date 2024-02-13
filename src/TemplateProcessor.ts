@@ -346,10 +346,10 @@ export default class TemplateProcessor {
      *   in the second case we need to reset the template processor data holders
      * @param template - the object representing the template
      * @param jsonPtr - defaults to "/" which is to say, this template is the root template. When we $import a template inside an existing template, then we must provide a path other than root to import into. Typically, we would use the json pointer of the expression where the $import function is used.
-     * @param templateExprRerooting - When we $import a template may look like `"foo":"../../${x~>|props|{foo:bar}|~>$import}"`. It has `../../` (rerooting) that needs to be pushed into the imported template
+     * @param _output - if provided, output is set to this initial value
      *
      */
-    public async initialize(template: {} = undefined, jsonPtr = "/"):Promise<void> {
+    public async initialize(template: {} = undefined, jsonPtr = "/", _output?:any):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
         }
@@ -358,6 +358,9 @@ export default class TemplateProcessor {
         // we need to reset the template. Otherwise, we rely on the one provided in the constructor
         if (template !== undefined && jsonPtr === "/") {
             this.resetTemplate(template)
+        }
+        if(_output){
+            this.output = _output; //use by restore to set the restored output state
         }
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
@@ -1481,6 +1484,22 @@ export default class TemplateProcessor {
             throw new Error(`$defer called on non-existant field: ${jsonPointer}`);
         }
         return deferFunc;
+    }
+
+     public snapshot():string  {
+        const snapshot = {
+            template: this.input,
+            output:this.output,
+            options: this.options
+        };
+        return stringifyTemplateJSON(snapshot);
+    }
+
+    public static async initializeFromSnapshot(snapshot:string, context={}): Promise<TemplateProcessor> {
+        const {template, options, output} = JSON.parse(snapshot);
+        const tp = new TemplateProcessor(template, context, options);
+        await tp.initialize(undefined, "/", output);
+        return tp;
     }
 
 
