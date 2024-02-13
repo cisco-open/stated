@@ -1950,6 +1950,62 @@ test("expected function call behavior", async () => {
 
 
 
+test("snapshot", async () => {
+    let template = {
+        "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+        "count": 0,
+        "deferredCount": "${$defer('/count', 500)}",
+        "rapidCaller": "${ $setInterval(counter, 10)}",
+        "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+    };
+    const tp = new TemplateProcessor(template);
+    let done;
+    let latch = new Promise(resolve => done = resolve);
+    let deferredCountNumChanges = 0;
+    tp.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
+        deferredCountNumChanges++;
+        if(deferredCountNumChanges === 2){ //will call once for initial value, then again on debounced/defer
+            done();
+        }
+    })
+    await tp.initialize();
+    await latch;
+    const snapshot = tp.snapshot();
+    expect(JSON.parse(snapshot)).toStrictEqual({
+        "options":{},
+        "output": {
+            "count": 10,
+            "counter": "{function:}",
+            "deferredCount": 10,
+            "rapidCaller": "--interval/timeout--",
+            "stop": "done"
+        },
+        "template": {
+            "count": 0,
+            "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+            "deferredCount": "${$defer('/count', 500)}",
+            "rapidCaller": "${ $setInterval(counter, 10)}",
+            "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        }
+    });
+    latch = new Promise(resolve => done = resolve);
+    deferredCountNumChanges = 0;
+    const tp2 = await TemplateProcessor.initializeFromSnapshot(snapshot);
+    expect(tp2.output.count).toBe(10);
+    expect(tp2.output.deferredCount).toBe(10);
+    /*
+    tp2.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
+        deferredCountNumChanges++;
+        if(deferredCountNumChanges === 2){ //will call once for initial value, then again on debounced/defer
+            done();
+        }
+    })*/
+    await tp2.setData("/count", 11);
+    await tp2.setData("/count", 12);
+    //await latch;
+    expect(tp2.output.count).toBe(12);
+    //expect(tp2.output.deferredCount).toBe(12);
+});
 
 
 
