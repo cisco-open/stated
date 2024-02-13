@@ -2009,6 +2009,52 @@ test("snapshot", async () => {
 
 
 
+// This test validates that multiple callbacks can be set or removed from root or non-root json pointers
+test("data change callbacks", async () => {
+    let template = {
+        "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+        "count": 0,
+        "rapidCaller": "${ $setInterval(counter, 10)}",
+        "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+    };
+    const tp = new TemplateProcessor(template);
+    let cbCount1 = 0;
+    let cbCount2 = 0;
+    let cbCount3 = 0;
+    const cbf1 = (data, jsonPtr)=> {
+        cbCount1++;
+        if (cbCount1 == 7){
+            tp.removeDataChangeCallback('/', cbf1);
+        }
+    }
+    const cbf2 = (data, jsonPtr)=> {
+        cbCount2++;
+        if (cbCount2 == 5){
+            tp.removeDataChangeCallback('/count', cbf2);
+        }
+    }
+    const cbf3 = (data, jsonPtr)=> {
+        cbCount3++;
+        if (cbCount3 == 3){
+            tp.removeDataChangeCallback('/', cbf3);
+        }
+    }
+    tp.setDataChangeCallback('/',cbf1);
+    tp.setDataChangeCallback('/count',cbf2);
+    tp.setDataChangeCallback('/',cbf3);
+    await tp.initialize();
+    while(tp.output.count < 10) {
+        await new Promise(resolve => setTimeout(resolve, 50));
+
+    }
+    expect(tp.output.count).toBe(10);
+    expect(cbCount1).toBe(7);
+    expect(cbCount2).toBe(5);
+    expect(cbCount3).toBe(3);
+});
+
+
+
 
 
 
