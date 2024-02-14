@@ -1954,9 +1954,9 @@ test("snapshot", async () => {
     let template = {
         "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
         "count": 0,
-        "deferredCount": "${$defer('/count', 500)}",
+        "deferredCount": "${$defer('/count', 100)}",
         "rapidCaller": "${ $setInterval(counter, 10)}",
-        "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
     };
     const tp = new TemplateProcessor(template);
     let done;
@@ -1971,7 +1971,8 @@ test("snapshot", async () => {
     await tp.initialize();
     await latch;
     const snapshot = tp.snapshot();
-    expect(JSON.parse(snapshot)).toStrictEqual({
+    const snapshotObject = JSON.parse(snapshot);
+    expect(snapshotObject).toStrictEqual({
         "options":{},
         "output": {
             "count": 10,
@@ -1983,28 +1984,30 @@ test("snapshot", async () => {
         "template": {
             "count": 0,
             "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
-            "deferredCount": "${$defer('/count', 500)}",
+            "deferredCount": "${$defer('/count', 100)}",
             "rapidCaller": "${ $setInterval(counter, 10)}",
-            "stop": "${ count=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+            "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
         }
     });
     latch = new Promise(resolve => done = resolve);
     deferredCountNumChanges = 0;
-    const tp2 = await TemplateProcessor.initializeFromSnapshot(snapshot);
-    expect(tp2.output.count).toBe(10);
-    expect(tp2.output.deferredCount).toBe(10);
-    /*
+    const tp2 = TemplateProcessor.constructFromSnapshotObject(snapshotObject);
     tp2.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
         deferredCountNumChanges++;
-        if(deferredCountNumChanges === 2){ //will call once for initial value, then again on debounced/defer
+        if(deferredCountNumChanges === 1){ //will only get called on final value, because when we rehydrate the output, the output already has the value 10, so the initial set of this value is ignored since value does not change
             done();
         }
-    })*/
-    await tp2.setData("/count", 11);
-    await tp2.setData("/count", 12);
-    //await latch;
-    expect(tp2.output.count).toBe(12);
-    //expect(tp2.output.deferredCount).toBe(12);
+    })
+    await tp2.initializeFromSnapshotObject(snapshotObject);
+    expect(tp2.output.count).toBe(10);
+    expect(tp2.output.deferredCount).toBe(10);
+
+    for(let i=11;i<=20;i++){
+        await tp2.setData("/count", i)
+    }
+    await latch;
+    expect(tp2.output.count).toBe(20);
+    expect(tp2.output.deferredCount).toBe(20);
 });
 
 

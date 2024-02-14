@@ -338,26 +338,26 @@ export default class TemplateProcessor {
 
     /**
      * Template processor initialize can be called from 2 major use cases
-     *   1. initialize a new template processor template
-     *   2. $import a new template for an existing template processor
-     *   in the second case we need to reset the template processor data holders
-     * @param template - the object representing the template
-     * @param jsonPtr - defaults to "/" which is to say, this template is the root template. When we $import a template inside an existing template, then we must provide a path other than root to import into. Typically, we would use the json pointer of the expression where the $import function is used.
-     * @param _output - if provided, output is set to this initial value
+     *   1. initialize a new importedSubtemplate processor importedSubtemplate
+     *   2. $import a new importedSubtemplate for an existing importedSubtemplate processor
+     *   in the second case we need to reset the importedSubtemplate processor data holders
+     * @param importedSubtemplate - the object representing the importedSubtemplate
+     * @param jsonPtr - defaults to "/" which is to say, this importedSubtemplate is the root importedSubtemplate. When we $import a importedSubtemplate inside an existing importedSubtemplate, then we must provide a path other than root to import into. Typically, we would use the json pointer of the expression where the $import function is used.
+     * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(template: {} = undefined, jsonPtr = "/", _output?:any):Promise<void> {
+    public async initialize(importedSubtemplate: {} = undefined, jsonPtr = "/", snapshottedOutput?:any):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
         }
 
-        // if initialize is called with a template and root json pointer (which is "/" b default)
-        // we need to reset the template. Otherwise, we rely on the one provided in the constructor
-        if (template !== undefined && jsonPtr === "/") {
-            this.resetTemplate(template)
+        // if initialize is called with a importedSubtemplate and root json pointer (which is "/" b default)
+        // we need to reset the importedSubtemplate. Otherwise, we rely on the one provided in the constructor
+        if (importedSubtemplate !== undefined && jsonPtr === "/") {
+            this.resetTemplate(importedSubtemplate)
         }
-        if(_output){
-            this.output = _output; //use by restore to set the restored output state
+        if(snapshottedOutput){
+            this.output = snapshottedOutput; //use by restore to set the restored output state
         }
         this.onInitialize && await this.onInitialize();
         if (jsonPtr === "/" && this.isInitializing) {
@@ -369,7 +369,7 @@ export default class TemplateProcessor {
         this.isInitializing = true;
         try {
             if (jsonPtr === "/") {
-                this.errorReport = {}; //clear the error report when we initialize a root template
+                this.errorReport = {}; //clear the error report when we initialize a root importedSubtemplate
             }
 
             if (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web') {
@@ -383,8 +383,14 @@ export default class TemplateProcessor {
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr = jp.parse(jsonPtr);
             parsedJsonPtr = isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            const metaInfos = await this.createMetaInfos(template === undefined ? this.output : template , parsedJsonPtr);
-            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for template meta info, by import path (jsonPtr)
+            let compilationTarget;
+            if(jsonPtr === "/"){ //this is the root, not an imported sub-importedSubtemplate
+                compilationTarget = this.input; //standard case
+            }else{
+                compilationTarget = importedSubtemplate; //the case where we already initialized once, and now we are initializing an imported sub-template
+            }
+            const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
+            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
             this.sortMetaInfos(metaInfos);
             this.populateTemplateMeta(metaInfos);
             this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
@@ -1497,10 +1503,13 @@ export default class TemplateProcessor {
     }
 
     /**
-     * Initializes a new TemplateProcessor instance from a given snapshot string.
+     * Constructs and initializes a new TemplateProcessor instance from a given snapshot string.
+     * This method parses the snapshot string, constructs a new TemplateProcessor with the parsed data,
+     * and then initializes it. It is a convenient method for quickly rehydrating and preparing a TemplateProcessor
+     * instance from a saved state.
      *
      * @param {string} snapshot - A JSON string snapshot from which to initialize the TemplateProcessor.
-     * @param {object} [context={}] - (Optional) The context object to be used by the TemplateProcessor.
+     * @param {object} [context={}] - An optional context object to be used by the TemplateProcessor.
      * @returns {Promise<TemplateProcessor>} A promise that resolves with the newly initialized TemplateProcessor instance.
      *
      * @example
@@ -1508,11 +1517,51 @@ export default class TemplateProcessor {
      * TemplateProcessor.initializeFromSnapshot(snapshotString, context)
      *     .then(tp => console.log('TemplateProcessor initialized from snapshot.'));
      */
-    public static async initializeFromSnapshot(snapshot:string, context={}): Promise<TemplateProcessor> {
-        const {template, options, output} = JSON.parse(snapshot);
-        const tp = new TemplateProcessor(template, context, options);
-        await tp.initialize(undefined, "/", output);
+    public static async fromSnapshotString(snapshot: string, context: {} = {}): Promise<TemplateProcessor> {
+        const parsedSnapshot = JSON.parse(snapshot);
+        const tp = TemplateProcessor.constructFromSnapshotObject(parsedSnapshot, context);
+        await tp.initialize(undefined, "/", parsedSnapshot.output);
         return tp;
+    }
+
+    /**
+     * Constructs a new TemplateProcessor instance from a given snapshot object, but does NOT initialize it.
+     * This method allows the caller the opportunity to register dataChangeCallbacks and so forth before
+     * template evaluation begins, providing more control over the initialization process.
+     *
+     * @param {object} snapshot - A snapshot object containing template, options, and output data for initializing the TemplateProcessor.
+     * @param {object} [context={}] - An optional context object to be used by the TemplateProcessor.
+     * @returns {TemplateProcessor} A new TemplateProcessor instance constructed from the snapshot data, not yet initialized.
+     *
+     * @example
+     * const snapshot = {"template":"...", "options":{}, "output":"..."};
+     * const tp = TemplateProcessor.constructFromSnapshot(snapshot);
+     * // Register callbacks or perform other setup operations here
+     * await tp.initialize();
+     */
+    public static constructFromSnapshotObject(snapshot: {template: {}, options: {}}, context: {} = {}): TemplateProcessor {
+        const {template, options} = snapshot;
+        return new TemplateProcessor(template, context, options);
+    }
+
+    /**
+     * Initializes the current TemplateProcessor instance using the output data from a given snapshot object.
+     * This method is designed for use with an already constructed TemplateProcessor instance, allowing it to be
+     * initialized (or re-initialized) with specific output data from a snapshot. This can be particularly useful
+     * for setting or resetting the processor's state based on dynamic conditions or to rehydrate the processor
+     * from a previously saved state without constructing a new instance.
+     *
+     * @param {object} snapshot - A snapshot object containing only the output data for initializing the TemplateProcessor.
+     * @returns {Promise<void>} A promise that resolves once the TemplateProcessor has been initialized with the output data from the snapshot.
+     *
+     * @example
+     * const snapshot = {"output":{...}, "options":{...}, "template":{...}};
+     * const tp = TemplateProcessor.constructFromSnapshotObject(snapshot);
+     * await tp.initializeFromSnapshotObject(snapshot)
+     *     .then(() => console.log('TemplateProcessor initialized from snapshot output.'));
+     */
+    public async initializeFromSnapshotObject(snapshot:{output:{}}){
+        return await this.initialize(undefined, "/", snapshot.output);
     }
 
 
