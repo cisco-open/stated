@@ -65,7 +65,12 @@ export default class CliCore {
         }else {
             tags = tags.split(',').map(s => s.trim()); //tags are provided as JSON array
         }
-        options = JSON.parse(options);
+        try {
+            options = JSON.parse(options);
+        }catch(e){
+            console.error("failed to parse --options json: " + e.message);
+            throw e;
+        }
 
         filepath = filepath?filepath:bareArgs[0];
         oneshot = oneshot===true?oneshot:bareArgs.length > 0;
