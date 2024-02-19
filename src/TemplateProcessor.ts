@@ -919,7 +919,7 @@ export default class TemplateProcessor {
     }
 
 
-    async setData(jsonPtr, data, op="set") {
+    async setData(jsonPtr, data=null, op="set") {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy

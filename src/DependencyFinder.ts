@@ -45,9 +45,11 @@ export default class DependencyFinder {
      */
     constructor(program: string | ExprNode) {
         if (typeof program === 'string') {
-            // Handle the case where program is a string
-            this.compiledExpression = jsonata(program);
-            this.ast = this.compiledExpression.ast();
+            if(program !== "") {
+                // Handle the case where program is a string
+                this.compiledExpression = jsonata(program);
+                this.ast = this.compiledExpression.ast();
+            }
         } else {
             this.ast = program;
         }
@@ -74,6 +76,9 @@ export default class DependencyFinder {
         Walk the AST of the JSONata program
      */
     findDependencies(node:GeneratedExprNode = this.ast):string[][] {
+        if(!this.ast){
+            return [];
+        }
         if (this.currentSteps.length === 0) {
             this.currentSteps.push([]); //initialize a container for steps
         }

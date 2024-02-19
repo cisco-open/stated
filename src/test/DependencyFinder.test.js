@@ -764,6 +764,20 @@ test("homeworldURLs.$fetch($).json()", () => {
     expect(deps).toEqual([["homeworldURLs"]]);
 });
 
+test("function($planet){$planet.residents.($fetch($).json())}", () => {
+    const program = "function($planet){$planet.residents.($fetch($).json())}";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(deps).toEqual([]);
+});
+
+test("empty string", () => {
+    const program = "";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(deps).toEqual([]);
+});
+
 
 
 
