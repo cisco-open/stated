@@ -254,7 +254,7 @@ export default class TemplateProcessor {
     private timerManager:TimerManager;
 
     /** Allows caller to set a callback to propagate initialization into their framework */
-    public onInitialize: () => Promise<void>;
+    public readonly onInitialize: Map<string,() => Promise<void>>;
     /** Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are removed*/
     public postInitialize: ()=> Promise<void>;
 
@@ -302,6 +302,7 @@ export default class TemplateProcessor {
         this.changeCallbacks = new Map();
         this.functionGenerators = new Map();
         this.tagSet = new Set();
+        this.onInitialize = new Map();
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -359,7 +360,7 @@ export default class TemplateProcessor {
         if(snapshottedOutput){
             this.output = snapshottedOutput; //use by restore to set the restored output state
         }
-        this.onInitialize && await this.onInitialize();
+
         if (jsonPtr === "/" && this.isInitializing) {
             console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
@@ -367,6 +368,11 @@ export default class TemplateProcessor {
 
         // Set the lock
         this.isInitializing = true;
+        //run all initialization plugins
+        for (const [name, task] of this.onInitialize) {
+            this.logger.info(`Running onInitialize plugin '${name}'...`);
+            await task();
+        }
         try {
             if (jsonPtr === "/") {
                 this.errorReport = {}; //clear the error report when we initialize a root importedSubtemplate

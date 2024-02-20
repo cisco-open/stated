@@ -147,7 +147,7 @@ export default class CliCore {
             //make variable called 'template' accessible in REPL
             this.replServer.context.template = this.templateProcessor;
         }
-        this.templateProcessor.onInitialize = this.onInit;
+        this.templateProcessor.onInitialize.set("CLI",this.onInit);
         tags.forEach(a => this.templateProcessor.tagSet.add(a));
         // set options
         this.templateProcessor.logger.level = this.logLevel;
@@ -544,9 +544,5 @@ export default class CliCore {
             return `http://localhost:${port}`;
         }
     }
-
-
-
-
 }
 
