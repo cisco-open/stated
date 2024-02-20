@@ -18,7 +18,7 @@ import yaml from 'js-yaml';
 import minimist from 'minimist';
 import {parseArgsStringToArgv} from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
-import repl from 'repl';
+import * as repl from 'repl';
 import StatedREPL from "./StatedREPL.js";
 import jsonata from "jsonata";
 import VizGraph from "./VizGraph.js";

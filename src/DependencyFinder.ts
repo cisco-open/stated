@@ -13,7 +13,8 @@
 // limitations under the License.
 
 import last from 'lodash/last.js';
-import {default as jsonata, ExprNode} from "jsonata";
+import * as jsonata from "jsonata";
+import {ExprNode} from "jsonata";
 
 /*
   There are cases where we need to generate some AST nodes the JSONata does not generate. Instead of referring to
@@ -47,7 +48,7 @@ export default class DependencyFinder {
         if (typeof program === 'string') {
             if(program !== "") {
                 // Handle the case where program is a string
-                this.compiledExpression = jsonata(program);
+                this.compiledExpression = jsonata.default(program);
                 this.ast = this.compiledExpression.ast();
             }
         } else {
@@ -67,7 +68,7 @@ export default class DependencyFinder {
      * @param jsonatExpr
      */
     async withAstFilterExpression(jsonatExpr:string):Promise<DependencyFinder>{
-        const filter = jsonata(jsonatExpr);
+        const filter = jsonata.default(jsonatExpr);
         this.ast = await filter.evaluate(this.ast);
         return this;
     }
