@@ -32,11 +32,13 @@ export default class CliCore {
     private currentDirectory:string;
     private server; //http server to serve SVG images
     replServer:repl.REPLServer;
+    public onInit: () => Promise<void>|void;
 
     constructor(templateProcessor: TemplateProcessor = null) {
         this.templateProcessor = templateProcessor;
         this.logLevel = "info";
         this.currentDirectory = process.cwd();
+        this.onInit = ()=>{};
     }
     public close(){
         if(this.templateProcessor){
@@ -46,7 +48,7 @@ export default class CliCore {
             this.server.close();
         }
     }
-    public onInit: () => Promise<void>;
+
 
     static minimistArgs(replCmdInputStr) {
         const args = parseArgsStringToArgv(replCmdInputStr);
