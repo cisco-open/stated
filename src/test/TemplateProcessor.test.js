@@ -2075,7 +2075,9 @@ test("data change on array append (/foo/-)", async () => {
     new Promise((resolve)=>{latch2=resolve;})
     const cbf2 = (data, jsonPtr)=> {
         cbCount2++;
-        latch2();
+        if(cbCount2 === 2) {
+            latch2();
+        };
     }
 
     tp.setDataChangeCallback('/',cbf2);

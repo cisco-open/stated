@@ -255,8 +255,7 @@ export default class TemplateProcessor {
 
     /** Allows caller to set a callback to propagate initialization into their framework */
     public readonly onInitialize: Map<string,() => Promise<void>|void>;
-    /** Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are removed*/
-    public postInitialize: ()=> Promise<void>;
+
 
 
 
@@ -403,7 +402,6 @@ export default class TemplateProcessor {
             this.propagateTags(metaInfos);
             this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
             await this.evaluate(jsonPtr);
-            this.postInitialize && await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars);
             this.logger.verbose("initialization complete...");
             this.logOutput();
@@ -414,6 +412,7 @@ export default class TemplateProcessor {
 
     close():void{
         this.timerManager.clearAll();
+        this.changeCallbacks.clear();
     }
 
     private async evaluate(jsonPtr:JsonPointerString) {
