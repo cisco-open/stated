@@ -1363,7 +1363,11 @@ export default class TemplateProcessor {
         if(Array.isArray(jsonPointer)){
             _jsonPointer = "/"; //when an array of pointers is provided, it means it was a change callback on "/"
         }else{
-            _jsonPointer = jsonPointer;
+            if(jsonPointer.endsWith("/-")){ //happens when we patch an array like /foo/myarray/- indicating "append"
+                _jsonPointer = jsonPointer.split("/-")[0]; //ditch the trailing /-
+            }else {
+                _jsonPointer = jsonPointer;
+            }
         }
         const callbacks = this.changeCallbacks.get(_jsonPointer);
         if (callbacks) {

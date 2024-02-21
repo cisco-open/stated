@@ -2056,6 +2056,37 @@ test("data change callbacks", async () => {
     expect(cbCount3).toBe(3);
 });
 
+test("data change on array append (/foo/-)", async () => {
+    let template = {
+        "appendFoo": "${ $set('/foo/-', 4) }",
+        "foo": [1,2,3]
+    };
+    const tp = new TemplateProcessor(template);
+    let cbCount1 = 0;
+    let cbCount2 = 0;
+    let latch1;
+    new Promise((resolve)=>{latch1=resolve;})
+    const cbf1 = (data, jsonPtr)=> {
+        cbCount1++;
+        latch1();
+    }
+
+    let latch2;
+    new Promise((resolve)=>{latch2=resolve;})
+    const cbf2 = (data, jsonPtr)=> {
+        cbCount2++;
+        latch2();
+    }
+
+    tp.setDataChangeCallback('/',cbf2);
+    tp.setDataChangeCallback('/foo',cbf1);
+    await tp.initialize();
+    await Promise.all([latch1, latch2]);
+
+    expect(cbCount2).toBe(2);
+    expect(cbCount1).toBe(1);
+});
+
 
 
 
