@@ -1364,6 +1364,7 @@ export default class TemplateProcessor {
         }else{
             if(jsonPointer.endsWith("/-")){ //happens when we patch an array like /foo/myarray/- indicating "append"
                 _jsonPointer = jsonPointer.split("/-")[0]; //ditch the trailing /-
+                data = jp.get(this.output, _jsonPointer); //this may be somewhat of a hack, but /foo/myarray/- is not an actual json pointer. It is the array itself that is the changed data
             }else {
                 _jsonPointer = jsonPointer;
             }
