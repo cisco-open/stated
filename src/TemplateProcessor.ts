@@ -369,7 +369,7 @@ export default class TemplateProcessor {
         this.isInitializing = true;
         //run all initialization plugins
         for (const [name, task] of this.onInitialize) {
-            this.logger.info(`Running onInitialize plugin '${name}'...`);
+            this.logger.debug(`Running onInitialize plugin '${name}'...`);
             await task();
         }
         try {
