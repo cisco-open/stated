@@ -2094,7 +2094,7 @@ test("dataChangeCallback on delete op", async () => {
     const tp = new TemplateProcessor({"foo": "bar"});
     let done;
     let latch = new Promise(resolve => done = resolve);
-    tp.setDataChangeCallback('/json', (data, jsonPtr, removed)=>{
+    tp.setDataChangeCallback('/foo', (data, jsonPtr, removed)=>{
         if(removed){
             done();
         }
