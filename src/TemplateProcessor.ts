@@ -1119,7 +1119,12 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    private async setUntrackedLocation(output, jsonPtr, data) {
+    private async setUntrackedLocation(output, jsonPtr, data, op:"set" |"setDeferred"| "delete"="set") {
+        if(op==="delete"){
+            if(!jp.has(this.output, jsonPtr)){
+                return; // we are being asked to remove something that isn't here
+            }
+        }
         jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         jp.set(this.templateMeta, jsonPtr, {
                 "materialized__": true,
@@ -1195,6 +1200,7 @@ export default class TemplateProcessor {
         if(op === 'delete'){
             if(jp.has(output, jsonPtr)) {
                 jp.remove(output, jsonPtr);
+                this.callDataChangeCallbacks(data, jsonPtr, true);
                 return true;
             }
             return false;
@@ -1206,7 +1212,6 @@ export default class TemplateProcessor {
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             this.callDataChangeCallbacks(data, jsonPtr, false);
-            //this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
         } else {
             this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
