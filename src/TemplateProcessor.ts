@@ -964,15 +964,15 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"setDeferred"|"delete"="set"):Promise<void> {
+    private async executePlan(changedJsonPointers:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"setDeferred"|"delete"="set"):Promise<void> {
         const resp = [];
-        let dependencies = plan;
+        let dependencies = changedJsonPointers;
         if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-            await this.applyMutationToFirstJsonPointerOfPlan(plan, data, op);
-            dependencies = plan.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
+            await this.applyMutationToFirstJsonPointerOfPlan(changedJsonPointers, data, op);
+            dependencies = changedJsonPointers.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
         }
         await this.executeDependentExpressions(dependencies);
-        await this.executeDataChangeCallbacks(plan);
+        await this.executeDataChangeCallbacks(changedJsonPointers, op);
     }
 
     private async executeDependentExpressions(dependencies: JsonPointerString[]) {
@@ -989,18 +989,20 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executeDataChangeCallbacks(plan: JsonPointerString[]) {
+    private async executeDataChangeCallbacks(changedJsonPointers: JsonPointerString[], op:"set"|"setDeferred"|"delete"="set") {
         let anyUpdates = false;
-        const thoseThatUpdated = plan.filter(jptr => {
+        const thoseThatUpdated = changedJsonPointers.filter(jptr => {
             const meta = jp.get(this.templateMeta, jptr);
             anyUpdates ||= meta.didUpdate__;
             return meta.didUpdate__
         });
         if (anyUpdates) {
+            // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
+            const removed = op==="delete";
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            await this.callDataChangeCallbacks(this.output, plan);
+            await this.callDataChangeCallbacks(this.output, changedJsonPointers, removed);
         }
     }
 
