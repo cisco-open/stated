@@ -23,6 +23,7 @@ import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
+import {expect} from "@jest/globals";
 
 
 test("test 1", async () => {
