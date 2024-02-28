@@ -98,7 +98,7 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
           const compiledExpr = jsonata(jsonataExpr);
           const success = await compiledExpr.evaluate(responseNormalized);
           if (success === false) {
-            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${jsonataExpr} \n data was: ${responseNormalized}` );
+            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${StatedREPL.stringify(jsonataExpr)} \n data was: ${StatedREPL.stringify(responseNormalized)}` );
           }
         } else {
           let expected;

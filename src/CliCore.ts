@@ -125,19 +125,19 @@ export default class CliCore {
     //replCmdInoutStr like:  -f "defaultSnapshot.json"
 
     /**
-     * replCmdInoutStr example:  -f "example/recoverSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     * replCmdInoutStr example:  -f "example/restoreSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
      * @param replCmdInputStr - the command line string that will be parsed into arguments
      */
-    async recover(replCmdInputStr: string) {
+    async restore(replCmdInputStr: string) {
         return this.init(replCmdInputStr, true);
 
     }
 
     /**
-     * This Cli core command may be invoked directly from the REPL or from exteded commands, like recover
+     * This Cli core command may be invoked directly from the REPL init command or from restore command
      *
      *  - fromSnapshot=false, replCmdInoutStr example:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
-     *  - fromSnapshot=true, replCmdInoutStr example:  -f "example/recoverSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     *  - fromSnapshot=true, replCmdInoutStr example:  -f "example/restoreSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
      *
      * @param replCmdInputStr
      * @param fromSnapshot - when set to true, template processor will treat input as a snapshot of a previous
