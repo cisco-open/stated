@@ -124,12 +124,25 @@ export default class CliCore {
 
     //replCmdInoutStr like:  -f "defaultSnapshot.json"
 
+    /**
+     * replCmdInoutStr example:  -f "example/recoverSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     * @param replCmdInputStr - the command line string that will be parsed into arguments
+     */
     async recover(replCmdInputStr: string) {
         return this.init(replCmdInputStr, true);
 
     }
 
-    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
+    /**
+     * This Cli core command may be invoked directly from the REPL or from exteded commands, like recover
+     *
+     *  - fromSnapshot=false, replCmdInoutStr example:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
+     *  - fromSnapshot=true, replCmdInoutStr example:  -f "example/recoverSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     *
+     * @param replCmdInputStr
+     * @param fromSnapshot - when set to true, template processor will treat input as a snapshot of a previous
+     * templateProcessor state
+     */
     async init(replCmdInputStr, fromSnapshot: boolean=false) {
         if(this.templateProcessor){
             this.templateProcessor.close();
@@ -146,7 +159,7 @@ export default class CliCore {
         if (!this.templateProcessor && !fromSnapshot) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
         } else if (!this.templateProcessor && fromSnapshot) {
-            this.templateProcessor = new TemplateProcessor(input.template, contextData, options);
+            this.templateProcessor = new TemplateProcessor(input.template, contextData, input.options);
         } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
             this.templateProcessor.options = options;
@@ -170,7 +183,7 @@ export default class CliCore {
                 tailPromise = this.tail(tail);
             }
             if (fromSnapshot) {
-                await this.templateProcessor.initialize(input.template, "/", input.snapshot);
+                await this.templateProcessor.initialize(input.template,"/", input.output);
             } else {
                 await this.templateProcessor.initialize(input);
             }

@@ -77,4 +77,37 @@ test("TemplateProcessor keeps context on init", async () => {
   );
 });
 
+// Validates that StatedREPL can be extended with a new command added to CliCore, and also test CliCore.recover
+test("Extend CliCore with recover command", async () => {
 
+  // ensure jest argv does not interfere with the test
+  const originalCmdLineArgsStr = process.argv;
+  process.argv = ["node", "dist/stated.js"]; // this is an argv when running stated.js repl.
+
+  // extend CliCore with recover command
+  const repl = new StatedREPL();
+  StatedREPL.CLICORE_COMMANDS.push("recover", "an example command added to CliCore by a library");
+
+  try {
+    await repl.initialize();
+  
+    // we call recover on the repl, which will expect it to be defined in CliCore.
+    await repl.cli('recover', '-f example/recoverSnapshot.json');
+
+
+    console.log(StatedREPL.stringify(repl.cliCore.templateProcessor.output));
+    expect(repl.cliCore.templateProcessor.output).toBeDefined();
+    expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after recovery from the snapshot
+    expect(repl.cliCore.templateProcessor.output.count).toBeLessThan(10); // ... but less than 10
+
+
+    while (repl.cliCore.templateProcessor.output.count < 10) { // validates that templateProcessor picks up where it was left in the snapshot.
+      console.log("waiting for output.count to reach 10")
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+    expect(repl.cliCore.templateProcessor.output.count).toBe(10);
+  } finally {
+    process.argv = originalCmdLineArgsStr;
+    if (repl !== undefined) repl.close();
+  }
+});
