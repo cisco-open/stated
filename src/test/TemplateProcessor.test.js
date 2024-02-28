@@ -23,6 +23,7 @@ import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
+import {expect} from "@jest/globals";
 
 
 test("test 1", async () => {
@@ -2089,14 +2090,17 @@ test("data change on array append (/foo/-)", async () => {
     expect(cbCount1).toBe(1);
 });
 
-
-
-
-
-
-
-
-
-
-
-
+test("dataChangeCallback on delete op", async () => {
+    const tp = new TemplateProcessor({"foo": "bar"});
+    let done;
+    let latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/foo', (data, jsonPtr, removed)=>{
+        if(removed){
+            done();
+        }
+    });
+    await tp.initialize();
+    tp.setData("/foo", undefined, "delete");
+    await latch;
+    expect(tp.output.foo).toBeUndefined();
+})

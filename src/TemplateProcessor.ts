@@ -964,15 +964,15 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"setDeferred"|"delete"="set"):Promise<void> {
+    private async executePlan(changedJsonPointers:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"setDeferred"|"delete"="set"):Promise<void> {
         const resp = [];
-        let dependencies = plan;
+        let dependencies = changedJsonPointers;
         if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-            await this.applyMutationToFirstJsonPointerOfPlan(plan, data, op);
-            dependencies = plan.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
+            await this.applyMutationToFirstJsonPointerOfPlan(changedJsonPointers, data, op);
+            dependencies = changedJsonPointers.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
         }
         await this.executeDependentExpressions(dependencies);
-        await this.executeDataChangeCallbacks(plan);
+        await this.executeDataChangeCallbacks(changedJsonPointers, op);
     }
 
     private async executeDependentExpressions(dependencies: JsonPointerString[]) {
@@ -989,18 +989,20 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executeDataChangeCallbacks(plan: JsonPointerString[]) {
+    private async executeDataChangeCallbacks(changedJsonPointers: JsonPointerString[], op:"set"|"setDeferred"|"delete"="set") {
         let anyUpdates = false;
-        const thoseThatUpdated = plan.filter(jptr => {
+        const thoseThatUpdated = changedJsonPointers.filter(jptr => {
             const meta = jp.get(this.templateMeta, jptr);
             anyUpdates ||= meta.didUpdate__;
             return meta.didUpdate__
         });
         if (anyUpdates) {
+            // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
+            const removed = op==="delete";
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            await this.callDataChangeCallbacks(this.output, plan);
+            await this.callDataChangeCallbacks(this.output, changedJsonPointers, removed);
         }
     }
 
@@ -1117,7 +1119,12 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    private async setUntrackedLocation(output, jsonPtr, data) {
+    private async setUntrackedLocation(output, jsonPtr, data, op:"set" |"setDeferred"| "delete"="set") {
+        if(op==="delete"){
+            if(!jp.has(this.output, jsonPtr)){
+                return; // we are being asked to remove something that isn't here
+            }
+        }
         jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         jp.set(this.templateMeta, jsonPtr, {
                 "materialized__": true,
@@ -1193,6 +1200,7 @@ export default class TemplateProcessor {
         if(op === 'delete'){
             if(jp.has(output, jsonPtr)) {
                 jp.remove(output, jsonPtr);
+                this.callDataChangeCallbacks(data, jsonPtr, true);
                 return true;
             }
             return false;
@@ -1204,7 +1212,6 @@ export default class TemplateProcessor {
         if (!isEqual(existingData, data)) {
             jp.set(output, jsonPtr, data);
             this.callDataChangeCallbacks(data, jsonPtr, false);
-            //this.commonCallback && this.commonCallback(data, jsonPtr); //called if callback set on "/"
             return true;
         } else {
             this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
