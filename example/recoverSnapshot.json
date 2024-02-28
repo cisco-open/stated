@@ -1,0 +1,18 @@
+{
+  "template": {
+    "count": 0,
+    "counter": "${ $setInterval(function(){$set('/count', count+1)}, 10) }",
+    "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"
+  },
+  "output": {
+    "count": 3,
+    "counter": "--interval/timeout--",
+    "stop": "not done"
+  },
+  "options": {
+    "snapshot": {
+      "seconds": 1
+    },
+    "importPath": "/Users/sesergee/projects/sandbox/workflows/stated-workflow"
+  }
+}
