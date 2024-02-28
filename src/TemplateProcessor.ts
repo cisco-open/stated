@@ -1241,11 +1241,22 @@ export default class TemplateProcessor {
 
         //----------------- utility functions ----------------//
 
+        const isInterval = (metaInf:MetaInfo): boolean =>{
+            const {data__} = metaInf;
+            return data__ && this.timerManager.isInterval(data__);
+        }
+
         const isFunction = (jsonPointer)=>{
+
             if(!jp.has(this.templateMeta, jsonPointer)){
                 return false;
             }
             const metaInf = jp.get(this.templateMeta, jsonPointer);
+            //treat intervals same as immutable functions. Changes should not propagate through an interval causing
+            //interval re-evaluation
+            if(isInterval(metaInf)){
+                return true;
+            }
             return !!metaInf.isFunction__;
         }
 

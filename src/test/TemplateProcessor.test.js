@@ -1916,6 +1916,20 @@ test("functions are immutable and have no 'from'", async () => {
     );
 });
 
+test("don't re-evaluate intervals", async () => {
+
+    let template = {
+        "count": 0,
+        "counter": "${ $setInterval(function(){$set('/count', count+1)}, 1000) }",
+        "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"
+    }
+    const tp = new TemplateProcessor(template);
+    await tp.initialize();
+    const from = tp.from("/count");
+    expect(from).toEqual(["/count", "/stop"]);
+
+});
+
 test("expected function call behavior", async () => {
     let context = {
         "a":42,
@@ -2089,14 +2103,18 @@ test("data change on array append (/foo/-)", async () => {
     expect(cbCount1).toBe(1);
 });
 
-
-
-
-
-
-
-
-
-
-
+test("dataChangeCallback on delete op", async () => {
+    const tp = new TemplateProcessor({"foo": "bar"});
+    let done;
+    let latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/foo', (data, jsonPtr, removed)=>{
+        if(removed){
+            done();
+        }
+    });
+    await tp.initialize();
+    tp.setData("/foo", undefined, "delete");
+    await latch;
+    expect(tp.output.foo).toBeUndefined();
+})
 

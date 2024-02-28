@@ -60,6 +60,10 @@ class TimerManager {
         this.clearAllTimeouts();
         this.clearAllIntervals();
     }
+
+    isInterval(interval: any){
+        return this.intervals.has(interval);
+    }
 }
 
 export { TimerManager };
