@@ -122,8 +122,15 @@ export default class CliCore {
         return path.join(process.cwd(), filepath);
     }
 
+    //replCmdInoutStr like:  -f "defaultSnapshot.json"
+
+    async recover(replCmdInputStr: string) {
+        return this.init(replCmdInputStr, true);
+
+    }
+
     //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
-    async init(replCmdInputStr) {
+    async init(replCmdInputStr, fromSnapshot: boolean=false) {
         if(this.templateProcessor){
             this.templateProcessor.close();
         }
@@ -136,8 +143,10 @@ export default class CliCore {
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
-        if (!this.templateProcessor) {
+        if (!this.templateProcessor && !fromSnapshot) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        } else if (!this.templateProcessor && fromSnapshot) {
+            this.templateProcessor = new TemplateProcessor(input.template, contextData, options);
         } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
             this.templateProcessor.options = options;
@@ -160,7 +169,11 @@ export default class CliCore {
             if(tail !== undefined){
                 tailPromise = this.tail(tail);
             }
-            await this.templateProcessor.initialize(input);
+            if (fromSnapshot) {
+                await this.templateProcessor.initialize(input.template, "/", input.snapshot);
+            } else {
+                await this.templateProcessor.initialize(input);
+            }
             if(tail !== undefined){
                 return tailPromise;
             }
