@@ -1017,7 +1017,23 @@ export default class TemplateProcessor {
             jp.get(this.templateMeta, entryPoint).didUpdate__ = didUpdate;
         } else {
             // Check if the node contains an expression. If so, print a warning and return.
-            const firstMeta = jp.get(this.templateMeta, entryPoint);
+            let firstMeta;
+            try {
+                firstMeta = jp.get(this.templateMeta, entryPoint);
+            } catch (error) {
+                if (op != 'delete') {
+                    throw error;
+                }
+
+                this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to delete it from the output`);
+                try {
+                    jp.remove(this.output, entryPoint);
+                } catch (error) {
+                    this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the output. The operation is ignored`);
+                }
+                return;
+            }
+
             if (firstMeta.expr__ !== undefined && op !== "setDeferred") { //setDeferred allows $defer('/foo') to 'self replace' with a value
                 this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
             } else {
