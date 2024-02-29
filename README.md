@@ -1,7 +1,9 @@
 # stated
 Stated is a cisco-open, Apache 2 Licensed, Open Source project at https://github.com/cisco-open/stated, our github 
 main page. If you would like to see a table of contents and developer API docs, jump over to our API docs page which is
-generated in CI and [published here](https://cisco-open.github.io/stated/index.html)  
+generated in CI and [published here](https://cisco-open.github.io/stated/index.html). Are the examples in this README 
+correct/reliable? Every markdown codeblock in this readme is 
+[tested on every commit](https://github.com/cisco-open/stated/blob/main/README.test.js).
 
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
