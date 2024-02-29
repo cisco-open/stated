@@ -1021,17 +1021,20 @@ export default class TemplateProcessor {
             try {
                 firstMeta = jp.get(this.templateMeta, entryPoint);
             } catch (error) {
-                if (op != 'delete') {
-                    throw error;
-                }
-
-                this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to delete it from the output`);
-                try {
-                    jp.remove(this.output, entryPoint);
-                } catch (error) {
-                    this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the output. The operation is ignored`);
-                }
-                return;
+                this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to evaluateNode`);
+                await this.evaluateNode(entryPoint, data, op);
+                firstMeta = jp.get(this.templateMeta, entryPoint);
+                // if (op != 'delete') {
+                //     throw error;
+                // }
+                //
+                // this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to delete it from the output`);
+                // try {
+                //     jp.remove(this.output, entryPoint);
+                // } catch (error) {
+                //     this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the output. The operation is ignored`);
+                // }
+                // return;
             }
 
             if (firstMeta.expr__ !== undefined && op !== "setDeferred") { //setDeferred allows $defer('/foo') to 'self replace' with a value

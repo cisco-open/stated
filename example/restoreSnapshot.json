@@ -7,12 +7,12 @@
   "output": {
     "count": 3,
     "counter": "--interval/timeout--",
-    "stop": "not done"
+    "stop": "not done",
+    "onlyInSnapshot": "dataFromSnapshot"
   },
   "options": {
     "snapshot": {
       "seconds": 1
-    },
-    "importPath": "/Users/sesergee/projects/sandbox/workflows/stated-workflow"
+    }
   }
 }

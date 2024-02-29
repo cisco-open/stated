@@ -2119,3 +2119,77 @@ test("dataChangeCallback on delete op", async () => {
     expect(tp.output.foo).toBeUndefined();
 })
 
+test("dataChangeCallback on delete op from Snapshot", async () => {
+    const snapshot = {
+        "template": {
+            "step": {
+                "name": "step0"
+            }
+        },
+        "output": {
+            "some": "thing",
+            "step": {
+                "name": "step0",
+                "log": {
+                    "han": {
+                        "start": {
+                            "timestamp": 1709228824377,
+                            "args": "han"
+                        },
+                        "end": {
+                            "timestamp": 1709228825880,
+                            "out": {
+                                "name": "Han Solo",
+                                "height": "180",
+                                "mass": "80",
+                                "hair_color": "brown",
+                                "skin_color": "fair",
+                                "eye_color": "brown",
+                                "birth_year": "29BBY",
+                                "gender": "male",
+                                "homeworld": "https://swapi.dev/api/planets/22/",
+                                "films": [
+                                    "https://swapi.dev/api/films/1/",
+                                    "https://swapi.dev/api/films/2/",
+                                    "https://swapi.dev/api/films/3/"
+                                ],
+                                "species": [],
+                                "vehicles": [],
+                                "starships": [
+                                    "https://swapi.dev/api/starships/10/",
+                                    "https://swapi.dev/api/starships/22/"
+                                ],
+                                "created": "2014-12-10T16:49:14.582000Z",
+                                "edited": "2014-12-20T21:17:50.334000Z",
+                                "url": "https://swapi.dev/api/people/14/"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "options": {
+        }
+    }
+    const tp = TemplateProcessor.constructFromSnapshotObject(snapshot);
+    let done;
+    let latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/step/log/han', (data, jsonPtr, removed)=>{
+        // jp.get(tp.metaInfo, jsonPtr);
+        done();
+    });
+    try {
+        tp.initialize();
+        tp.setData("/step/log/han", undefined, "delete");
+        await latch;
+        console.log(tp.output);
+        while (tp.output.step.log.han !== undefined) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+        }
+    } catch (error) {
+        console.log(error);
+        jest.fail(error);
+    }
+    expect(tp.output.step.log.han).toBeNull();
+})
+
