@@ -27,6 +27,28 @@ export default class StatedREPL {
         this.cliCore = new CliCore(temaplateProcessor);
     }
 
+    // a list of commands that are available in the CLI
+    // this list can be extended if CLICORE is extended as well
+    static CLICORE_COMMANDS: string[][] = [
+        ["open", 'interactive command to open select and open a template'],
+        ["cd", "change directory for example 'cd ..' "],
+        ["init", '-f <fname> to Initialize the template'],
+        ["set", 'Set data to a JSON pointer path and show the executed output'],
+        ["in", 'Show the input template'],
+        ["out", '[jsonPointer] Show the executed output'],
+        ["state", 'Show the current state of the templateMeta'],
+        ["from", 'Show the dependents of a given JSON pointer'],
+        ["to", 'Show the dependencies of a given JSON pointer'],
+        ["plan", 'Show the evaluation plan'],
+        ["note", "returns ═══ ... for creating documentation"],
+        ["log", "set the log level [debug, info, warn, error]"],
+        ["debug", "set debug commands (WIP)"],
+        ["errors", "return an error report"],
+        ["tail", 'tail "/ until count=100" will tail the template root until its count field is 100'],
+        ["svg", 'serve SVG of depedency graph off http://localhost:3000'],
+        ["restore", 'restore the template from a snapshot'],
+    ];
+
     async initialize() {
         this.isColorized = false;
         const cmdLineArgsStr = process.argv.slice(2).join(" ");
@@ -52,25 +74,7 @@ export default class StatedREPL {
     }
 
     registerCommands() {
-        [ //these are CLICore commands
-            ["open", 'interactive command to open select and open a template'],
-            ["cd", "change directory for example 'cd ..' "],
-            ["init", '-f <fname> to Initialize the template'],
-            ["set", 'Set data to a JSON pointer path and show the executed output'],
-            ["in", 'Show the input template'],
-            ["out", '[jsonPointer] Show the executed output'],
-            ["state", 'Show the current state of the templateMeta'],
-            ["from", 'Show the dependents of a given JSON pointer'],
-            ["to", 'Show the dependencies of a given JSON pointer'],
-            ["plan", 'Show the evaluation plan'],
-            ["note", "returns ═══ ... for creating documentation"],
-            ["log", "set the log level [debug, info, warn, error]"],
-            ["debug", "set debug commands (WIP)"],
-            ["errors", "return an error report"],
-            ["tail", 'tail "/ until count=100" will tail the template root until its count field is 100'],
-            ["svg", 'serve SVG of depedency graph off http://localhost:3000'],
-
-        ].map(c=>{
+        StatedREPL.CLICORE_COMMANDS.map(c=>{
             const [cmdName, helpMsg] = c;
             this.r.defineCommand(cmdName, {
                 help: helpMsg,

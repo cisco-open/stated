@@ -346,7 +346,7 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {} = undefined, jsonPtr = "/", snapshottedOutput?:any):Promise<void> {
+    public async initialize(importedSubtemplate: {} = undefined, jsonPtr: string = "/", snapshottedOutput: {} = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
         }

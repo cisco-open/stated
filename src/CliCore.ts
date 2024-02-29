@@ -122,8 +122,28 @@ export default class CliCore {
         return path.join(process.cwd(), filepath);
     }
 
-    //replCmdInoutStr like:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
-    async init(replCmdInputStr) {
+    //replCmdInoutStr like:  -f "defaultSnapshot.json"
+
+    /**
+     * replCmdInoutStr example:  -f "example/restoreSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     * @param replCmdInputStr - the command line string that will be parsed into arguments
+     */
+    async restore(replCmdInputStr: string) {
+        return this.init(replCmdInputStr, true);
+
+    }
+
+    /**
+     * This Cli core command may be invoked directly from the REPL init command or from restore command
+     *
+     *  - fromSnapshot=false, replCmdInoutStr example:  -f "example/ex23.json" --tags=["PEACE"] --xf=example/myEnv.json
+     *  - fromSnapshot=true, replCmdInoutStr example:  -f "example/restoreSnapshot.json" --tags=["PEACE"] --xf=example/myEnv.json
+     *
+     * @param replCmdInputStr
+     * @param fromSnapshot - when set to true, template processor will treat input as a snapshot of a previous
+     * templateProcessor state
+     */
+    async init(replCmdInputStr, fromSnapshot: boolean=false) {
         if(this.templateProcessor){
             this.templateProcessor.close();
         }
@@ -136,8 +156,10 @@ export default class CliCore {
         const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
-        if (!this.templateProcessor) {
+        if (!this.templateProcessor && !fromSnapshot) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
+        } else if (!this.templateProcessor && fromSnapshot) {
+            this.templateProcessor = new TemplateProcessor(input.template, contextData, input.options);
         } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
             this.templateProcessor.options = options;
@@ -160,7 +182,11 @@ export default class CliCore {
             if(tail !== undefined){
                 tailPromise = this.tail(tail);
             }
-            await this.templateProcessor.initialize(input);
+            if (fromSnapshot) {
+                await this.templateProcessor.initialize(input.template,"/", input.output);
+            } else {
+                await this.templateProcessor.initialize(input);
+            }
             if(tail !== undefined){
                 return tailPromise;
             }
