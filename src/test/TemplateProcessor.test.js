@@ -2006,6 +2006,7 @@ test("snapshot", async () => {
     });
     latch = new Promise(resolve => done = resolve);
     deferredCountNumChanges = 0;
+    await TemplateProcessor.prepareSnapshotInPlace(snapshotObject);
     const tp2 = TemplateProcessor.constructFromSnapshotObject(snapshotObject);
     tp2.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
         deferredCountNumChanges++;
@@ -2117,5 +2118,22 @@ test("dataChangeCallback on delete op", async () => {
     tp.setData("/foo", undefined, "delete");
     await latch;
     expect(tp.output.foo).toBeUndefined();
+})
+
+test("snapshot contains injected fields", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${function(){'yo'}}",
+        "b": {"c": {"d":"${'hello'}"}, "e":42}
+    });
+    await tp.initialize();
+    await tp.setData("/f","XXX");
+    await tp.setData("/b/c/g","YYY");
+    const snapshotStr = tp.snapshot();
+    const tpRestored = await TemplateProcessor.fromSnapshotString(snapshotStr);
+    expect(await tpRestored.output.a()).toBe('yo');
+    expect(tpRestored.output.b.c.d).toBe('hello');
+    expect(tpRestored.output.b.e).toBe(42);
+    expect(tpRestored.output.f).toBe("XXX");
+    expect(tpRestored.output.b.c.g).toBe('YYY');
 })
 
