@@ -2175,11 +2175,12 @@ test("dataChangeCallback on delete op from Snapshot", async () => {
     let done;
     let latch = new Promise(resolve => done = resolve);
     tp.setDataChangeCallback('/step/log/han', (data, jsonPtr, removed)=>{
-        // jp.get(tp.metaInfo, jsonPtr);
-        done();
-    });
+        if (removed){
+            done();
+        }
+     });
     try {
-        tp.initialize();
+        await tp.initializeFromSnapshotObject(snapshot);
         tp.setData("/step/log/han", undefined, "delete");
         await latch;
         console.log(tp.output);
@@ -2190,6 +2191,6 @@ test("dataChangeCallback on delete op from Snapshot", async () => {
         console.log(error);
         jest.fail(error);
     }
-    expect(tp.output.step.log.han).toBeNull();
+    expect(tp.output.step.log.han).toBeUndefined();
 })
 

@@ -924,6 +924,7 @@ export default class TemplateProcessor {
     }
 
 
+    // setting data as 'null' is required to assume default values for other methods invocation.
     async setData(jsonPtr, data=null, op="set") {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
@@ -1023,18 +1024,8 @@ export default class TemplateProcessor {
             } catch (error) {
                 this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to evaluateNode`);
                 await this.evaluateNode(entryPoint, data, op);
-                firstMeta = jp.get(this.templateMeta, entryPoint);
-                // if (op != 'delete') {
-                //     throw error;
-                // }
-                //
-                // this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the templateMeta, attempting to delete it from the output`);
-                // try {
-                //     jp.remove(this.output, entryPoint);
-                // } catch (error) {
-                //     this.logger.log('warn', `The reference with json pointer ${entryPoint} does not exist in the output. The operation is ignored`);
-                // }
-                // return;
+
+                return;
             }
 
             if (firstMeta.expr__ !== undefined && op !== "setDeferred") { //setDeferred allows $defer('/foo') to 'self replace' with a value
@@ -1055,7 +1046,7 @@ export default class TemplateProcessor {
         //set /foo when /foo does not exist yet
         const isUntracked = !jp.has(templateMeta, jsonPtr);
         if (isUntracked) {
-            return this.setUntrackedLocation(output, jsonPtr, data);
+            return this.setUntrackedLocation(output, jsonPtr, data, op);
         }
 
         const hasDataToSet = data !== undefined && data !== TemplateProcessor.NOOP;
@@ -1138,13 +1129,24 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
+    /**
+     * This
+     * @param output
+     * @param jsonPtr
+     * @param data
+     * @param op
+     * @private
+     */
     private async setUntrackedLocation(output, jsonPtr, data, op:"set" |"setDeferred"| "delete"="set") {
         if(op==="delete"){
             if(!jp.has(this.output, jsonPtr)){
                 return; // we are being asked to remove something that isn't here
             }
+            jp.remove(output, jsonPtr); // delete the node from output
+            if (data === TemplateProcessor.NOOP || data === null) data = undefined;
+        } else {
+            jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         }
-        jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
         jp.set(this.templateMeta, jsonPtr, {
                 "materialized__": true,
                 "jsonPointer__": jsonPtr,
@@ -1155,7 +1157,7 @@ export default class TemplateProcessor {
                 "materialized": true
             }
         );
-        await this.callDataChangeCallbacks(data, jsonPtr);
+        await this.callDataChangeCallbacks(data, jsonPtr, op === 'delete');
         return true;
     }
 
