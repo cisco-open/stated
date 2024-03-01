@@ -411,12 +411,6 @@ export default class TemplateProcessor {
         }
     }
 
-    public async initializeFromSnapshot(snapshot:Snapshot){
-        //this = {...this, ...snapshot};
-        this.timerManager.clearAll();
-        this.output
-    }
-
     close():void{
         this.timerManager.clearAll();
         this.changeCallbacks.clear();
