@@ -931,7 +931,15 @@ export default class TemplateProcessor {
     }
 
 
-    async setData(jsonPtr, data=null, op="set") {
+    /**
+     * Sets or deletes data based on the specified operation.
+     * @async
+     * @param {string} jsonPtr - The JSON pointer indicating where to apply the operation.
+     * @param {*} [data=null] - The data to be used with the set or setDeferred operation.
+     * @param {"set"|"delete"|"setDeferred"} [op="set"] - The operation to perform - setDeferred is for internal use
+     * @returns {Promise<void>} A promise that resolves when the operation is complete.
+     */
+    async setData(jsonPtr, data=null, op:"set"|"delete"|"setDeferred"="set") {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy
