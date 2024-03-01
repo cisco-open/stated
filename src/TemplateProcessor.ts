@@ -30,6 +30,7 @@ import {debounce} from "./utils/debounce.js"
 import {rateLimit} from "./utils/rateLimit.js"
 
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
+export type Snapshot = {template:object, options:{}, output: any, prepared?:boolean}
 export type StatedError = {
     error: {
         message: string;
@@ -924,7 +925,15 @@ export default class TemplateProcessor {
     }
 
 
-    async setData(jsonPtr, data=null, op="set") {
+    /**
+     * Sets or deletes data based on the specified operation.
+     * @async
+     * @param {string} jsonPtr - The JSON pointer indicating where to apply the operation.
+     * @param {*} [data=null] - The data to be used with the set or setDeferred operation.
+     * @param {"set"|"delete"|"setDeferred"} [op="set"] - The operation to perform - setDeferred is for internal use
+     * @returns {Promise<void>} A promise that resolves when the operation is complete.
+     */
+    async setData(jsonPtr, data=null, op:"set"|"delete"|"setDeferred"="set") {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy
@@ -1547,6 +1556,7 @@ export default class TemplateProcessor {
      */
     public static async fromSnapshotString(snapshot: string, context: {} = {}): Promise<TemplateProcessor> {
         const parsedSnapshot = JSON.parse(snapshot);
+        await TemplateProcessor.prepareSnapshotInPlace(parsedSnapshot);
         const tp = TemplateProcessor.constructFromSnapshotObject(parsedSnapshot, context);
         await tp.initialize(undefined, "/", parsedSnapshot.output);
         return tp;
@@ -1567,7 +1577,10 @@ export default class TemplateProcessor {
      * // Register callbacks or perform other setup operations here
      * await tp.initialize();
      */
-    public static constructFromSnapshotObject(snapshot: {template: {}, options: {}}, context: {} = {}): TemplateProcessor {
+    public static constructFromSnapshotObject(snapshot: Snapshot, context: {} = {}): TemplateProcessor {
+        if(!snapshot.prepared){
+            throw new Error("Cannot construct TemplateProcessor from unprepared Snapshot")
+        }
         const {template, options} = snapshot;
         return new TemplateProcessor(template, context, options);
     }
@@ -1588,10 +1601,52 @@ export default class TemplateProcessor {
      * await tp.initializeFromSnapshotObject(snapshot)
      *     .then(() => console.log('TemplateProcessor initialized from snapshot output.'));
      */
-    public async initializeFromSnapshotObject(snapshot:{output:{}}){
+    public async initializeFromSnapshotObject(snapshot:Snapshot){
+        if(!snapshot.prepared){
+            throw new Error("Cannot initialize TemplateProcessor from unprepared Snapshot")
+        }
         return await this.initialize(undefined, "/", snapshot.output);
     }
 
+    /**
+     *
+     * @param snapshot
+     * this method mutates the Snapshot's template in place to merge accumulated output data into it
+     * @private
+     */
+    public static async prepareSnapshotInPlace(snapshot:Snapshot):Promise<void>{
+        if(snapshot.prepared){
+            throw new Error("Attempt to prepare an already-prepared snapshot")
+        }
+        const {template, output} = snapshot;
+        const metaInfos:MetaInfo[] = await MetaInfoProducer.getMetaInfos(template);
+        const jsonPointersToMetaInfo:Map<JsonPointerString, MetaInfo> = metaInfos.reduce((acc, metaInf)=>{
+            if(metaInf.treeHasExpressions__){
+                acc.set(jp.compile(metaInf.jsonPointer__), metaInf);
+            }
+            return acc;
+        }, new Map<JsonPointerString, MetaInfo>());
+
+        //descend callback wil prevent descending further when it reaches a node that is an expression in the template
+        const descend = (value, jsonPointer:JsonPointerString)=>{
+            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer).expr__ !== undefined){
+                return false; //the location in the output tree corresponds to an expression in the template
+            }
+            const type = Object.prototype.toString.call(value);
+            return type === '[object Object]' || type === '[object Array]';
+        }
+        const transferDataToTemplate = (val, jsonPointer)=>{
+            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer).treeHasExpressions__){
+                return; //don't replace any expression or ancestor of expression in the template
+            }
+            //update the template with fields from the output that may not have been present in the template (like they got $set into template at runtime before snapshot)
+            jp.set(template, jsonPointer, val); //this will only get called for 'data', not expressions
+        }
+        jp.walk(output, transferDataToTemplate, descend);
+        //template has now been mutated in place
+        snapshot.prepared = true;
+        return;
+    }
 
 }
 

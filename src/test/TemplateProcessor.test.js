@@ -2006,6 +2006,7 @@ test("snapshot", async () => {
     });
     latch = new Promise(resolve => done = resolve);
     deferredCountNumChanges = 0;
+    await TemplateProcessor.prepareSnapshotInPlace(snapshotObject);
     const tp2 = TemplateProcessor.constructFromSnapshotObject(snapshotObject);
     tp2.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
         deferredCountNumChanges++;
@@ -2117,5 +2118,97 @@ test("dataChangeCallback on delete op", async () => {
     tp.setData("/foo", undefined, "delete");
     await latch;
     expect(tp.output.foo).toBeUndefined();
+})
+
+test("snapshot contains injected fields", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${function(){'yo'}}",
+        "b": {"c": {"d":"${'hello'}"}, "e":42}
+    });
+    await tp.initialize();
+    await tp.setData("/f","XXX");
+    await tp.setData("/b/c/g","YYY");
+    const snapshotStr = tp.snapshot();
+    const tpRestored = await TemplateProcessor.fromSnapshotString(snapshotStr);
+    expect(await tpRestored.output.a()).toBe('yo');
+    expect(tpRestored.output.b.c.d).toBe('hello');
+    expect(tpRestored.output.b.e).toBe(42);
+    expect(tpRestored.output.f).toBe("XXX");
+    expect(tpRestored.output.b.c.g).toBe('YYY');
+})
+
+test("dataChangeCallback on delete op from Snapshot", async () => {
+    const snapshot = {
+        "template": {
+            "step": {
+                "name": "step0"
+            }
+        },
+        "output": {
+            "some": "thing",
+            "step": {
+                "name": "step0",
+                "log": {
+                    "han": {
+                        "start": {
+                            "timestamp": 1709228824377,
+                            "args": "han"
+                        },
+                        "end": {
+                            "timestamp": 1709228825880,
+                            "out": {
+                                "name": "Han Solo",
+                                "height": "180",
+                                "mass": "80",
+                                "hair_color": "brown",
+                                "skin_color": "fair",
+                                "eye_color": "brown",
+                                "birth_year": "29BBY",
+                                "gender": "male",
+                                "homeworld": "https://swapi.dev/api/planets/22/",
+                                "films": [
+                                    "https://swapi.dev/api/films/1/",
+                                    "https://swapi.dev/api/films/2/",
+                                    "https://swapi.dev/api/films/3/"
+                                ],
+                                "species": [],
+                                "vehicles": [],
+                                "starships": [
+                                    "https://swapi.dev/api/starships/10/",
+                                    "https://swapi.dev/api/starships/22/"
+                                ],
+                                "created": "2014-12-10T16:49:14.582000Z",
+                                "edited": "2014-12-20T21:17:50.334000Z",
+                                "url": "https://swapi.dev/api/people/14/"
+                            }
+                        }
+                    }
+                }
+            }
+        },
+        "options": {
+        }
+    }
+    await TemplateProcessor.prepareSnapshotInPlace(snapshot);
+    const tp = TemplateProcessor.constructFromSnapshotObject(snapshot);
+    let done;
+    let latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/step/log/han', (data, jsonPtr, removed)=>{
+        if (removed){
+            done();
+        }
+    });
+    try {
+        await tp.initializeFromSnapshotObject(snapshot);
+        await tp.setData("/step/log/han", undefined, "delete");
+        await latch;
+    } catch (error) {
+        console.log(error);
+        jest.fail(error);
+    }
+    expect(tp.output).toStrictEqual({ some: 'thing', step: { name: 'step0', log: {} } });
+    //try to delete the log a second time, just to make sure no double-delete problems
+    await tp.setData("/step/log/han", undefined, "delete");
+
 })
 

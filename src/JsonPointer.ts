@@ -1,3 +1,32 @@
+/*
+The MIT License (MIT)
+
+Copyright (c) 2016 Manuel Stofer
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the "Software"), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+    OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.
+
+ */
+/*
+    This class is mostly a cut-n-paste of the MIT licensed source code noted above
+ */
+import {JsonPointerString} from "./MetaInfoProducer.js";
+
 export default class JsonPointer {
     /**
      * Convenience wrapper around jp.
@@ -144,10 +173,10 @@ export default class JsonPointer {
      * @param {function} iterator
      * @param {function} descend
      */
-    static walk(obj, iterator, descend) {
+    static walk(obj, iterator, descend?) {
         const refTokens = [];
 
-        descend = descend || function (value) {
+        descend = descend || function (value, ptrString:JsonPointerString) {
             const type = Object.prototype.toString.call(value);
             return type === '[object Object]' || type === '[object Array]';
         };
@@ -155,10 +184,11 @@ export default class JsonPointer {
         (function next(cur) {
             for (const [key, value] of Object.entries(cur)) {
                 refTokens.push(String(key));
-                if (descend(value)) {
+                const ptrString = JsonPointer.compile(refTokens);
+                if (descend(value, ptrString)) {
                     next(value);
                 } else {
-                    iterator(value, JsonPointer.compile(refTokens));
+                    iterator(value, ptrString);
                 }
                 refTokens.pop();
             }
