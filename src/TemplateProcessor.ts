@@ -38,6 +38,10 @@ export type StatedError = {
         stack?: string | null;
     };
 };
+export type Op = "set"|"delete"|"forceSetInternal";
+type MutationPlan = {sortedJsonPtrs, data?, op};
+type SnapshotPlan = {op:"snapshot", generatedSnapshot: string}
+
 
 /**
  * This is the main TemplateProcessor class.
@@ -222,11 +226,12 @@ export default class TemplateProcessor {
     /** Contains any errors encountered during template processing. */
     errorReport: {};
 
-    /** Execution plans generated for template processing. */
-    private executionPlans: {};
+    /** Execution plans 'from' a given JSON Pointer. So key is JSON Pointer and value is array of JSON
+     * pointers (a plan) */
+    private executionPlans: { [key: JsonPointerString]: JsonPointerString[] };
 
     /** A queue of execution plans awaiting processing. */
-    private readonly executionQueue = [];
+    private readonly executionQueue:(MutationPlan|SnapshotPlan)[] = [];
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
@@ -256,6 +261,8 @@ export default class TemplateProcessor {
 
     /** Allows caller to set a callback to propagate initialization into their framework */
     public readonly onInitialize: Map<string,() => Promise<void>|void>;
+
+    //private requestSnapshot:boolean
 
 
 
@@ -933,11 +940,11 @@ export default class TemplateProcessor {
      * @param {"set"|"delete"|"setDeferred"} [op="set"] - The operation to perform - setDeferred is for internal use
      * @returns {Promise<void>} A promise that resolves when the operation is complete.
      */
-    async setData(jsonPtr, data=null, op:"set"|"delete"|"setDeferred"="set") {
+    async setData(jsonPtr, data=null, op:Op="set") {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const sortedJsonPtrs = [...this.from(jsonPtr)]; //defensive copy
-        const plan = {sortedJsonPtrs, data, op};
+        const plan:MutationPlan = {sortedJsonPtrs, data, op};
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
@@ -947,18 +954,29 @@ export default class TemplateProcessor {
             return sortedJsonPtrs; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
         }
 
-        async function drainQueue() {
-            while (this.executionQueue.length > 0) {
-                const {sortedJsonPtrs, data, op} = this.executionQueue[0];
-                await this.executePlan(sortedJsonPtrs, data, op);
-                this.executionQueue.shift();
-            }
-        }
-
-        await drainQueue.call(this);
-        this.removeTemporaryVariables(this.tempVars);
+        await this.drainExecutionQueue();
         this.logOutput();
         return sortedJsonPtrs;
+
+    }
+
+    private async drainExecutionQueue(){
+        while (this.executionQueue.length > 0) {
+            const executionDirective:MutationPlan|SnapshotPlan = this.executionQueue[0];
+            if(executionDirective.op === "snapshot"){
+                const snapshot = {
+                    template: this.input,
+                    output:this.output,
+                    options: this.options
+                };
+                (executionDirective as SnapshotPlan).generatedSnapshot = stringifyTemplateJSON(snapshot);
+            }else {
+                const {sortedJsonPtrs, data, op} = executionDirective as MutationPlan;
+                await this.executePlan(sortedJsonPtrs, data, op);
+            }
+            this.removeTemporaryVariables(this.tempVars);
+            this.executionQueue.shift();
+        }
 
     }
 
@@ -973,7 +991,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(changedJsonPointers:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:"set"|"setDeferred"|"delete"="set"):Promise<void> {
+    private async executePlan(changedJsonPointers:JsonPointerString[], data:any = TemplateProcessor.NOOP, op:Op="set"):Promise<void> {
         const resp = [];
         let dependencies = changedJsonPointers;
         if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
@@ -998,7 +1016,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executeDataChangeCallbacks(changedJsonPointers: JsonPointerString[], op:"set"|"setDeferred"|"delete"="set") {
+    private async executeDataChangeCallbacks(changedJsonPointers: JsonPointerString[], op:Op="set") {
         let anyUpdates = false;
         const thoseThatUpdated = changedJsonPointers.filter(jptr => {
             const meta = jp.get(this.templateMeta, jptr);
@@ -1015,19 +1033,19 @@ export default class TemplateProcessor {
         }
     }
 
-    private async applyMutationToFirstJsonPointerOfPlan(plan: JsonPointerString[], data: any, op: "set" |"setDeferred"| "delete") {
+    private async applyMutationToFirstJsonPointerOfPlan(plan: JsonPointerString[], data: any, op: Op) {
         const entryPoint = plan[0];
         await this.startPlanExecution(entryPoint, data, op);
     }
 
-    private async startPlanExecution(entryPoint:JsonPointerString, data: any, op: "set" |"setDeferred"| "delete"):Promise<void> {
+    private async startPlanExecution(entryPoint:JsonPointerString, data: any, op: Op):Promise<void> {
         if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
             const didUpdate = await this.evaluateNode(entryPoint, data, op);
             jp.get(this.templateMeta, entryPoint).didUpdate__ = didUpdate;
         } else {
             // Check if the node contains an expression. If so, print a warning and return.
             const firstMeta = jp.get(this.templateMeta, entryPoint);
-            if (firstMeta.expr__ !== undefined && op !== "setDeferred") { //setDeferred allows $defer('/foo') to 'self replace' with a value
+            if (firstMeta.expr__ !== undefined && op !== "forceSetInternal") { //setDeferred allows $defer('/foo') to 'self replace' with a value
                 this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
             } else {
                 firstMeta.didUpdate__ = await this.evaluateNode(entryPoint, data, op); // Evaluate the node provided with the data provided
@@ -1038,7 +1056,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async evaluateNode(jsonPtr, data=undefined, op:"set" |"setDeferred"| "delete"="set") {
+    private async evaluateNode(jsonPtr, data=undefined, op:Op="set") {
         const {output, templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
@@ -1114,9 +1132,9 @@ export default class TemplateProcessor {
         }
     }
 
-    private setDataIntoTrackedLocation(templateMeta, jsonPtr, data=undefined,op:"set" |"setDeferred"| "delete"="set" ) {
+    private setDataIntoTrackedLocation(templateMeta, jsonPtr, data=undefined,op:Op="set" ) {
         const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr);
-        if (treeHasExpressions__ && op !== 'setDeferred') {
+        if (treeHasExpressions__ && op !== 'forceSetInternal') {
             this.logger.log('warn', `nodes containing expressions cannot be overwritten: ${jsonPtr}`);
             return false;
         }
@@ -1128,7 +1146,7 @@ export default class TemplateProcessor {
         return didSet; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    private async setUntrackedLocation(output, jsonPtr, data, op:"set" |"setDeferred"| "delete"="set") {
+    private async setUntrackedLocation(output, jsonPtr, data, op:Op="set") {
         if(op==="delete"){
             if(!jp.has(this.output, jsonPtr)){
                 return; // we are being asked to remove something that isn't here
@@ -1201,7 +1219,7 @@ export default class TemplateProcessor {
         return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
     }
 
-    private _setData(jsonPtr:JsonPointerString, data:any=undefined, op:"set" |"setDeferred"| "delete" ="set"):boolean {
+    private _setData(jsonPtr:JsonPointerString, data:any=undefined, op:Op ="set"):boolean {
         if (data === TemplateProcessor.NOOP) { //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
             return false;
         }
@@ -1508,7 +1526,7 @@ export default class TemplateProcessor {
 
             if(jp.has(this.output, jsonPointer)){
                 const dataChangeCallback =  debounce(async (data)=>{
-                    this.setData(metaInfo.jsonPointer__, data, "setDeferred"); //sets the value into the location in the template where the $defer() call is made
+                    this.setData(metaInfo.jsonPointer__, data, "forceSetInternal"); //sets the value into the location in the template where the $defer() call is made
                 }, timeoutMs);
                 this.setDataChangeCallback(jsonPointer, dataChangeCallback);
                 return jp.get(this.output, jsonPointer); //returns the current value of the location $defer is called on
@@ -1527,16 +1545,15 @@ export default class TemplateProcessor {
      *
      * @example
      * const tp = new TemplateProcessor(template, context, options);
-     * const snapshotString = tp.snapshot();
+     * const snapshotString = await tp.snapshot();
      * // snapshotString contains a JSON string with the template, output, and options of the TemplateProcessor
      */
-     public snapshot():string  {
-        const snapshot = {
-            template: this.input,
-            output:this.output,
-            options: this.options
-        };
-        return stringifyTemplateJSON(snapshot);
+     public async snapshot():Promise<string>  {
+        const snapshotPlan:SnapshotPlan = {op:"snapshot", generatedSnapshot:"replace me"}; //generatedSnapshot gets filled in
+        this.executionQueue.push(snapshotPlan);
+        await this.drainExecutionQueue();
+        const {generatedSnapshot} = snapshotPlan;
+        return generatedSnapshot;
     }
 
     /**
@@ -1611,7 +1628,20 @@ export default class TemplateProcessor {
     /**
      *
      * @param snapshot
-     * this method mutates the Snapshot's template in place to merge accumulated output data into it
+     * this method mutates the Snapshot's template in place to merge accumulated output data into it. It does this
+     * by
+     *  1. generating local MetaInfo for the template.
+     *  2. making a Map whose key is jsonPointer, and placing into that the MetaInfo for places in the template
+     *     whose subtree has expressions (treeHasExpressions__). This tells us that these are parts of the template
+     *     that cannot be altered, ever, because to alter them would be to remove expressions from the template.
+     *  3. walking the output object recursively. As it walks, it looks up the json pointer in the aformmentioned Map.
+     *     If it does not see the pointer in the Map, then it means the current piece of output is pure data, and is
+     *     transferred ino the template
+     *
+     *  Net effect is that pure data that had been shoved into the output, at runtime gets transfered into the template.
+     *  Now it is safe to initialize from this Snapshot and we will not have a situation where there is pure data in
+     *  the output with no corresponding MetaInfo to mark it as materialized__
+     *
      * @private
      */
     public static async prepareSnapshotInPlace(snapshot:Snapshot):Promise<void>{
