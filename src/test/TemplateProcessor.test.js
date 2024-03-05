@@ -1985,7 +1985,7 @@ test("snapshot", async () => {
     })
     await tp.initialize();
     await latch;
-    const snapshot = tp.snapshot();
+    const snapshot = await tp.snapshot();
     const snapshotObject = JSON.parse(snapshot);
     expect(snapshotObject).toStrictEqual({
         "options":{},
@@ -2128,7 +2128,7 @@ test("snapshot contains injected fields", async () => {
     await tp.initialize();
     await tp.setData("/f","XXX");
     await tp.setData("/b/c/g","YYY");
-    const snapshotStr = tp.snapshot();
+    const snapshotStr = await tp.snapshot();
     const tpRestored = await TemplateProcessor.fromSnapshotString(snapshotStr);
     expect(await tpRestored.output.a()).toBe('yo');
     expect(tpRestored.output.b.c.d).toBe('hello');
