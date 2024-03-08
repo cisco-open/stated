@@ -159,10 +159,11 @@ interact with running templates. Stated uses asynchronous event loop I/O and can
 ```json
 > .init -f example/homeworlds.json
 {
-  "lukePersonDetails": "${ $fetch('https://swapi.dev/api/people/?search=luke').json().results[0]}",
-  "lukeHomeworldURL": "${ lukePersonDetails.homeworld }",
+  "lukePersonUrl": "${ $fetch('https://swapi.tech/api/people/?name=luke').json().**.url}",
+  "lukePersonDetails": "${ $fetch(lukePersonUrl).json().result[0]}",
+  "lukeHomeworldURL": "${ lukePersonDetails.**.homeworld }",
   "homeworldDetails": "${ $fetch(lukeHomeworldURL).json() }",
-  "homeworldName": "${ homeworldDetails.name }"
+  "homeworldName": "${ homeworldDetails.**.name }"
 }
 > .out /homeworldName
 "Tatooine"
@@ -967,15 +968,15 @@ resolution of the two fetch functions they each depend on.
 ```json
 > .init -f "example/ex21.json"
 {
-  "story": "${ [partI, 'then', partII]~>$join(' ')}",
-  "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
   "call": "${function($url){$fetch($url) ~> handleRes}}",
+  "falcon": "${ call('https://swapi.tech/api/starships/?name=Millennium').result[0].properties.name}",
+  "han": "${ call('https://swapi.tech/api/people/?name=han').result[0].properties.name}",
+  "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+  "luke": "${ call('https://swapi.tech/api/people/?name=luke').result[0].properties.name}",
   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
-  "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
-  "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
-  "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
-  "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+  "story": "${ [partI, 'then', partII]~>$join(' ')}",
+  "xwing": "${ call('https://swapi.tech/api/starships/?name=x-wing').result[0].properties.name}"
 }
 > .plan
 [
@@ -1001,6 +1002,191 @@ resolution of the two fetch functions they each depend on.
   "han": "Han Solo",
   "falcon": "Millennium Falcon"
 } 
+```
+## SVG command
+The .svg command serves an SVG diagram of the DAG
+```json [false, "$='http://localhost:4042'"]
+> .init -f "example/ex21.json"
+{
+   "story": "${ [partI, 'then', partII]~>$join(' ')}",
+   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+   "call": "${function($url){$fetch($url) ~> handleRes}}",
+   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+   "luke": "${ call('https://swapi.tech/api/people/?name=luke').result[0].properties.name}",
+   "xwing": "${ call('https://swapi.tech/api/starships/?name=x-wing').result[0].properties.name}",
+   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+   "han": "${ call('https://swapi.tech/api/people/?name=han').result[0].properties.name}",
+   "falcon": "${ call('https://swapi.tech/api/starships/?name=Millennium').result[0].properties.name}"
+}
+> .svg --port=4042
+Server is running on port 4042
+"http://localhost:4042"
+```
+Access the URL from your web browser to view the SVG diagram.
+![starwars svg](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/df9b46590c28285a06bce7aa4948fe62042345f1/starwarsgraph.svg)
+
+## YAML
+Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 
+support text blocks with line returns in a way that is readable. For instance if we compare ex12.json and ex12.yaml, 
+which is more readable?
+```json
+falken$ cat ex12.json
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game.selected}",
+  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
+}
+```
+In YAML the `respHandler` function can be written as a text block, whereas in JSON it must appear on a single line.
+```bash
+falken$ cat ex12.yaml
+```
+```yaml
+url: "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json"
+selectedGame: "${game$.selected}"
+respHandler$: |
+  function($res){
+    $res.ok? $res.json():{'error': $res.status}
+  }
+game$: "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
+```
+
+However, once a YAML file is parsed with the JavaScript runtime it becomes a JavaScript
+object. Hence, in the example below a YAML is the input file, but the REPL displays the resulting Javascript object 
+using JSON syntax. As we can see below, loading the yaml file still results in the function being deisplayed
+as it's parsed in-memory JS representation.
+```json lines
+> .init -f "example/ex12.yaml"
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game$.selected}",
+  "respHandler$": "function($res){\n  $res.ok? $res.json():{'error': $res.status}\n}\n",
+  "game$": "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
+}
+```
+## Setting Values in the stated REPL
+
+The stated REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
+In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+
+```json
+> .init -f "example/ex09.json"
+{
+  "a": [
+    0,
+    1,
+    "${ $[0] + $[1] }"
+  ]
+}
+> .set /a/0 100
+{
+  "a": [
+    100,
+    1,
+    101
+  ]
+}
+```
+## Expression Scope
+Individual JSONata programs are embedded in JSON files between `${..}`. What is the input to the JSONata program? 
+The input, by default, is the object or array that the expression resides in. For instance in the example **above**, you can see that the JSONata `$` variable refers to the array itself. Therefore, expressions like `$[0]`
+refer to the first element of the array. 
+## Rerooting Expressions
+In Stated templates, one way to declare a JSONata expression is by surrounding it by "dollars moustaches".
+E.g `${...some expression...}`. JSONata expressions always have a [context](https://docs.jsonata.org/programming#built-in-variables).
+The `$` variable always points to the current context. The `$$` variable always points to the input (root context) for an 
+expression.
+In a Stated template, the root context for an expression is the object in which the expression is contained. For
+Example:
+```json
+> .init -f "example/context.json"
+{
+   "a": {
+      "b": "${[c,' and ',$.c,' and ',$$.c,' are the same thing. $ (current context) is /a, the object in which this expression resides']~>$join}",
+      "c": "hello"
+   }
+}
+> .out
+{
+   "a": {
+      "b": "hello and hello and hello are the same thing. $ (current context) is /a, the object in which this expression resides",
+      "c": "hello"
+   }
+}
+```
+Now we will show how we can change the context of an expression using 'rerooting.' Rerooting allows the expression's root
+context to be pointed anywhere in the json document.
+In the example below, consider `greeting & ', ' &  player1'`. We want `player1` to refer to the content at json pointer `/player1` (the field named 'player1' at the root of the document). 
+But our expression `greeting & ', ' &  player1` is located deep in the document at `/dialog/partI`. So how can we cause 
+the root of the document to be the context for the JSONata expression `greeting & ', ' &  player1`? 
+You can reroot an expression in a different part of the document using relative rooting `../${<expr>}` syntax or you can root an
+at the absolute doc root with `/${<expr>}`. The example below shows how expressions located below the root object, can
+explicitly set their context using the rooting syntax. Both absolute rooting, `/${...}` and relative rooting `../${...}`
+are shown.
+
+```json
+> .init -f "example/ex04.json"
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "../../${greeting & ', ' &  player1}",
+      "../../${greeting & ', ' &  player2}"
+     ],
+    "partII": {
+      "msg3": "/${player1 & ', would you like to play a game?'}",
+      "msg4": "/${'Certainly, '& player2 & '. How about a nice game of chess?'}"
+    }
+  }
+}
+> .out
+{
+  "greeting": "Hello",
+  "player1": "Joshua",
+  "player2": "Professor Falken",
+  "dialog": {
+    "partI": [
+      "Hello, Joshua",
+      "Hello, Professor Falken"
+    ],
+    "partII": {
+      "msg3": "Joshua, would you like to play a game?",
+      "msg4": "Certainly, Professor Falken. How about a nice game of chess?"
+    }
+  }
+}
+```
+An advanced rerooting operator is the `//` absolute root operator. The `/` rooting operator, that we showed above,  will never allow the expression
+to 'escape' outside of the template it was defined in. But what if we intend for a template to be imported into another template
+and we expect there to be a variable defined in the other template that we should use? This is where the `//` absolute root
+operator can be used. The `//` operator will set the expression context to the absolute root of whatever the final document is
+after all imports have been performed.
+```json
+> .init -f "example/absoluteRoot.json"
+{
+   "to": "!${'Professor Falken'}",
+   "greeting": "//${'Hello, ' & to}"
+}
+> .out
+{
+   "greeting": "Hello, Professor Falken"
+}
+> .init -f "example/importsAbsoluteRoot.json"
+{
+   "to": "Joshua",
+   "message": "${$import('example/absoluteRoot.json')}"
+}
+> .out
+{
+   "to": "Joshua",
+   "message": {
+      "greeting": "Hello, Joshua"
+   }
+}
+
 ```
 ## DAG
 Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
@@ -1077,15 +1263,15 @@ evaluated twice.
 ```json [false, "$='http://localhost:4042'"]
 > .init -f "example/ex21.json"
 {
-   "story": "${ [partI, 'then', partII]~>$join(' ')}",
-   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
-   "call": "${function($url){$fetch($url) ~> handleRes}}",
-   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
-   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
-   "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
-   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
-   "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
-   "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+  "call": "${function($url){$fetch($url) ~> handleRes}}",
+  "falcon": "${ call('https://swapi.tech/api/starships/?name=Millennium').result[0].properties.name}",
+  "han": "${ call('https://swapi.tech/api/people/?name=han').result[0].properties.name}",
+  "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+  "luke": "${ call('https://swapi.tech/api/people/?name=luke').result[0].properties.name}",
+  "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+  "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+  "story": "${ [partI, 'then', partII]~>$join(' ')}",
+  "xwing": "${ call('https://swapi.tech/api/starships/?name=x-wing').result[0].properties.name}"
 }
 > .svg --port=4042
 Server is running on port 4042
