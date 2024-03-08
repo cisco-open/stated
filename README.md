@@ -719,15 +719,15 @@ resolution of the two fetch functions they each depend on.
 ```json
 > .init -f "example/ex21.json"
 {
-  "story": "${ [partI, 'then', partII]~>$join(' ')}",
-  "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
-  "call": "${function($url){$fetch($url) ~> handleRes}}",
-  "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
-  "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
-  "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
-  "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
-  "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
-  "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+   "story": "${ [partI, 'then', partII]~>$join(' ')}",
+   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+   "call": "${function($url){$fetch($url) ~> handleRes}}",
+   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+   "luke": "${ call('https://swapi.tech/api/people/?name=luke').result[0].properties.name}",
+   "xwing": "${ call('https://swapi.tech/api/starships/?name=x-wing').result[0].properties.name}",
+   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+   "han": "${ call('https://swapi.tech/api/people/?name=han').result[0].properties.name}",
+   "falcon": "${ call('https://swapi.tech/api/starships/?name=Millennium').result[0].properties.name}"
 }
 > .plan
 [
@@ -763,11 +763,11 @@ The .svg command serves an SVG diagram of the DAG
    "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
    "call": "${function($url){$fetch($url) ~> handleRes}}",
    "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
-   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
-   "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
+   "luke": "${ call('https://swapi.tech/api/people/?name=luke').result[0].properties.name}",
+   "xwing": "${ call('https://swapi.tech/api/starships/?name=x-wing').result[0].properties.name}",
    "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
-   "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
-   "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+   "han": "${ call('https://swapi.tech/api/people/?name=han').result[0].properties.name}",
+   "falcon": "${ call('https://swapi.tech/api/starships/?name=Millennium').result[0].properties.name}"
 }
 > .svg --port=4042
 Server is running on port 4042
