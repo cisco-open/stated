@@ -1,6 +1,6 @@
 {
   "people": ["luke", "han"],
-  "personDetails": "!${ people.$fetch('https://swapi.dev/api/people/?search='& $).json().results[0]}",
+  "personDetails": "!${ people.$fetch('https://swapi.tech/api/people/?search='& $).json().results[0]}",
   "homeworldURLs": "${ personDetails.homeworld }",
   "homeworldDetails": "!${ homeworldURLs.$fetch($).json() }",
   "homeworldName": "${ homeworldDetails.name }"
