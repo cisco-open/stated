@@ -16,7 +16,7 @@ call: |
   }
 partI: "${ [han, 'piloted the', falcon]~> $join(' ')}"
 luke: "${ call('https://*****BROKEN-ON-PURPOSE-TO-SHOW-ERROR-HANDLING*****/api/people/?search=luke')}"
-xwing: "${ call('https://swapi.dev/api/starships/?search=x')}"
+xwing: "${ call('https://swapi.tech/api/starships/?search=x')}"
 partII: "${ [luke, 'piloted the', xwing]~> $join(' ')}"
-han: "${ call('https://swapi.dev/api/people/?search=han')}"
-falcon: "${ call('https://swapi.dev/api/starships/?search=Millennium')}"
+han: "${ call('https://swapi.tech/api/people/?search=han')}"
+falcon: "${ call('https://swapi.tech/api/starships/?search=Millennium')}"
