@@ -772,6 +772,47 @@ test("import 1", async () => {
     );
 });
 
+test("import 2", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}"
+    });
+    await tp.initialize();
+    await tp.import({
+        "b1": "${ 'hello B' }",
+        "b2": 42,
+        "b3": "//${a}",
+        "b4": "../${a}"
+    }, "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": {
+                "b1": "hello B",
+                "b2": 42,
+                "b3": "hello A",
+                "b4": "hello A"
+            }
+        }
+    );
+    await tp.import({
+        "b1": "${ 'hello B NEW STUFF' }",
+        "b2": 42,
+        "b3": "//${a & ' NEW STUFF'}",
+        "b4": "../${a & ' NEW STUFF'}"
+    }, "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": {
+                "b1": "hello B NEW STUFF",
+                "b2": 42,
+                "b3": "hello A NEW STUFF",
+                "b4": "hello A NEW STUFF"
+            }
+        }
+    );
+});
+
 test("context", async () => {
     const nozzle = (something) => "nozzle got some " + something;
     const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}
@@ -2210,5 +2251,96 @@ test("dataChangeCallback on delete op from Snapshot", async () => {
     //try to delete the log a second time, just to make sure no double-delete problems
     await tp.setData("/step/log/han", undefined, "delete");
 
+})
+
+test("forked1", async () => {
+    const tp = new TemplateProcessor({
+        "vals": "${[1..10].($forked('/val', $))}",
+        "val": 0,
+        "val1": "${{'val':val, 'val1':val}}",
+        "val2": "${val1 ~>|$|{'val2':$$.val1.val1&':hello'}|}",
+        "onVal": "${ $joined('/acc/-', $$.val2 ~>|$|{'done':true}|) }",
+        "acc":[],
+        "accSort": "${acc^($.val)}",
+        "done" : "${$count(acc)=11}"
+    });
+    let latch;
+    const latchPromise = new Promise((resolve)=>{latch = resolve})
+    tp.setDataChangeCallback("/done", (done)=>{
+        if(done===true) {
+            tp.output.acc;
+            latch();
+        }
+    })
+    await tp.initialize();
+    await latchPromise;
+    expect(await tp.output.accSort).toStrictEqual([
+        {
+            "done": true,
+            "val": 0,
+            "val1": 0,
+            "val2": "0:hello"
+        },
+        {
+            "done": true,
+            "val": 1,
+            "val1": 1,
+            "val2": "1:hello"
+        },
+        {
+            "done": true,
+            "val": 2,
+            "val1": 2,
+            "val2": "2:hello"
+        },
+        {
+            "done": true,
+            "val": 3,
+            "val1": 3,
+            "val2": "3:hello"
+        },
+        {
+            "done": true,
+            "val": 4,
+            "val1": 4,
+            "val2": "4:hello"
+        },
+        {
+            "done": true,
+            "val": 5,
+            "val1": 5,
+            "val2": "5:hello"
+        },
+        {
+            "done": true,
+            "val": 6,
+            "val1": 6,
+            "val2": "6:hello"
+        },
+        {
+            "done": true,
+            "val": 7,
+            "val1": 7,
+            "val2": "7:hello"
+        },
+        {
+            "done": true,
+            "val": 8,
+            "val1": 8,
+            "val2": "8:hello"
+        },
+        {
+            "done": true,
+            "val": 9,
+            "val1": 9,
+            "val2": "9:hello"
+        },
+        {
+            "done": true,
+            "val": 10,
+            "val1": 10,
+            "val2": "10:hello"
+        }
+    ]);
 })
 
