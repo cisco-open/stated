@@ -1,0 +1,7 @@
+data: ${['luke', 'han', 'leia', 'chewbacca', 'darth', 'ben', 'c-3po', 'yoda'].($forked('/name',$))}
+name: null
+personDetails: ${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null)}
+homeworldURL: ${ personDetails!=null?personDetails.properties.homeworld:null ~> $save}
+homeworldDetails: ${ homeworldURL!=null?$fetch(homeworldURL).json().result:null }
+homeworldName: ${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+homeworlds: []

@@ -89,5 +89,8 @@
   "jest": {
     "transform": {}
   },
-  "type": "module"
+  "type": "module",
+  "browser":{
+    "child_process": false
+  }
 }
