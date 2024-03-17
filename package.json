@@ -1,6 +1,6 @@
 {
   "name": "stated-js",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "./dist/src/TemplateProcessor.js",
@@ -90,7 +90,7 @@
     "transform": {}
   },
   "type": "module",
-  "browser":{
+  "browser": {
     "child_process": false
   }
 }
