@@ -67,6 +67,7 @@ export default {
             zlib: false,
             http: false,
             https:false,
+            child_process: false
         }
     },
     plugins: [

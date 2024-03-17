@@ -778,6 +778,24 @@ test("empty string", () => {
     expect(deps).toEqual([]);
 });
 
+test("acc^($.val)", () => {
+    const program = "acc^($.val)";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(deps).toEqual([
+        [
+            "acc",
+            "",
+            "val"
+        ],
+        [
+            "acc"
+        ]
+    ]);
+});
+
+
+
 
 
 

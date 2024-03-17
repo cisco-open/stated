@@ -772,6 +772,47 @@ test("import 1", async () => {
     );
 });
 
+test("import 2", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'hello A'}"
+    });
+    await tp.initialize();
+    await tp.import({
+        "b1": "${ 'hello B' }",
+        "b2": 42,
+        "b3": "//${a}",
+        "b4": "../${a}"
+    }, "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": {
+                "b1": "hello B",
+                "b2": 42,
+                "b3": "hello A",
+                "b4": "hello A"
+            }
+        }
+    );
+    await tp.import({
+        "b1": "${ 'hello B NEW STUFF' }",
+        "b2": 42,
+        "b3": "//${a & ' NEW STUFF'}",
+        "b4": "../${a & ' NEW STUFF'}"
+    }, "/b")
+    expect(tp.output).toEqual(
+        {
+            "a": "hello A",
+            "b": {
+                "b1": "hello B NEW STUFF",
+                "b2": 42,
+                "b3": "hello A NEW STUFF",
+                "b4": "hello A NEW STUFF"
+            }
+        }
+    );
+});
+
 test("context", async () => {
     const nozzle = (something) => "nozzle got some " + something;
     const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}
@@ -929,16 +970,16 @@ test("remove all DEFAULT_FUNCTIONS", async () => {
 
 test("shadow DEFAULT_FUNCTIONS fetch with hello", async () => {
     let template = {"fetchFunctionBecomesHello": "${$fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/foobar.json')}"};
-    const restore = TemplateProcessor.DEFAULT_FUNCTIONS;
+    const restoreFetch = TemplateProcessor.DEFAULT_FUNCTIONS.fetch;
     try {
-        TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => 'hello';
+        TemplateProcessor.DEFAULT_FUNCTIONS['fetch'] = () => {console.error('fetch function replaced by "hello" by function shadowing test"'); return 'hello'};
         const tp = new TemplateProcessor(template);
         await tp.initialize();
         expect(tp.output).toStrictEqual({
             "fetchFunctionBecomesHello": "hello"
         })
     }finally{
-        TemplateProcessor.DEFAULT_FUNCTIONS = restore;
+        TemplateProcessor.DEFAULT_FUNCTIONS.fetch = restoreFetch;
     }
 });
 
@@ -2211,4 +2252,156 @@ test("dataChangeCallback on delete op from Snapshot", async () => {
     await tp.setData("/step/log/han", undefined, "delete");
 
 })
+
+test("forked1", async () => {
+    const tp = new TemplateProcessor({
+        "vals": "${[1..10].($forked('/val', $))}",
+        "val": 0,
+        "val1": "${{'val':val, 'val1':val}}",
+        "val2": "${val1 ~>|$|{'val2':$$.val1.val1&':hello'}|}",
+        "onVal": "${ $joined('/acc/-', $$.val2 ~>|$|{'done':true}|) }",
+        "acc":[],
+        "accSort": "${acc^($.val)}",
+        "done" : "${$count(acc)=11}"
+    });
+    let latch;
+    const latchPromise = new Promise((resolve)=>{latch = resolve})
+    tp.setDataChangeCallback("/done", (done)=>{
+        if(done===true) {
+            latch();
+        }
+    })
+    await tp.initialize();
+    await latchPromise;
+    expect(await tp.output.accSort).toStrictEqual([
+        {
+            "done": true,
+            "val": 0,
+            "val1": 0,
+            "val2": "0:hello"
+        },
+        {
+            "done": true,
+            "val": 1,
+            "val1": 1,
+            "val2": "1:hello"
+        },
+        {
+            "done": true,
+            "val": 2,
+            "val1": 2,
+            "val2": "2:hello"
+        },
+        {
+            "done": true,
+            "val": 3,
+            "val1": 3,
+            "val2": "3:hello"
+        },
+        {
+            "done": true,
+            "val": 4,
+            "val1": 4,
+            "val2": "4:hello"
+        },
+        {
+            "done": true,
+            "val": 5,
+            "val1": 5,
+            "val2": "5:hello"
+        },
+        {
+            "done": true,
+            "val": 6,
+            "val1": 6,
+            "val2": "6:hello"
+        },
+        {
+            "done": true,
+            "val": 7,
+            "val1": 7,
+            "val2": "7:hello"
+        },
+        {
+            "done": true,
+            "val": 8,
+            "val1": 8,
+            "val2": "8:hello"
+        },
+        {
+            "done": true,
+            "val": 9,
+            "val1": 9,
+            "val2": "9:hello"
+        },
+        {
+            "done": true,
+            "val": 10,
+            "val1": 10,
+            "val2": "10:hello"
+        }
+    ]);
+})
+
+test("forked homeworlds", async () => {
+    let savedState;
+    let latch;
+    const latchSaveCommand = new Promise(resolve => {latch=resolve});
+    const tp = TemplateProcessor.fromString(`
+    data: \${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}
+    name: null
+    personDetails: \${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}
+    homeworldURL: \${ personDetails!=null?personDetails.properties.homeworld:null }
+    homeworldDetails: \${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
+    homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+    homeworlds: []`,
+        {save:(o)=>{
+            savedState = tp.executionStatus.toJsonObject();
+            if (savedState.mvcc.length === 6){
+                latch();
+            }
+            return o;
+        }}
+    );
+    let latchHomeworlds;
+    const homeworldsPromise = new Promise(resolve=>{latchHomeworlds = resolve});
+    tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
+        if(homeworlds.length === 5){
+            latchHomeworlds();
+        }
+    })
+    await tp.initialize();
+    await homeworldsPromise;
+    const expectedHomeworlds = [
+        "Corellia",
+        "Tatooine",
+        "Alderaan",
+        "Socorro",
+        "Kashyyyk"
+    ];
+    const homeworlds = tp.output.homeworlds;
+    // Ensure the array contains all the expected elements (we cannot expec them to be in a particular order
+    //due to the async nature of $forked
+    expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
+
+    // Ensure the array does not contain any elements not expected
+    expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
+
+    // Ensure the array is exactly the same length as the expected array
+    expect(homeworlds).toHaveLength(expectedHomeworlds.length);
+
+    expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
+    expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
+},5000);
+
+/*
+
+data: ${['luke', 'han', 'leia', 'chewbacca', 'darth', 'ben', 'c-3po', 'yoda'].(($sleep(100);$forked('/name',$)))}
+name: null
+personDetails: ${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null)~>$save}
+homeworldURL: ${ personDetails!=null?personDetails.properties.homeworld:null }
+homeworldDetails: ${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
+homeworldName: ${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+homeworlds: []
+ */
 
