@@ -37,7 +37,7 @@ export type JsonPointerStructureArray = (string|number)[];
 export type JsonPointerString = string;
 
 export default class MetaInfoProducer {
-    private static EMBEDDED_EXPR_REGEX = new RegExp(
+    public static EMBEDDED_EXPR_REGEX = new RegExp(
         '\\s*' +                    // Match optional whitespace
         '(?:(@(?<tag>\\w+))?\\s*)' +   // Match the 'tag' like @DEV or @TPC on an expression
         '(?:(?<tempVariable>!)?\\s*)' +    // Match the ! symbol which means 'temp variable'
