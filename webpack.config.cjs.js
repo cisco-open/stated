@@ -72,7 +72,7 @@ export default {
         new CopyPlugin({
             patterns: [
                 {
-                    from: 'src',
+                    from: 'types/src',
                     to: 'src',
                     globOptions: {
                         ignore: ['**/test/**'], // Exclude the src/test directory
