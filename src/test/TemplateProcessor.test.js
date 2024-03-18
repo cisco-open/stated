@@ -832,7 +832,7 @@ test("import simple template strings", async () => {
         }
     );
     //test *injecting* a literal expression moustache string into '/d'
-    await tp.import(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
+    await tp.setExpression(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
     expect(tp.output).toEqual(
         {
             "a": "A",
@@ -844,7 +844,7 @@ test("import simple template strings", async () => {
         }
     );
     //re-import same thing, make sure that's not a problem
-    await tp.import(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
+    await tp.setExpression(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
     expect(tp.output).toEqual(
         {
             "a": "A",
@@ -856,7 +856,7 @@ test("import simple template strings", async () => {
         }
     );
     //import nested deeper
-    await tp.import(`../../\${a}`, '/x/y');
+    await tp.setExpression(`../../\${a}`, '/x/y');
     expect(tp.output).toEqual(
         {
             "a": "A",
@@ -868,7 +868,7 @@ test("import simple template strings", async () => {
             }
         }
     );
-    await tp.import('//${x.y}', '/x/z');
+    await tp.setExpression('//${x.y}', '/x/z');
     expect(tp.output).toEqual(
         {
             "a": "A",

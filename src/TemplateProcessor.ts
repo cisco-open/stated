@@ -509,6 +509,17 @@ export default class TemplateProcessor {
         };
     };
 
+    /**
+     * allows direct injection of ${expression} into template at given jsonPointer.
+     * @param expression
+     * @param jsonPointer
+     */
+    async setExpression(expression:string, jsonPointer:JsonPointerString){
+        if(!MetaInfoProducer.EMBEDDED_EXPR_REGEX.test(expression)){
+            throw new Error("Not a valid stated exprssion (MetaInfoProducer.EMBEDDED_EXPR_REGEX test did not pass): " + expression);
+        }
+        await this.import(expression, jsonPointer);
+    }
 
     async import(template, jsonPtrImportPath) {
         jp.set(this.output, jsonPtrImportPath, template);
