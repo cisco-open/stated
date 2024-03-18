@@ -813,6 +813,77 @@ test("import 2", async () => {
     );
 });
 
+test("import simple template strings", async () => {
+    const tp = new TemplateProcessor({
+        "a": "${'A'}",
+        "b": `\${\$import('\${[a,"B"]~>\$join(" ")}')}`, //test literal import of raw template string
+        "x":{
+            "c":"C"
+        }
+    });
+    await tp.initialize();
+    expect(tp.output).toEqual(
+        {
+            "a": "A",
+            "b": "A B",
+            "x":{
+                "c":"C"
+            }
+        }
+    );
+    //test *injecting* a literal expression moustache string into '/d'
+    await tp.import(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
+    expect(tp.output).toEqual(
+        {
+            "a": "A",
+            "b": "A B",
+            "d": "A B C D",
+            "x":{
+                "c":"C"
+            }
+        }
+    );
+    //re-import same thing, make sure that's not a problem
+    await tp.import(`/\${[b,x.c,'D']~>\$join(' ')}`, '/d');
+    expect(tp.output).toEqual(
+        {
+            "a": "A",
+            "b": "A B",
+            "d": "A B C D",
+            "x":{
+                "c":"C"
+            }
+        }
+    );
+    //import nested deeper
+    await tp.import(`../../\${a}`, '/x/y');
+    expect(tp.output).toEqual(
+        {
+            "a": "A",
+            "b": "A B",
+            "d": "A B C D",
+            "x":{
+                "c":"C",
+                "y": "A"
+            }
+        }
+    );
+    await tp.import('//${x.y}', '/x/z');
+    expect(tp.output).toEqual(
+        {
+            "a": "A",
+            "b": "A B",
+            "d": "A B C D",
+            "x":{
+                "c":"C",
+                "y": "A",
+                "z": "A"
+            }
+        }
+    );
+
+});
+
 test("context", async () => {
     const nozzle = (something) => "nozzle got some " + something;
     const context = {"nozzle": nozzle, "ZOINK": "ZOINK"}

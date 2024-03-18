@@ -523,11 +523,12 @@ export default class TemplateProcessor {
             let resp;
             const parsedUrl = this.parseURL(importMe);
             if (parsedUrl) { //remote download
-                const {protocol} = parsedUrl;
                 this.logger.debug(`Attempting to fetch imported URL '${importMe}'`);
                 resp = await this.fetchFromURL(parsedUrl);
                 resp = this.extractFragmentIfNeeded(resp, parsedUrl);
-            } else {
+            } else if(MetaInfoProducer.EMBEDDED_EXPR_REGEX.test(importMe)){ //this is the case of importing an expression string
+                resp = importMe; //literally a direction expression like '/${foo}'
+            }else {
                 this.logger.debug(`Attempting local file import of '${importMe}'`);
                 const mightBeAFilename= importMe;
                 try {
@@ -540,7 +541,7 @@ export default class TemplateProcessor {
 
 
                 if(resp === undefined){
-                    this.logger.debug(`Attempting literal import of '${importMe}'`);
+                    this.logger.debug(`Attempting literal import of object '${importMe}'`);
                     resp = this.validateAsJSON(importMe);
                 }
             }
@@ -646,7 +647,7 @@ export default class TemplateProcessor {
                 if (cdUpParts) { // ../../{...}
                     metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
                 } else if (cdUpPath.match(/^\/$/g)) { // /${...}
-                    metaInfo.exprTargetJsonPointer__ = rootJsonPtr;
+                    metaInfo.exprTargetJsonPointer__ = this.adjustRootForSimpleExpressionImports(template,rootJsonPtr);
                 } else if(cdUpPath.match(/^\/\/$/g)){ // //${...}
                     metaInfo.exprTargetJsonPointer__ = []; //absolute root
                 } else{
@@ -1853,5 +1854,23 @@ export default class TemplateProcessor {
         return copiedObj;
     }
 
+    /**
+     * Sometimes we need to import a simple expression string that is not nested in an object.
+     * for example if we {"msg":"$import('${'hello ' & to }')"), then we are importing an expression directly
+     * into the parent, not nesting in an object. In this case we must slice off the last element of the
+     * rootJsonPointer, because to not slice it off would imply that the target of the expression is inside
+     * the msg field, but the intention when we import a simple expression is target the parent object which
+     * holds the msg field.
+     * @param template
+     * @param rootJsonPtr
+     * @returns either the original rootJsonPointer, or one that has been trimmed to point to the parent of rootJsonPtr
+     * @private
+     */
+    private adjustRootForSimpleExpressionImports(template, rootJsonPtr: any[]) {
+        if(typeof template === 'string' || template instanceof String){ //
+            return rootJsonPtr.slice(0,-1);
+        }
+        return rootJsonPtr;
+    }
 }
 
