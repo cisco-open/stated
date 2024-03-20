@@ -135,3 +135,6 @@ dist
 
 # IDEs
 .vscode
+
+docs
+types
