@@ -24,6 +24,8 @@ import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import {expect} from "@jest/globals";
+import exp from 'constants'
+
 
 
 test("test 1", async () => {
@@ -883,6 +885,491 @@ test("import simple template strings", async () => {
     );
 
 });
+
+test('Existing dashboard - nachi', async () => {
+  const ec2dashboard = {
+    props: {
+      entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+    },
+    datasources: {
+      utilization: {
+        type: 'uql',
+        options: {
+          since: '/${ globals.variables.since }',
+          until: '/${ globals.variables.until }',
+          fetchItems: {
+            User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+            System:
+              "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+            IOWait:
+              "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+            Stolen:
+              "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+          },
+          fetch:
+            "${ 'FETCH ' & $join($each(fetchItems, function($v, $k) { '`' & $k & '`' & ':' & $v }), ', ') }",
+          from: "/${ 'FROM entities(' & props.entityId & ')' }",
+          filters: [],
+          filterStr:
+            "${ $count([$filter(filters, $boolean)]) > 0 ? '[' & $join([$filter(filters, $boolean)], ' && ') & ']' : '' }",
+          queryStr: "${ $join([from, filterStr, fetch], ' ') }"
+        }
+      }
+    },
+    view: [
+      [
+        'div',
+        { '.': 'flex flex-col gap-6 p-4' },
+        [
+          ['uik:Heading', {}, 'CPU (%)'],
+          [
+            'dashify:Cartesian',
+            {
+              highchartsConfig: {
+                chart: {
+                  type: 'column'
+                },
+                plotOptions: {
+                  column: {
+                    stacking: 'normal'
+                  }
+                },
+                legend: { enabled: true },
+                yAxis: {
+                  labels: {
+                    format: '{text}%'
+                  },
+                  min: 0,
+                  max: 100
+                },
+                tooltip: {
+                  shared: true,
+                  valueSuffix: '%'
+                },
+                xAxis: {
+                  min: '/${ $parseDateTime(data.utilization.metadata.since) }',
+                  max: '/${ $parseDateTime(data.utilization.metadata.until) }'
+                },
+                series:
+                  "/${ $count($keys(data.utilization.data)) > 0 ? data.utilization.data@$d.$each($d,function ($v, $k){ {'name': $k, 'data': $count($v) > 0 ? $v.[timestamp, value][] : []}[] }) : [] }"
+              }
+            }
+          ]
+        ]
+      ]
+    ]
+  }
+  const output = {
+    props: {
+      entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+    },
+    datasources: {
+      utilization: {
+        type: 'uql',
+        options: {
+          since: undefined,
+          until: undefined,
+          fetchItems: {
+            User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+            System:
+              "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+            IOWait:
+              "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+            Stolen:
+              "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+          },
+          fetch:
+            "FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+          from: 'FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)',
+          filters: [],
+          filterStr: '',
+          queryStr:
+            "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)  FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+        }
+      }
+    },
+    view: [
+      [
+        'div',
+        {
+          '.': 'flex flex-col gap-6 p-4'
+        },
+        [
+          ['uik:Heading', {}, 'CPU (%)'],
+          [
+            'dashify:Cartesian',
+            {
+              highchartsConfig: {
+                chart: {
+                  type: 'column'
+                },
+                plotOptions: {
+                  column: {
+                    stacking: 'normal'
+                  }
+                },
+                legend: {
+                  enabled: true
+                },
+                yAxis: {
+                  labels: {
+                    format: '{text}%'
+                  },
+                  min: 0,
+                  max: 100
+                },
+                tooltip: {
+                  shared: true,
+                  valueSuffix: '%'
+                },
+                xAxis: {
+                  min: 0,
+                  max: 0
+                },
+                series: []
+              }
+            }
+          ]
+        ]
+      ]
+    ]
+  }
+
+  const tp = new TemplateProcessor(ec2dashboard, {
+    parseDateTime: str => {
+      return str && str.length > 0 ? new Date(str).getTime() : 0
+    }
+  })
+  await tp.initialize()
+
+  expect(tp.output).toEqual(output)
+})
+
+test('dashboard authoring - nachi', async () => {
+  const dashboard = {
+    props: {
+      entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+    },
+    view: [['p', {}, "/${ 'Details for, ' & props.entityId }"]]
+  }
+
+  const datasource = {
+    type: 'uql',
+    options: {
+      since: '/${ globals.variables.since }',
+      until: '/${ globals.variables.until }',
+      fetchItems: {
+        User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+        System: "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+        IOWait: "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+        Stolen: "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+      },
+      fetch:
+        "${ 'FETCH ' & $join($each(fetchItems, function($v, $k) { '`' & $k & '`' & ':' & $v }), ', ') }",
+      from: "/${ 'FROM entities(' & props.entityId & ')' }",
+      filters: [],
+      filterStr:
+        "${ $count([$filter(filters, $boolean)]) > 0 ? '[' & $join([$filter(filters, $boolean)], ' && ') & ']' : '' }",
+      queryStr: "${ $join([from, filterStr, fetch], ' ') }"
+    }
+  }
+
+  const view = [
+    'div',
+    { '.': 'flex flex-col gap-6 p-4' },
+    [
+      ['uik:Heading', {}, 'CPU (%)'],
+      [
+        'dashify:Cartesian',
+        {
+          highchartsConfig: {
+            chart: {
+              type: 'column'
+            },
+            plotOptions: {
+              column: {
+                stacking: 'normal'
+              }
+            },
+            legend: { enabled: true },
+            yAxis: {
+              labels: {
+                format: '{text}%'
+              },
+              min: 0,
+              max: 100
+            },
+            tooltip: {
+              shared: true,
+              valueSuffix: '%'
+            },
+            xAxis: {
+              min: '/${ $parseDateTime(data.utilization.metadata.since) }',
+              max: '/${ $parseDateTime(data.utilization.metadata.until) }'
+            },
+            series:
+              "/${ $count($keys(data.utilization.data)) > 0 ? data.utilization.data@$d.$each($d,function ($v, $k){ {'name': $k, 'data': $count($v) > 0 ? $v.[timestamp, value][] : []}[] }) : [] }"
+          }
+        }
+      ]
+    ]
+  ]
+
+  const tp = new TemplateProcessor(dashboard, {
+    parseDateTime: str => {
+      return str && str.length > 0 ? new Date(str).getTime() : 0
+    }
+  })
+  await tp.initialize()
+  expect(tp.output).toEqual({
+    props: {
+      entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+    },
+    view: [['p', {}, 'Details for, aws:ec2:JN26DeLhOyG7G1WoQlP+sw']]
+  })
+
+  // set datasource
+  await tp.setExpression(JSON.stringify(datasource), '/datasources/utilization')
+  // expect(tp.output).toEqual({
+  //     props: {
+  //       entityId: "aws:ec2:JN26DeLhOyG7G1WoQlP+sw",
+  //     },
+  //     datasources: {
+  //       utilization: {
+  //         type: "uql",
+  //         options: {
+  //           since: undefined,
+  //           until: undefined,
+  //           fetchItems: {
+  //             User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+  //             System: "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+  //             IOWait: "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+  //             Stolen: "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+  //           },
+  //           fetch: "FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+  //           from: "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)",
+  //           filters: [
+  //           ],
+  //           filterStr: "",
+  //           queryStr: "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)  FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+  //         },
+  //       },
+  //     },
+  //     view: [
+  //         ["p", {}, "Details for, aws:ec2:JN26DeLhOyG7G1WoQlP+sw"]
+  //     ]
+  //   });
+
+  // set view
+  //   await tp.setExpression(JSON.stringify(view), '/view/0')
+  //   expect(tp.output).toEqual({
+  //     props: {
+  //       entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+  //     },
+  //     datasources: {
+  //       utilization: {
+  //         type: 'uql',
+  //         options: {
+  //           since: undefined,
+  //           until: undefined,
+  //           fetchItems: {
+  //             User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+  //             System:
+  //               "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+  //             IOWait:
+  //               "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+  //             Stolen:
+  //               "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+  //           },
+  //           fetch:
+  //             "FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+  //           from: 'FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)',
+  //           filters: [],
+  //           filterStr: '',
+  //           queryStr:
+  //             "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)  FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+  //         }
+  //       }
+  //     },
+  //     view: [
+  //       [
+  //         'div',
+  //         {
+  //           '.': 'flex flex-col gap-6 p-4'
+  //         },
+  //         [
+  //           ['uik:Heading', {}, 'CPU (%)'],
+  //           [
+  //             'dashify:Cartesian',
+  //             {
+  //               highchartsConfig: {
+  //                 chart: {
+  //                   type: 'column'
+  //                 },
+  //                 plotOptions: {
+  //                   column: {
+  //                     stacking: 'normal'
+  //                   }
+  //                 },
+  //                 legend: {
+  //                   enabled: true
+  //                 },
+  //                 yAxis: {
+  //                   labels: {
+  //                     format: '{text}%'
+  //                   },
+  //                   min: 0,
+  //                   max: 100
+  //                 },
+  //                 tooltip: {
+  //                   shared: true,
+  //                   valueSuffix: '%'
+  //                 },
+  //                 xAxis: {
+  //                   min: 0,
+  //                   max: 0
+  //                 },
+  //                 series: []
+  //               }
+  //             }
+  //           ]
+  //         ]
+  //       ]
+  //     ]
+  //   })
+
+  // TODO: unclear how to rename datasource from utilization to cpu ?
+  // await tp.setExpression('', '/datasource')  // not sure how ?
+  // await tp.setExpression("/${ $count($keys(data.cpu.data)) > 0 ? data.cpu.data@$d.$each($d,function ($v, $k){ {'name': $k, 'data': $count($v) > 0 ? $v.[timestamp, value][] : []}[] }) : [] }", '/view/0/1/highchartsConfig/series')
+  //   expect(tp.output).toEqual({
+  //     props: {
+  //       entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+  //     },
+  //     datasources: {
+  //       cpu: {
+  //         type: 'uql',
+  //         options: {
+  //           since: undefined,
+  //           until: undefined,
+  //           fetchItems: {
+  //             User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+  //             System:
+  //               "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+  //             IOWait:
+  //               "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+  //             Stolen:
+  //               "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+  //           },
+  //           fetch:
+  //             "FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+  //           from: 'FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)',
+  //           filters: [],
+  //           filterStr: '',
+  //           queryStr:
+  //             "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)  FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+  //         }
+  //       }
+  //     },
+  //     view: [
+  //       [
+  //         'div',
+  //         {
+  //           '.': 'flex flex-col gap-6 p-4'
+  //         },
+  //         [
+  //           ['uik:Heading', {}, 'CPU (%)'],
+  //           [
+  //             'dashify:Cartesian',
+  //             {
+  //               highchartsConfig: {
+  //                 chart: {
+  //                   type: 'column'
+  //                 },
+  //                 plotOptions: {
+  //                   column: {
+  //                     stacking: 'normal'
+  //                   }
+  //                 },
+  //                 legend: {
+  //                   enabled: true
+  //                 },
+  //                 yAxis: {
+  //                   labels: {
+  //                     format: '{text}%'
+  //                   },
+  //                   min: 0,
+  //                   max: 100
+  //                 },
+  //                 tooltip: {
+  //                   shared: true,
+  //                   valueSuffix: '%'
+  //                 },
+  //                 xAxis: {
+  //                   min: 0,
+  //                   max: 0
+  //                 },
+  //                 series: []
+  //               }
+  //             }
+  //           ]
+  //         ]
+  //       ]
+  //     ]
+  //   })
+
+  // update visualization to table
+  await tp.setExpression(
+    "['dashify:Table', { data: '/${ data.cpu.data }' }]",
+    '/view/0/2/1'
+  )
+  expect(tp.output).toEqual({
+    props: {
+      entityId: 'aws:ec2:JN26DeLhOyG7G1WoQlP+sw'
+    },
+    datasources: {
+      cpu: {
+        type: 'uql',
+        options: {
+          since: undefined,
+          until: undefined,
+          fetchItems: {
+            User: "metrics(infra:system.cpu.user.utilization, 'infra-agent')",
+            System:
+              "metrics(infra:system.cpu.system.utilization, 'infra-agent')",
+            IOWait:
+              "metrics(infra:system.cpu.iowait.utilization, 'infra-agent')",
+            Stolen:
+              "metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+          },
+          fetch:
+            "FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')",
+          from: 'FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)',
+          filters: [],
+          filterStr: '',
+          queryStr:
+            "FROM entities(aws:ec2:JN26DeLhOyG7G1WoQlP+sw)  FETCH `User`:metrics(infra:system.cpu.user.utilization, 'infra-agent'), `System`:metrics(infra:system.cpu.system.utilization, 'infra-agent'), `IOWait`:metrics(infra:system.cpu.iowait.utilization, 'infra-agent'), `Stolen`:metrics(infra:system.cpu.stolen.utilization, 'infra-agent')"
+        }
+      }
+    },
+    view: [
+      [
+        'div',
+        {
+          '.': 'flex flex-col gap-6 p-4'
+        },
+        [
+          ['uik:Heading', {}, 'CPU (%)'],
+          [
+            'dashify:Table',
+            {
+              data: []
+            }
+          ]
+        ]
+      ]
+    ]
+  })
+})
 
 test("context", async () => {
     const nozzle = (something) => "nozzle got some " + something;
