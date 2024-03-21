@@ -745,7 +745,7 @@ test("rando", () => {
 });
 
 test("navigate into function's return", () => {
-    const program = "call('https://swapi.tech/api/people/?search=luke').results[0].name";
+    const program = "call('https://swapi.dev/api/people/?search=luke').results[0].name";
     const df = new DependencyFinder(program);
     expect(df.findDependencies()).toEqual([["call"]]);
 });
