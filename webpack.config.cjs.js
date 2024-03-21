@@ -69,6 +69,21 @@ export default {
         new webpack.DefinePlugin({
             BUILD_TARGET: JSON.stringify('web'),
         }),
+//make sure the .ts files go into dist for sourcemaps
+        new CopyPlugin({
+            patterns: [
+                {
+                    from: 'src/**/*.ts', // Match only .ts files within the src directory
+                    to: 'src/[name][ext]', // Copy to dist/src while retaining the file names and extensions
+                    globOptions: {
+                        ignore: [
+                            '**/test/**', // Exclude the src/test directory
+                        ],
+                    },
+                },
+            ],
+        })
+
     ],
 
 
