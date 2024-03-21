@@ -1,5 +1,5 @@
 import { fileURLToPath } from 'url';
-import { dirname } from 'path';
+import path, { dirname } from 'path';
 import webpack from 'webpack';
 import nodeExternals from 'webpack-node-externals';
 import CopyPlugin from "copy-webpack-plugin";
@@ -73,13 +73,16 @@ export default {
         new CopyPlugin({
             patterns: [
                 {
-                    from: 'src/**/*.ts', // Match only .ts files within the src directory
-                    to: 'src/[name][ext]', // Copy to dist/src while retaining the file names and extensions
+                    from: 'src/**/*.ts', // Match .ts files in src and subdirectories
+                    to: ({ context, absoluteFilename }) => {
+                        return path.relative(context, absoluteFilename);
+                    },
                     globOptions: {
                         ignore: [
-                            '**/test/**', // Exclude the src/test directory
+                            '**/test/**', // Exclude the src/test directory and its subdirectories
                         ],
                     },
+                    noErrorOnMissing: true,
                 },
             ],
         })

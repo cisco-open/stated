@@ -1,6 +1,6 @@
 {
   "name": "stated-js",
-  "version": "0.1.15",
+  "version": "0.1.16",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "./dist/src/TemplateProcessor.js",
