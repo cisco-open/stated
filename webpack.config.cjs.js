@@ -43,7 +43,7 @@ export default {
         rules: [
             {
                 test: /\.js$/,
-                exclude: [/node_modules/, `${__dirname}/dist/src/FancyLogger.js`],
+                exclude: [/node_modules/, `${__dirname}/dist/src/FancyLogger.js`, `${__dirname}/dist/src/CliCore.js`, `${__dirname}/dist/src/StatedREPL.js`],
                 use: {
                     loader: 'babel-loader', // You can add Babel or other loaders here
                 },
@@ -69,17 +69,6 @@ export default {
         new webpack.DefinePlugin({
             BUILD_TARGET: JSON.stringify('web'),
         }),
-        new CopyPlugin({
-            patterns: [
-                {
-                    from: 'types/src',
-                    to: 'src',
-                    globOptions: {
-                        ignore: ['**/test/**'], // Exclude the src/test directory
-                    },
-                },
-            ],
-        })
     ],
 
 

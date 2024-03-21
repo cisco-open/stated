@@ -15,7 +15,7 @@
 // Utility to parse markdown and extract test data
 import fs from 'fs';
 import jsonata from "jsonata";
-import StatedREPL  from './StatedREPL.js';
+import {stringifyTemplateJSON} from "./utils/stringify.js";
 import { test, expect, afterAll } from '@jest/globals';
 import CliCore from "./CliCore.js";
 
@@ -26,7 +26,7 @@ export type CommandAndResponse = {
   jsonataExpr: string;
 };
 
-export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, printFunction:(k:any, v:any)=>any = StatedREPL.stringify){
+export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, printFunction:(k:any, v:any)=>any = stringifyTemplateJSON){
   runMarkdownTests(parseMarkdownTests(md, cliCore), cliCore, printFunction);
 }
 
@@ -89,7 +89,7 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
  * @param {object} cliCore An instance of the CLI class that has the methods to be tested.
  * @param {function} printFunction The function is used to print response output to compare with expected response.
  */
-function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = StatedREPL.stringify) {
+function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = stringifyTemplateJSON) {
   try {
     afterAll(async () => {
       if (cliCore) {
@@ -111,7 +111,7 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
           const compiledExpr = jsonata(jsonataExpr);
           const success = await compiledExpr.evaluate(responseNormalized);
           if (success === false) {
-            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${StatedREPL.stringify(jsonataExpr)} \n data was: ${StatedREPL.stringify(responseNormalized)}` );
+            throw new Error(`Markdown codeblock contained custom jsonata test expression that returned false: ${stringifyTemplateJSON(jsonataExpr)} \n data was: ${stringifyTemplateJSON(responseNormalized)}` );
           }
         } else {
           let expected;

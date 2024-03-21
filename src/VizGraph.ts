@@ -19,8 +19,8 @@
  */
 import TemplateProcessor from "./TemplateProcessor.js";
 import {default as jp} from "./JsonPointer.js"
-import {REPLServer} from "repl";
-import StatedREPL from "./StatedREPL.js";
+import {stringifyTemplateJSON} from "./utils/stringify.js";
+
 export default class VizGraph {
     public static dot(tp: TemplateProcessor) {
         const metaInfos = tp.metaInfoByJsonPointer['/'];
@@ -44,7 +44,7 @@ export default class VizGraph {
                 dataPreview = "--REMOVED (! var)--"
             }else if(jp.has(tp.output, metaInfo.jsonPointer__)){
                 data = jp.get(tp.output, metaInfo.jsonPointer__);
-                dataPreview = VizGraph.escapeSpecialCharacters(StatedREPL.stringify(data));
+                dataPreview = VizGraph.escapeSpecialCharacters(stringifyTemplateJSON(data));
             }else{
                 dataPreview = "";
             }

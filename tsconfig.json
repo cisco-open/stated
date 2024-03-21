@@ -7,7 +7,6 @@
     "moduleResolution": "NodeNext",
     "outDir": "./dist",
     "declaration": true,
-    "declarationDir": "./types",
     "declarationMap": true,
     "types": ["jest", "node"]
   },

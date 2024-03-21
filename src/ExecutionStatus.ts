@@ -1,6 +1,6 @@
 import { JsonPointerString } from "./MetaInfoProducer.js";
 import TemplateProcessor, {MutationPlan, Op, PlanStep, Fork} from "./TemplateProcessor.js";
-import StatedREPL from "./StatedREPL.js";
+import { stringifyTemplateJSON } from './utils/stringify.js';
 
 type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
@@ -21,7 +21,7 @@ export class ExecutionStatus {
     }
 
     public toJsonString():string{
-        return StatedREPL.stringify(this.toJsonObject());
+        return stringifyTemplateJSON(this.toJsonObject());
     }
 
     public toJsonObject():object{
@@ -38,7 +38,7 @@ export class ExecutionStatus {
             mvcc:Array.from(outputsByForkId.values()),
             plans: Array.from(this.statuses).map(this.mutationPlanToJSON)
         };
-        return JSON.parse(StatedREPL.stringify(snapshot));
+        return JSON.parse(stringifyTemplateJSON(snapshot));
     }
 
     private planStepToJSON = (planStep:PlanStep):object => {

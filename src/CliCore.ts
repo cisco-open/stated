@@ -16,10 +16,10 @@ import path from 'path';
 import TemplateProcessor from './TemplateProcessor.js';
 import yaml from 'js-yaml';
 import minimist from 'minimist';
-import {parseArgsStringToArgv} from 'string-argv';
+import parseArgsStringToArgv from 'string-argv';
 import {LOG_LEVELS} from "./ConsoleLogger.js";
 import * as repl from 'repl';
-import StatedREPL from "./StatedREPL.js";
+import {stringifyTemplateJSON} from "./utils/stringify.js";
 import jsonata from "jsonata";
 import VizGraph from "./VizGraph.js";
 import { exec } from 'child_process';
@@ -58,7 +58,8 @@ export default class CliCore {
     static parseInitArgs(replCmdInputStr){
 
         const parsed = CliCore.minimistArgs(replCmdInputStr);
-        let {_:bareArgs ,f:filepath, tags = "", o:oneshot,options="{}", tail} = parsed;
+        let {_:bareArgs ,f:filepath, o:oneshot,options="{}", tail} = parsed;
+        let tags:any = parsed.tags ||"";
         if(tags === true){ //weird case of --tags with no arguments
             tags = "";
         }
@@ -147,7 +148,7 @@ export default class CliCore {
         if(this.templateProcessor){
             this.templateProcessor.close();
         }
-        const parsed = CliCore.parseInitArgs(replCmdInputStr);
+        const parsed:any = CliCore.parseInitArgs(replCmdInputStr);
         const {filepath, tags,oneshot, options, xf:contextFilePath, importPath=this.currentDirectory, tail} = parsed;
         if(filepath===undefined){
             return undefined;
@@ -391,7 +392,7 @@ export default class CliCore {
                 return; //just ignore any latent callbacks
             }
             // Convert data to a string
-            const output = StatedREPL.stringify(data);
+            const output = stringifyTemplateJSON(data);
             _data = JSON.parse(output); //save data so we can return the final value from the promise. It is important to return a snapshot via reparsing from string so that returned objects don't continue to 'evolve' and make testing impossible
             const outputLines = output.split('\n');
 
@@ -483,7 +484,7 @@ export default class CliCore {
                 const filepath = templateFiles[fileIndex];
                 try {
                     const result = await this.init(`-f "${filepath}"`); // Adjust this call as per your init method's expected format
-                    console.log(StatedREPL.stringify(result));
+                    console.log(stringifyTemplateJSON(result));
                     console.log("...try '.out' or 'template.output' to see evaluated template")
                 } catch (error) {
                     console.log('Error loading file:', error);
