@@ -247,7 +247,7 @@ export default class TemplateProcessor {
     private executionPlans: { [key: JsonPointerString]: JsonPointerString[] };
 
     /** A queue of execution plans awaiting processing. */
-    private readonly executionQueue:(MutationPlan|SnapshotPlan)[] = [];
+    private readonly executionQueue:Set<MutationPlan|SnapshotPlan> = new Set(); //it's a set to dedup 'requeue' bad behavior of clients
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
@@ -774,7 +774,7 @@ export default class TemplateProcessor {
 
     private async evaluateInitialPlanDependencies(metaInfos) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        return await this.executePlan({sortedJsonPtrs:evaluationPlan, output:this.output, forkStack:[], forkId:"ROOT"});
+        return await this.executePlan({sortedJsonPtrs:evaluationPlan, data: TemplateProcessor.NOOP, output:this.output, forkStack:[], forkId:"ROOT"});
     }
 
     private makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
@@ -984,12 +984,12 @@ export default class TemplateProcessor {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
         const plan:MutationPlan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT"}
-        this.executionQueue.push(plan);
+        this.executionQueue.add(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
-            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
+            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(Array.from(this.executionQueue))}`);
         }
-        if(this.executionQueue.length>1){
+        if(this.executionQueue.size>1){
             return fromPlan; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
         }
 
@@ -1017,23 +1017,32 @@ export default class TemplateProcessor {
         return fromPlan;
     }
 
-    private async drainExecutionQueue(){
-        while (this.executionQueue.length > 0) {
-            const plan:MutationPlan|SnapshotPlan = this.executionQueue[0];
-            if(plan.op === "snapshot"){
-                const snapshot = {
-                    template: this.input,
-                    output:this.output,
-                    options: this.options
-                };
-                (plan as SnapshotPlan).generatedSnapshot = stringifyTemplateJSON(snapshot);
-            }else {
-                await this.executePlan(plan);
-            }
-            this.removeTemporaryVariables(this.tempVars);
-            this.executionQueue.shift();
-        }
+    private async drainExecutionQueue() {
+        let plan: MutationPlan | SnapshotPlan;
 
+        while (this.executionQueue.size > 0) {
+            const iterator = this.executionQueue.values(); // Get an iterator for the Set
+            plan = iterator.next().value; // Get the first item in the Set
+
+            try {
+                if (plan.op === "snapshot") {
+                    const snapshot = {
+                        template: this.input,
+                        output: this.output,
+                        options: this.options
+                    };
+                    (plan as SnapshotPlan).generatedSnapshot = stringifyTemplateJSON(snapshot);
+                } else {
+                    await this.executePlan(plan);
+                }
+                this.removeTemporaryVariables(this.tempVars);
+            } finally {
+                if (plan) {
+                    this.executionQueue.delete(plan); // Remove the processed item from the Set
+                }
+                // Since we're directly modifying the Set, there's no need to recreate or update an intermediate queue.
+            }
+        }
     }
 
     private isEnabled(logLevel:string):boolean{
@@ -1047,17 +1056,20 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:MutationPlan):Promise<void> {
+    private async executePlan(plan:MutationPlan):Promise<boolean> {
         try {
-            const {sortedJsonPtrs: changedJsonPointers, data = TemplateProcessor.NOOP, op = "set"} = plan;
-            let dependencies = changedJsonPointers;
+            const {sortedJsonPtrs, data, op = "set"} = plan;
             if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-                await this.applyMutationToFirstJsonPointerOfPlan(plan);
-                dependencies = changedJsonPointers.slice(1); //we have processes=d the entry point which can receive a mutation (data), so now just need to process remaining dependencies
+                const didMutate = await this.applyMutationToFirstJsonPointerOfPlan(plan);
+                if(didMutate) {
+                    await this.executeDependentExpressions({...plan, sortedJsonPtrs: sortedJsonPtrs.slice(1)});
+                    await this.executeDataChangeCallbacks(sortedJsonPtrs, op);
+                }
+                return didMutate;
+            }else { //this is an initial evaluation
+                await this.executeDependentExpressions(plan);
+                await this.executeDataChangeCallbacks(plan.sortedJsonPtrs, op); //this should be more selective by passing the completed plan and allowing the callbacks to be called based on real truth of whether or not an expression executed
             }
-            const reactionPlan: MutationPlan = {...plan, sortedJsonPtrs: dependencies};
-            await this.executeDependentExpressions(reactionPlan);
-            await this.executeDataChangeCallbacks(changedJsonPointers, op);
         }catch(error){
             this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
             throw error;
@@ -1102,38 +1114,44 @@ export default class TemplateProcessor {
         }
     }
 
-    private async applyMutationToFirstJsonPointerOfPlan(plan:MutationPlan) {
+    private async applyMutationToFirstJsonPointerOfPlan(plan:MutationPlan):Promise<boolean> {
         if(plan.lastCompletedStep){
             return; //this is a one-step plan, so if it has a completed step, it's already done
         }
         this.executionStatus.begin(plan);
+        let theStep;
         try {
             const {sortedJsonPtrs} = plan;
             const jsonPtr = sortedJsonPtrs[0];
-            const theStep = {jsonPtr, ...plan}
-            await this.mutate(theStep);
-            theStep.lastCompletedStep = theStep; //completed self
+            theStep = {jsonPtr, ...plan}
+            return await this.mutate(theStep);
         }finally {
+            if(theStep){
+                theStep.lastCompletedStep = theStep;
+            } //completed self
             this.executionStatus.end(plan)
         }
     }
 
-    private async mutate(planStep: PlanStep):Promise<void> {
+    private async mutate(planStep: PlanStep):Promise<boolean> {
         try {
             const {jsonPtr: entryPoint, data, op} = planStep;
             if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
                 const didUpdate = await this.evaluateNode(planStep);
                 jp.get(this.templateMeta, entryPoint).didUpdate__ = didUpdate;
+                return didUpdate;
             } else {
                 // Check if the node contains an expression. If so, print a warning and return.
                 const firstMeta = jp.get(this.templateMeta, entryPoint);
                 if (firstMeta.expr__ !== undefined && op !== "forceSetInternal") { //setDeferred allows $defer('/foo') to 'self replace' with a value
                     this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
+                    return false;
                 } else {
                     firstMeta.didUpdate__ = await this.evaluateNode(planStep); // Evaluate the node provided with the data provided
                     if (!firstMeta.didUpdate__) {
                         this.logger.verbose(`data did not change for ${entryPoint}, short circuiting dependents.`);
                     }
+                    return firstMeta.didUpdate__;
                 }
             }
         }catch(error){
@@ -1647,7 +1665,7 @@ export default class TemplateProcessor {
      */
      public async snapshot():Promise<string>  {
         const snapshotPlan:SnapshotPlan = {op:"snapshot", generatedSnapshot:"replace me"}; //generatedSnapshot gets filled in
-        this.executionQueue.push(snapshotPlan);
+        this.executionQueue.add(snapshotPlan);
         await this.drainExecutionQueue();
         const {generatedSnapshot} = snapshotPlan;
         return generatedSnapshot;
