@@ -247,7 +247,7 @@ export default class TemplateProcessor {
     private executionPlans: { [key: JsonPointerString]: JsonPointerString[] };
 
     /** A queue of execution plans awaiting processing. */
-    private readonly executionQueue:Set<MutationPlan|SnapshotPlan> = new Set(); //it's a set to dedup 'requeue' bad behavior of clients
+    private readonly executionQueue:(MutationPlan|SnapshotPlan)[] = [];
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
@@ -984,12 +984,12 @@ export default class TemplateProcessor {
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
         const plan:MutationPlan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT"}
-        this.executionQueue.add(plan);
+        this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
-            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(Array.from(this.executionQueue))}`);
+            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
         }
-        if(this.executionQueue.size>1){
+        if(this.executionQueue.length>1){
             return fromPlan; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
         }
 
@@ -1017,14 +1017,10 @@ export default class TemplateProcessor {
         return fromPlan;
     }
 
-    private async drainExecutionQueue() {
-        let plan: MutationPlan | SnapshotPlan;
-
-        while (this.executionQueue.size > 0) {
-            const iterator = this.executionQueue.values(); // Get an iterator for the Set
-            plan = iterator.next().value; // Get the first item in the Set
-
+    private async drainExecutionQueue(){
+        while (this.executionQueue.length > 0) {
             try {
+                const plan: MutationPlan | SnapshotPlan = this.executionQueue[0];
                 if (plan.op === "snapshot") {
                     const snapshot = {
                         template: this.input,
@@ -1036,11 +1032,8 @@ export default class TemplateProcessor {
                     await this.executePlan(plan);
                 }
                 this.removeTemporaryVariables(this.tempVars);
-            } finally {
-                if (plan) {
-                    this.executionQueue.delete(plan); // Remove the processed item from the Set
-                }
-                // Since we're directly modifying the Set, there's no need to recreate or update an intermediate queue.
+            }finally {
+                this.executionQueue.shift();
             }
         }
     }
@@ -1665,7 +1658,7 @@ export default class TemplateProcessor {
      */
      public async snapshot():Promise<string>  {
         const snapshotPlan:SnapshotPlan = {op:"snapshot", generatedSnapshot:"replace me"}; //generatedSnapshot gets filled in
-        this.executionQueue.add(snapshotPlan);
+        this.executionQueue.push(snapshotPlan);
         await this.drainExecutionQueue();
         const {generatedSnapshot} = snapshotPlan;
         return generatedSnapshot;
