@@ -1,0 +1,4 @@
+{
+  "count": 0,
+  "counter": "${ $setInterval(function(){$set('/count', count+1)}, 10) }"
+}

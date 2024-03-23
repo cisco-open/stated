@@ -58,7 +58,7 @@ export default class CliCore {
     static parseInitArgs(replCmdInputStr){
 
         const parsed = CliCore.minimistArgs(replCmdInputStr);
-        let {_:bareArgs ,f:filepath, o:oneshot,options="{}", tail} = parsed;
+        let {_:bareArgs ,f:filepath, o:oneshot,options="{}", ctx={}} = parsed;
         let tags:any = parsed.tags ||"";
         if(tags === true){ //weird case of --tags with no arguments
             tags = "";
@@ -77,7 +77,7 @@ export default class CliCore {
 
         filepath = filepath?filepath:bareArgs[0];
         oneshot = oneshot===true?oneshot:bareArgs.length > 0;
-        const processedArgs = {filepath, tags, oneshot, options};
+        const processedArgs = {filepath, tags, oneshot, options, ctx};
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
 
@@ -149,12 +149,13 @@ export default class CliCore {
             this.templateProcessor.close();
         }
         const parsed:any = CliCore.parseInitArgs(replCmdInputStr);
-        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath=this.currentDirectory, tail} = parsed;
+        const {filepath, tags,oneshot, options, xf:contextFilePath, importPath=this.currentDirectory, tail, ctx={}} = parsed;
         if(filepath===undefined){
             return undefined;
         }
         const input = await this.openFile(filepath);
-        const contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
+        let contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
+        contextData = {...contextData, ...ctx} //--ctx.foo=bar creates ctx={foo:bar}. The dot argument syntax is built into minimist
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
         if (!this.templateProcessor && !fromSnapshot) {

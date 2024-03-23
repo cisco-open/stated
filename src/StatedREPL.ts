@@ -23,8 +23,8 @@ export default class StatedREPL {
     private readonly cliCore: CliCore;
     r: repl.REPLServer;
     private isColorized:boolean;
-    constructor(temaplateProcessor: TemplateProcessor = null) {
-        this.cliCore = new CliCore(temaplateProcessor);
+    constructor(templateProcessor: TemplateProcessor = null) {
+        this.cliCore = new CliCore(templateProcessor);
     }
 
     // a list of commands that are available in the CLI
