@@ -63,6 +63,68 @@ test("test 1", async () => {
             ]
         }
     ]);
+    //set the same data, expect plan to short circuit and not call callbacks
+    await tp.setData("/a", 42);
+    expect(received).toEqual([
+        {
+            "data": 42,
+            "jsonPtr": "/a"
+        },
+        {
+            "data": 42,
+            "jsonPtr": "/b"
+        },
+        {
+            "data": {
+                "a": 42,
+                "b": 42
+            },
+            "jsonPtr": [
+                "/a",
+                "/b"
+            ]
+        }
+    ]);
+    //now we change data to 2600 we expect callbacks to be called
+    await tp.setData("/a", 2600);
+    expect(received).toEqual([
+        {
+            "data": 42,
+            "jsonPtr": "/a"
+        },
+        {
+            "data": 42,
+            "jsonPtr": "/b"
+        },
+        {
+            "data": {
+                "a": 2600,
+                "b": 2600
+            },
+            "jsonPtr": [
+                "/a",
+                "/b"
+            ]
+        },
+        {
+            "data": 2600,
+            "jsonPtr": "/a"
+        },
+        {
+            "data": 2600,
+            "jsonPtr": "/b"
+        },
+        {
+            "data": {
+                "a": 2600,
+                "b": 2600
+            },
+            "jsonPtr": [
+                "/a",
+                "/b"
+            ]
+        }
+    ]);
 });
 
 test("test 2", async () => {
