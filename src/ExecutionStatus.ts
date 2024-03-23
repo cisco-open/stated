@@ -1,18 +1,18 @@
 import { JsonPointerString } from "./MetaInfoProducer.js";
-import TemplateProcessor, {MutationPlan, Op, PlanStep, Fork} from "./TemplateProcessor.js";
+import TemplateProcessor, {Plan, Op, PlanStep, Fork} from "./TemplateProcessor.js";
 import { stringifyTemplateJSON } from './utils/stringify.js';
 
 type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
-    private statuses: Set<MutationPlan>;
+    private statuses: Set<Plan>;
     constructor() {
         this.statuses = new Set();
     }
-    public begin(mutationPlan:MutationPlan) {
+    public begin(mutationPlan:Plan) {
         this.statuses.add(mutationPlan)
     }
 
-    public end(mutationPlan: MutationPlan) {
+    public end(mutationPlan: Plan) {
         this.statuses.delete(mutationPlan);
     }
 
@@ -26,7 +26,7 @@ export class ExecutionStatus {
 
     public toJsonObject():object{
         const outputsByForkId =new  Map<string, Fork>();
-        Array.from(this.statuses).forEach((mutationPlan:MutationPlan)=>{
+        Array.from(this.statuses).forEach((mutationPlan:Plan)=>{
             const {forkId, output, forkStack}= mutationPlan;
             outputsByForkId.set(forkId, {forkId, output} as Fork);
             forkStack.forEach((fork:Fork)=>{
@@ -52,7 +52,7 @@ export class ExecutionStatus {
         };
     }
 
-    private mutationPlanToJSON = (mutationPlan:MutationPlan):object => {
+    private mutationPlanToJSON = (mutationPlan:Plan):object => {
         const {forkId,forkStack,sortedJsonPtrs, lastCompletedStep, op, data, output} = mutationPlan;
         const json = {
             forkId,

@@ -43,16 +43,28 @@ export type StatedError = {
 };
 export type Op = "set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
-export type MutationPlan = {
+export type Plan = {
     sortedJsonPtrs:JsonPointerString[],
-    data?:any, op?:Op,
+    data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
     output:object,
     forkId:string,
     forkStack:Fork[]
-    lastCompletedStep?:PlanStep
+    lastCompletedStep?:PlanStep,
+    didUpdate: boolean[]
 }; //setData is a mutation
-type SnapshotPlan = {op:"snapshot", generatedSnapshot: string}; //a plan that simply dumps a snapshot
-export type PlanStep = {jsonPtr:JsonPointerString, data?:any, op?:Op, output:object, forkStack:Fork[], forkId:string}
+type SnapshotPlan = {//a plan that simply dumps a snapshot
+    op:"snapshot",
+    generatedSnapshot: string}
+    ;
+export type PlanStep = {
+    jsonPtr:JsonPointerString,
+    data?:any,
+    op?:Op,
+    output:object,
+    forkStack:Fork[],
+    forkId:string,
+    didUpdate:boolean
+}
 interface SaveFunction {
     (output: object, args?: any[]): object;
 }
@@ -247,7 +259,7 @@ export default class TemplateProcessor {
     private executionPlans: { [key: JsonPointerString]: JsonPointerString[] };
 
     /** A queue of execution plans awaiting processing. */
-    private readonly executionQueue:(MutationPlan|SnapshotPlan)[] = [];
+    private readonly executionQueue:(Plan|SnapshotPlan)[] = [];
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
@@ -774,7 +786,14 @@ export default class TemplateProcessor {
 
     private async evaluateInitialPlanDependencies(metaInfos) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        return await this.executePlan({sortedJsonPtrs:evaluationPlan, data: TemplateProcessor.NOOP, output:this.output, forkStack:[], forkId:"ROOT"});
+        return await this.executePlan({
+            sortedJsonPtrs:evaluationPlan,
+            data: TemplateProcessor.NOOP,
+            output:this.output,
+            forkStack:[],
+            forkId:"ROOT",
+            didUpdate:[]
+        });
     }
 
     private makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
@@ -983,7 +1002,7 @@ export default class TemplateProcessor {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const plan:MutationPlan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT"}
+        const plan:Plan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
@@ -1012,7 +1031,7 @@ export default class TemplateProcessor {
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan};
+        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, didUpdate:[]};
         await this.executePlan(mutationPlan);
         return fromPlan;
     }
@@ -1020,7 +1039,7 @@ export default class TemplateProcessor {
     private async drainExecutionQueue(){
         while (this.executionQueue.length > 0) {
             try {
-                const plan: MutationPlan | SnapshotPlan = this.executionQueue[0];
+                const plan: Plan | SnapshotPlan = this.executionQueue[0];
                 if (plan.op === "snapshot") {
                     const snapshot = {
                         template: this.input,
@@ -1049,65 +1068,63 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:MutationPlan):Promise<boolean> {
+    private async executePlan(plan:Plan){
         try {
             const {sortedJsonPtrs, data, op = "set"} = plan;
             if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-                const didMutate = await this.applyMutationToFirstJsonPointerOfPlan(plan);
-                if(didMutate) {
-                    await this.executeDependentExpressions({...plan, sortedJsonPtrs: sortedJsonPtrs.slice(1)});
-                    await this.executeDataChangeCallbacks(sortedJsonPtrs, op);
+                const didUpdate = await this.applyMutationToFirstJsonPointerOfPlan(plan);
+                if (!didUpdate){
+                    return;
                 }
-                return didMutate;
-            }else { //this is an initial evaluation
-                await this.executeDependentExpressions(plan);
-                await this.executeDataChangeCallbacks(plan.sortedJsonPtrs, op); //this should be more selective by passing the completed plan and allowing the callbacks to be called based on real truth of whether or not an expression executed
             }
+            await this.executeDependentExpressions(plan);
+            await this.executeDataChangeCallbacks(plan); //this should be more selective by passing the completed plan and allowing the callbacks to be called based on real truth of whether or not an expression executed
         }catch(error){
             this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
             throw error;
         }
     }
 
-    private async executeDependentExpressions(plan: MutationPlan) {
+    private async executeDependentExpressions(plan: Plan) {
         this.executionStatus.begin(plan);
         try {
-            const {sortedJsonPtrs: dependencies} = plan;
-            let {output, forkStack, forkId} = plan;
+            let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies} = plan;
             const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
             const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
             for (let i = startIndex; i < dependencies.length; i++) {
                 const jsonPtr = dependencies[i];
-                let didUpdate;
-                const planStep = {jsonPtr, output, forkStack, forkId}; //pick up the output and forkStack from the prior step
-                didUpdate = await this.evaluateNode(planStep);
+                const planStep:PlanStep = {jsonPtr, output, forkStack, forkId, didUpdate:false}; //pick up the output and forkStack from the prior step
+                planStep.didUpdate = await this.evaluateNode(planStep);
                 plan.lastCompletedStep = planStep;
                 output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
-                jp.get(this.templateMeta, jsonPtr).didUpdate__ = didUpdate;
+                jp.get(this.templateMeta, jsonPtr).didUpdate__ = planStep.didUpdate;
+                updatesArray[i] = planStep.didUpdate;
             }
         }finally {
             this.executionStatus.end(plan);
         }
     }
 
-    private async executeDataChangeCallbacks(changedJsonPointers: JsonPointerString[], op:Op="set") {
+    private async executeDataChangeCallbacks(plan:Plan) {
         let anyUpdates = false;
-        const thoseThatUpdated = changedJsonPointers.filter(jptr => {
-            const meta = jp.get(this.templateMeta, jptr);
-            anyUpdates ||= meta.didUpdate__;
-            return meta.didUpdate__
-        });
+        const thoseThatUpdated = plan.didUpdate.reduce((acc,did,i)=>{
+            if(did){
+                acc.push(plan.sortedJsonPtrs[i]);
+                anyUpdates = true;
+            }
+            return acc;
+        }, []);
         if (anyUpdates) {
             // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
-            const removed = op==="delete";
+            const removed = plan.op==="delete";
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            await this.callDataChangeCallbacks(this.output, changedJsonPointers, removed);
+            await this.callDataChangeCallbacks(plan.output, thoseThatUpdated, removed);
         }
     }
 
-    private async applyMutationToFirstJsonPointerOfPlan(plan:MutationPlan):Promise<boolean> {
+    private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
         if(plan.lastCompletedStep){
             return; //this is a one-step plan, so if it has a completed step, it's already done
         }
@@ -1117,10 +1134,12 @@ export default class TemplateProcessor {
             const {sortedJsonPtrs} = plan;
             const jsonPtr = sortedJsonPtrs[0];
             theStep = {jsonPtr, ...plan}
-            return await this.mutate(theStep);
+            const didUpdate =  await this.mutate(theStep);
+            plan.didUpdate.push(didUpdate);
+            return didUpdate;
         }finally {
             if(theStep){
-                theStep.lastCompletedStep = theStep;
+                plan.lastCompletedStep = theStep;
             } //completed self
             this.executionStatus.end(plan)
         }
@@ -1144,6 +1163,7 @@ export default class TemplateProcessor {
                     if (!firstMeta.didUpdate__) {
                         this.logger.verbose(`data did not change for ${entryPoint}, short circuiting dependents.`);
                     }
+                    planStep.didUpdate = firstMeta.didUpdate__;
                     return firstMeta.didUpdate__;
                 }
             }
@@ -1153,7 +1173,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async evaluateNode(step:PlanStep) {
+    private async evaluateNode(step:PlanStep):Promise<boolean> {
         const {jsonPtr, data=undefined, op="set", output} = step;
         const {templateMeta} = this;
 
