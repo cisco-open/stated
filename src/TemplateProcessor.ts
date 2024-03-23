@@ -45,17 +45,17 @@ export type Op = "set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
 export type Plan = {
     sortedJsonPtrs:JsonPointerString[],
+    didUpdate: boolean[] //peers with sortedJsonPointers, tells us which of those locations in output actually updated
     data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
     output:object,
     forkId:string,
-    forkStack:Fork[]
+    forkStack:Fork[] //allows us to have nested execution contexts that cen restored by popping this stack onto output
     lastCompletedStep?:PlanStep,
-    didUpdate: boolean[]
-}; //setData is a mutation
+};
 type SnapshotPlan = {//a plan that simply dumps a snapshot
     op:"snapshot",
-    generatedSnapshot: string}
-    ;
+    generatedSnapshot: string
+};
 export type PlanStep = {
     jsonPtr:JsonPointerString,
     data?:any,
@@ -65,9 +65,7 @@ export type PlanStep = {
     forkId:string,
     didUpdate:boolean
 }
-interface SaveFunction {
-    (output: object, args?: any[]): object;
-}
+
 
 
 
@@ -1097,7 +1095,6 @@ export default class TemplateProcessor {
                 planStep.didUpdate = await this.evaluateNode(planStep);
                 plan.lastCompletedStep = planStep;
                 output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
-                jp.get(this.templateMeta, jsonPtr).didUpdate__ = planStep.didUpdate;
                 updatesArray[i] = planStep.didUpdate;
             }
         }finally {
@@ -1149,9 +1146,7 @@ export default class TemplateProcessor {
         try {
             const {jsonPtr: entryPoint, data, op} = planStep;
             if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
-                const didUpdate = await this.evaluateNode(planStep);
-                jp.get(this.templateMeta, entryPoint).didUpdate__ = didUpdate;
-                return didUpdate;
+                return  await this.evaluateNode(planStep);
             } else {
                 // Check if the node contains an expression. If so, print a warning and return.
                 const firstMeta = jp.get(this.templateMeta, entryPoint);
@@ -1159,12 +1154,11 @@ export default class TemplateProcessor {
                     this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
                     return false;
                 } else {
-                    firstMeta.didUpdate__ = await this.evaluateNode(planStep); // Evaluate the node provided with the data provided
-                    if (!firstMeta.didUpdate__) {
+                    planStep.didUpdate = await this.evaluateNode(planStep); // Evaluate the node provided with the data provided
+                    if (!planStep.didUpdate) {
                         this.logger.verbose(`data did not change for ${entryPoint}, short circuiting dependents.`);
                     }
-                    planStep.didUpdate = firstMeta.didUpdate__;
-                    return firstMeta.didUpdate__;
+                    return planStep.didUpdate;
                 }
             }
         }catch(error){
