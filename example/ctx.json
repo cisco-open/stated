@@ -1,0 +1,4 @@
+{
+  "msg": "${'Hello, ' & $name & ', how about a nice game of ' & $games.choice1}",
+  "games": "${$games}"
+}

@@ -7,8 +7,8 @@ correct/reliable? Every markdown codeblock in this readme is
 
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
 
-Stated allows fields in json or yaml to be computed via embedded [JSONata](http://docs.jsonata.org/) expressions, like 
-this:
+Stated is an engine of reactive state (a State Daemon). State is expressed as JSON or YAML. Rules for evolving state are
+written via embedded [JSONata](http://docs.jsonata.org/) expressions in classic shell variable syntax `${}`. 
 ```shell
 cat examples/hello.json
 {
@@ -16,7 +16,7 @@ cat examples/hello.json
   "msg": "${'hello ' & to}"
 }
 ```
-As you can see, any part of the document can be accessed by dollars-moustache expressions: `${}` You can use stated as a 'one shot' template processor. Let's process the template above:
+You can use stated as a 'one shot' template processor that computes all bound states once. Let's process the template above:
 ```shell
 stated example/hello.json
 {
@@ -24,21 +24,19 @@ stated example/hello.json
   "msg": "hello world"
 }
 ```
-You can also pass context variables into a template:
+Variables can be passed in:
 ```shell
-cat examples/helloVar.json
+cat example/helloVar.json
 {
   "msg": "${'hello ' & $TO}"
 }
-stated examples/helloVar.json --ctx.TO=world
+stated example/helloVar.json --ctx.TO=world
 {
    "msg": "hello world"
 }
 ```
-Ordinary template engines only operate in "one shot" mode. However, Stated is an engine of state
-and it uses templates as an initial state that can react to inputs. In the REPL session below Stated loads the template 
-and prepares internal compiled execution plans. When you set/change a field of the JSON, these compiled plans are used
-to efficiently update the in-memory state. 
+The more interesting use of Stated is an engine of reactive state. Load a template in the REPL, `.set` a value
+and watch the state evolve.
 ```json
 stated
 > .init -f example/hello.json
@@ -46,10 +44,15 @@ stated
    "to": "world",
    "msg": "${'hello ' & to}"
 }
-> .set /to "universe"
+> .set /to "Joshua"
 {
-   "to": "universe",
-   "msg": "hello universe"
+   "to": "Joshua",
+   "msg": "hello Joshua"
+}
+> .set /to "David Lightman"
+{
+   "to": "David Lightman",
+   "msg": "hello David Lightman"
 }
 ```
 Stated templates can contain expressions, reusable functions, and can even use JS timeouts and intervals. Let's see
@@ -66,6 +69,19 @@ stated
 > .init -f example/infiniteCount.json --tail "/count until $=100"
 Started tailing... Press Ctrl+C to stop.
 100
+```
+Stated is written in JS, and runs in the browser and in Node. Stated's REPL extends the Node.js REPL and allows you to 
+interact with running templates. Stated uses asynchronous event loop I/O and can be used to orchestrate complex workflows:
+```json
+> .init -f example/homeworlds.json
+{
+  "lukePersonDetails": "${ $fetch('https://swapi.dev/api/people/?search=luke').json().results[0]}",
+  "lukeHomeworldURL": "${ lukePersonDetails.homeworld }",
+  "homeworldDetails": "${ $fetch(lukeHomeworldURL).json() }",
+  "homeworldName": "${ homeworldDetails.name }"
+}
+> .out /homeworldName
+"Tatooine"
 ```
 
 Unlike an ordinary program, Stated templates can be kept "alive" indefinitely. A change to any of the independent fields
@@ -1774,6 +1790,25 @@ to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expre
   "name": "Dr. Stephen Falken",
   "address": "Goose Island, OR, USA"
 }
+```
+## Setting the context with --ctx
+The `--ctx` argument can be used to inject context variables into the template. Variables with a sinle `$` like `$foo` 
+refer to the JSONata Context. You can inject variables into the context using `--ctx.<dot-path>=val`. 
+```shell
+> .init -f example/ctx.json --ctx.name david --ctx.games.choice1=chess --ctx.games.choice2 "global thermonuclear war"
+{
+  "msg": "${'Hello, ' & $name & ', how about a nice game of ' & $games.choice1}",
+  "games": "${$games}"
+}
+> .out
+{
+  "msg": "Hello, david, how about a nice game of chess",
+  "games": {
+    "choice1": "chess",
+    "choice2": "global thermonuclear war"
+  }
+}
+
 ```
 ## Setting up local imports with --importPath
 You can import local files by specifying a folder where stated will look for the imported files
