@@ -39,7 +39,7 @@ export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, print
 export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):CommandAndResponse[] {
   const markdownContent = fs.readFileSync(markdownPath, 'utf-8');
   const codeBlockRegex = /```(?<codeBlock>[\s\S]*?)```/g;
-  const jsonataExpressionsArrayRegex = /^json \s*(?<jsonataExpressionsArrayString>\s*\[.*?])\s*[\r\n]/;
+  const jsonataExpressionsArrayRegex = /^(json|yaml) \s*(?<jsonataExpressionsArrayString>\s*\[.*?])\s*[\r\n]/;
   const commandRegex = /^> \.(?<command>.+[\r\n])(?<expectedResponse>(?:(?!^>|```)[\s\S])*)$/gm;
   let match;
   const testData = [];

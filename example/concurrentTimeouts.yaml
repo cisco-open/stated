@@ -1,0 +1,16 @@
+start: |
+  ${
+      [1..10].(
+                $setTimeout(
+                    function(){
+                      $set('/step1', $string($))
+                    }, $random()*100)
+              )
+  }
+step1: NA
+step2: ${step1 & ':' & step1}
+step3: ${step2 & ':' & step2}
+step4: ${$set('/final/-', step3)}
+final: []
+
+
