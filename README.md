@@ -1,9 +1,11 @@
-# stated
+# Stated
 <!-- TOC -->
-* [stated](#stated)
+* [Stated](#stated)
 * [Licensing and documentation](#licensing-and-documentation)
-  * [Intro](#intro)
-  * [Why Do We Need stated?](#why-do-we-need-stated)
+* [API docs](#api-docs)
+* [Testing](#testing)
+* [Intro](#intro)
+* [Motivation](#motivation)
 * [Getting Started](#getting-started)
   * [Installation](#installation)
   * [Running](#running)
@@ -75,13 +77,19 @@
 <!-- TOC -->
 # Licensing and documentation
 Stated is a cisco-open, Apache 2 Licensed, Open Source project at https://github.com/cisco-open/stated, our github 
-main page. If you would like to see a table of contents and developer API docs, jump over to our API docs page which is
-generated in CI and [published here](https://cisco-open.github.io/stated/index.html). Are the examples in this README 
+main page. 
+# API docs
+If you would like to see a table of contents and developer API docs, jump over to our API docs page which is
+generated in CI and [published here](https://cisco-open.github.io/stated/index.html). Most developers will need to 
+interact with the TemplateProcessor. It's [API Docs are here](https://cisco-open.github.io/stated/classes/TemplateProcessor.default.html)
+
+# Testing
+Are the examples in this README 
 correct/reliable? Every markdown codeblock in this readme is 
 [tested on every commit](https://github.com/cisco-open/stated/blob/main/README.test.js).
 
 ![stated logo](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stated.svg)
-## Intro
+# Intro
 Stated is an engine of reactive state (a State Daemon). State is expressed as JSON or YAML. Rules for evolving state are
 written via embedded [JSONata](http://docs.jsonata.org/) expressions in classic shell variable syntax `${}`. 
 ```shell
@@ -228,10 +236,7 @@ Stated templates are modular and can be imported from a URL:
   }
 }
 ```
-
-
-## Why Do We Need stated?
-
+# Motivation
 Consider this ordinary program:
 ```js
 let a=1;
