@@ -1,0 +1,7 @@
+{
+  "name": "luke",
+  "personDetails": "${ $fetch('https://swapi.dev/api/people/?search='&name).json().results[0]}",
+  "homeworldURL": "${ personDetails.homeworld }",
+  "homeworldDetails": "${ $fetch(homeworldURL).json() }",
+  "homeworldName": "${ {'name': $uppercase(personDetails.name), 'homeworld': homeworldDetails.name} }"
+}

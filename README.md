@@ -1,4 +1,79 @@
 # stated
+<!-- TOC -->
+* [stated](#stated)
+* [Licensing and documentation](#licensing-and-documentation)
+  * [Intro](#intro)
+  * [Why Do We Need stated?](#why-do-we-need-stated)
+* [Getting Started](#getting-started)
+  * [Installation](#installation)
+  * [Running](#running)
+    * [REPL Mode](#repl-mode)
+    * [Oneshot mode](#oneshot-mode)
+* [stated-js lib](#stated-js-lib)
+  * [API documentation](#api-documentation)
+  * [Basic usage](#basic-usage)
+      * [Stated-js package.json exports](#stated-js-packagejson-exports)
+      * [Node.js based projects](#nodejs-based-projects)
+* [REPL Commands](#repl-commands)
+  * [.open](#open)
+  * [All commands](#all-commands)
+  * [.out](#out)
+  * [.color](#color)
+  * [.log](#log)
+  * [.set](#set-)
+  * [REPL command arguments](#repl-command-arguments)
+    * [--options](#--options)
+      * [strict](#strict)
+    * [--xf](#--xf)
+    * [--ctx](#--ctx)
+* [Language & Syntax](#language--syntax)
+  * [Expressions and Variables](#expressions-and-variables)
+  * [Dollars-Moustache](#dollars-moustache)
+  * [Dollars-Variables](#dollars-variables)
+  * [Temporary Expressions](#temporary-expressions)
+  * [References](#references)
+  * [Expression Scope](#expression-scope)
+  * [Rerooting Expressions](#rerooting-expressions)
+  * [Tags](#tags)
+* [Generative Templates](#generative-templates)
+* [Reactive Behavior](#reactive-behavior)
+  * [DAG](#dag)
+  * [visualizing the plan with .svg command](#visualizing-the-plan-with-svg-command)
+* [Concurrency](#concurrency)
+  * [Serialized Mutations](#serialized-mutations)
+  * [Atomic State Updates](#atomic-state-updates)
+  * [Multi Version Concurrency Control (MVCC) and  $forked](#multi-version-concurrency-control-mvcc-and-forked)
+* [YAML](#yaml)
+* [Complex Data Processing](#complex-data-processing)
+* [Functions](#functions)
+  * [JSONata built-in](#jsonata-built-in)
+  * [Stated functions](#stated-functions)
+    * [$timeout](#timeout)
+    * [$interval](#interval)
+    * [$fetch](#fetch)
+    * [$import](#import)
+      * [Importing bits of other templates](#importing-bits-of-other-templates)
+      * [Setting up local imports with --importPath](#setting-up-local-imports-with---importpath)
+      * [Import JS functions](#import-js-functions)
+    * [$open](#open-1)
+    * [$set](#set)
+    * [$debounce](#debounce)
+    * [$defer](#defer)
+    * [$rateLimit](#ratelimit)
+  * [Custom Functions](#custom-functions)
+    * [Simple Custom Function Example](#simple-custom-function-example)
+    * [More Complex Function Example](#more-complex-function-example)
+* [Error Handling](#error-handling)
+  * [The error object](#the-error-object)
+  * [Error Reporting](#error-reporting)
+  * [$errorReport function](#errorreport-function)
+* [TemplateProcessor Snapshots](#templateprocessor-snapshots)
+* [Understanding Plans](#understanding-plans)
+* [Planning](#planning)
+  * [MetaInfo Graph](#metainfo-graph)
+  * [DFS Tree Traversal](#dfs-tree-traversal)
+<!-- TOC -->
+# Licensing and documentation
 Stated is a cisco-open, Apache 2 Licensed, Open Source project at https://github.com/cisco-open/stated, our github 
 main page. If you would like to see a table of contents and developer API docs, jump over to our API docs page which is
 generated in CI and [published here](https://cisco-open.github.io/stated/index.html). Are the examples in this README 
@@ -314,12 +389,16 @@ When you run Node.js, you must pass `--experimental-vm-modules` flag to the Node
 fact that stated-js is written using ES Module syntax.
 
 # REPL Commands
+REPL commands can be used once you start the REPL by running `stated` from your prompt. All examples in this
+doc assume your working directory is the stated git repo's root folder.
 
-stated provides a set of REPL commands to interact with the system. The `.open` command is the easiest way to get started
+## .open
+Stated provides a set of REPL commands to interact with the system. The `.open` command is the easiest way to get started
 opening an example template:
 
 <img width="1000" src="https://media.giphy.com/media/v1.Y2lkPTc5MGI3NjExdnl6NDgzdnE0bWlwbzU0NjBlOTNtMmE0OHJ1NjRpdmJxYTdtb3FleiZlcD12MV9pbnRlcm5hbF9naWZfYnlfaWQmY3Q9Zw/0kmQtLaWvuthTU1f2o/giphy.gif"/>
 
+## All commands
 | Command    | Description                                                          | flags & args                                                                                                                                                                                       | Example                                                                                                                                                                                        |
 |------------|----------------------------------------------------------------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | `.open`    | Interactive command to open a template (defaults to examples folder) |                                                                                                                                                                                                    | `.open`                                                                                                                                                                                        |
@@ -339,7 +418,7 @@ opening an example template:
 | `.svg`     | Serve an SVG diagram of the DAG                                      | `--port <portnumber>` (defaults to 4242)                                                                                                                                                           | `.svg --port 3000`                                                                                                                                                                             |
 | `.restore` | Restore from a snapshot                                              | &bull; `-f <path>` <br> &bull; `--tags=<taglist>`<br>&bull; `--xf=<path>`<br> &bull; `--importPath=<path>` <br> &bull; `--tail "<tailargs>"`                                                       | `.restore -f "example/restoreSnapshot.json" --tail "/count until $=10"`                                                                                                                        |                                   
 
-
+## .out
 The stated repl lets you experiment with templates. The simplest thing to do in the REPL is load a json file. The REPL
 parses the input, builds an execution plan, and executes the result. To see the result you have to use the `.out`
 ```json
@@ -360,7 +439,8 @@ parses the input, builds an execution plan, and executes the result. To see the 
   ]
 }
 ```
-# Color
+## .color
+You can set terminal colors for enhanced readability from a terminal
 ```json
 > .note color does not appear in this markdown file
 "============================================================="
@@ -372,7 +452,152 @@ parses the input, builds an execution plan, and executes the result. To see the 
   "c": "${'the answer is: '& b}"
 }
 ```
+## .log
+the `.log` command can set the log level to `[silent, error, warn, info, verbose, debug]`. Enabling high
+log levels like debug can help you track down problems with expressions.
+```json
+> .log debug
+{
+  "log level": "debug"
+}
+```
+```shell
+ .init -f "example/errors.json"
+arguments: {"_":[],"f":"example/errors.json","filepath":"example/errors.json","tags":[],"oneshot":false,"options":{}}
+verbose: initializing...
+debug: tags: {}
+verbose: evaluating template...
+error: Error evaluating expression at /b
+error: The right side of the "+" operator must evaluate to a number {"code":"T2002","position":3,"stack":"Error\n    at evaluateNumericExpression (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:4122:25)\n    at evaluateBinary (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3900:30)\n    at async evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3490:26)\n    at async Object.evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:5558:26)\n    at async TemplateProcessor._evaluateExprNode (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:637:25)\n    at async TemplateProcessor._evaluateExpression (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:556:28)\n    at async TemplateProcessor.evaluateJsonPointersInOrder (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:515:31)\n    at async TemplateProcessor.evaluateDependencies (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:358:16)\n    at async TemplateProcessor.evaluate (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:123:9)\n    at async TemplateProcessor.initialize (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:113:9)","token":"+","value":" is not a string"}
+debug: Expression: a + ' is not a string'
+debug: Target: {
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+debug: Result: null
+verbose: _evaluateExpression at /b completed in 13 ms.
+verbose: evaluation complete in 13 ms...
+verbose: initialization complete...
+{
+  "a": 42,
+  "b": "${a + ' is not a string'}"
+}
+```
+## .set 
 
+The stated REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
+In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
+
+```json
+> .init -f "example/ex09.json"
+{
+  "a": [
+    0,
+    1,
+    "${ $[0] + $[1] }"
+  ]
+}
+> .set /a/0 100
+{
+  "a": [
+    100,
+    1,
+    101
+  ]
+}
+```
+## REPL command arguments
+### --options
+The cli and REPL both support `--options` which can be provided as arguments to other commands
+Options can also be used in oneshot mode. Note the use of backslashes to escape quotes in the JSON on the CLI
+```shell
+falken$ stated --options={\"strict\":{\"refs\":true}} example/strictref.json
+error: /z does not exist, referenced from /c (strict.refs option enabled)
+{
+  a: 42,
+  b: 42,
+  c: {
+    error: {
+      name: 'strict.refs',
+      message: '/z does not exist, referenced from /c (strict.refs option enabled)'
+    }
+  }
+}
+```
+#### strict
+The `strict` option currently supports the `refs` property. Setting `{"strict":{"refs":true}}` will cause templates
+to throw an Exception when references in the template cannot be resolved. Reference checking is only performed against
+the template itself; it is not performed agains variables that are injected into the execution context by the TemplateProcessor
+library.
+```json
+> .log silent
+{
+  "log level": "silent"
+}
+> .init -f "example/strictref.json" --options={"strict":{"refs":true}}
+{
+  "a": 42,
+  "b": "${a}",
+  "c": "${z}"
+}
+> .out
+{
+  "a": 42,
+  "b": 42,
+  "c": {
+    "error": {
+      "name": "strict.refs",
+      "message": "/z does not exist, referenced from /c (strict.refs option enabled)"
+    }
+  }
+}
+```
+
+### --xf
+The `--xf` argument can be used to provide a context file. Context is used
+to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expressionevaluateinput-bindings-callback)
+```shell
+> .note here is a regular json file
+"============================================================="
+> .init -f "example/env.json" 
+{
+  "env": {
+    "name": "Dr. Stephen Falken",
+    "addr": "Goose Island, OR, USA"
+  }
+}
+> .note let's use it as context to a stated template
+"============================================================="
+> .init -f "example/useEnv.json" --xf=example/env.json
+{
+  "name": "${$env.name}",
+  "address": "${$env.addr}"
+}
+> .out
+{
+  "name": "Dr. Stephen Falken",
+  "address": "Goose Island, OR, USA"
+}
+```
+### --ctx
+The `--ctx` argument can be used to inject context variables into the template. Variables with a sinle `$` like `$foo`
+refer to the JSONata Context. You can inject variables into the context using `--ctx.<dot-path>=val`.
+```shell
+> .init -f example/ctx.json --ctx.name david --ctx.games.choice1=chess --ctx.games.choice2 "global thermonuclear war"
+{
+  "msg": "${'Hello, ' & $name & ', how about a nice game of ' & $games.choice1}",
+  "games": "${$games}"
+}
+> .out
+{
+  "msg": "Hello, david, how about a nice game of chess",
+  "games": {
+    "choice1": "chess",
+    "choice2": "global thermonuclear war"
+  }
+}
+
+```
 # Language & Syntax
 ## Expressions and Variables
 What makes a Stated template different from an ordinary JSON file? JSONata Expressions of course! Stated analyzes the 
@@ -382,7 +607,8 @@ used to build a DAG. The DAG allows Stated to know what expressions to compute i
 Fields of the document are changed either via the REPL `.set` function, or by calling the equivalent library function.
 Many classes of _reactive_ application need to maintain state, and need to propagate state changes through the _dependees_
 of a particular field (a _dependee_ of foo is a field that _depends_ on foo). Stated can be used as state store for
-reactiver applications.
+reactive applications.
+
 ## Dollars-Moustache
 returning to our `example/hello.json`, the `msg` field is a simple example of a dollars-moustache. 
 Stated allows JSONata _expressions_ to be embedded in a JSON document using `${<...JSONata here...>}` syntax. The `${}`
@@ -634,9 +860,9 @@ expression are also tagged.
 }
 
 ```
-# Liveness
+# Generative Templates
 Templates can contain generative expressions that cause their content to change over time. 
-For instance the $setInterval function behaves exactyl as it does in Javascript. Below, 
+For instance the `$setInterval` function behaves exactly as it does in Javascript. Below, 
 it causes the `incr` function to be called forever, every 10 ms.
 ```json
 > .init -f "example/tail.json"
@@ -771,7 +997,122 @@ resolution of the two fetch functions they each depend on.
   "falcon": "Millennium Falcon"
 } 
 ```
+## DAG
+Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
+expressions. stated is at its core a data flow engine. Stated analyzes the abstract syntax tree (AST) of JSONata
+expressions and builds a Directed Acyclic Graph (DAG). Stated ensures that when fields in your JSON change, that the
+changes flow through the DAG in an optimal order that avoids redundant expression calculation.
+
+stated helps you track and debug transitive dependencies in your templates. You can use the
+``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
+you the order in which changes propagate.
+
+```json
+> .init -f "example/ex01.json"
+{
+"a": 42,
+"b": "${a}",
+"c": "${'the answer is: '& b}"
+}
+> .out
+{
+"a": 42,
+"b": 42,
+"c": "the answer is: 42"
+}
+> .from /a
+[
+"/a",
+"/b",
+"/c"
+]
+> .to /b
+[
+"/a",
+"/b"
+]
+> .to /c
+[
+"/a",
+"/b",
+"/c"
+]
+```
+The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
+when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is
+evaluated twice.
+```json
+> .init -f "example/ex08.json"
+{
+  "a": "${c}",
+  "b": "${d+1+e}",
+  "c": "${b+1}",
+  "d": "${e+1}",
+  "e": 1
+}
+> .plan
+[
+  "/d",
+  "/b",
+  "/c",
+  "/a"
+]
+> .out
+{
+  "a": 5,
+  "b": 4,
+  "c": 5,
+  "d": 2,
+  "e": 1
+}
+
+```
+## visualizing the plan with .svg command
+
+```json [false, "$='http://localhost:4042'"]
+> .init -f "example/ex21.json"
+{
+   "story": "${ [partI, 'then', partII]~>$join(' ')}",
+   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
+   "call": "${function($url){$fetch($url) ~> handleRes}}",
+   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
+   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
+   "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
+   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
+   "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
+   "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
+}
+> .svg --port=4042
+Server is running on port 4042
+"http://localhost:4042"
+```
+Access the URL from your web browser to view the SVG diagram.
+![starwars svg](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/df9b46590c28285a06bce7aa4948fe62042345f1/starwarsgraph.svg)
+
 # Concurrency
+Stated executes expressions in your template according to a plan. The ordering of the plan is critical to ensuring correctness.
+As we have seen in the section on reactive behavior, a plan is an array of JSON pointers, each json pointer pointing
+to an expression in the template that must be evaluated. The DAG section of this document discusses plans like this:
+```json
+[
+  "/handleRes",
+  "/call",
+  "/falcon",
+  "/han",
+  "/luke",
+  "/partI",
+  "/xwing",
+  "/partII",
+  "/story"
+]
+```
+Now we are going to discuss what happens if we introduce concurrent behavior. Concurrency can happen if an external 
+actor, like your code using the stated library, mutates a field of the template concurrently. For example by creating an
+array of Promises that each change a field, and calling Promises.all. Concurrency can also happen inside your template
+itself by using `$timeout` and `$interval` which schedule functions on the event loop. Stated cannot allow two plans 
+to concurrently access the same set of variables in the template, as this will cause behavior that is inconsistent with
+the expected behavior of a plan. Therefore, this section discusses how Stated provides correct and performant behavior
+when concurrent mutations trigger concurrent plan execution.
 ## Serialized Mutations
 A template has a single set of variables. What you see is what you get. The fields of the JSON are the variables
 of the program. Using `$timeout` and `$interval` causes concurrent behavior. In an ordinary program, concurrent 
@@ -965,28 +1306,6 @@ totalTime$: (homeworlds;$string($millis()-startTime$) & ' ms')
 ```
 The `$forked` variation runs in 781 ms, while the SERIALIZED version ran in 6290 ms. The forked version is 8x faster.
 
-# SVG command
-The .svg command serves an SVG diagram of the DAG
-```json [false, "$='http://localhost:4042'"]
-> .init -f "example/ex21.json"
-{
-   "story": "${ [partI, 'then', partII]~>$join(' ')}",
-   "handleRes": "${ function($res){$res.ok? $res.json():$res.status?{'status': $res.status}:$res} }",
-   "call": "${function($url){$fetch($url) ~> handleRes}}",
-   "partI": "${ [han, 'piloted the', falcon] ~> $join(' ')}",
-   "luke": "${ call('https://swapi.dev/api/people/?search=luke').results[0].name}",
-   "xwing": "${ call('https://swapi.dev/api/starships/?search=x').results[0].name}",
-   "partII": "${ [luke, 'piloted the', xwing] ~> $join(' ')}",
-   "han": "${ call('https://swapi.dev/api/people/?search=han').results[0].name}",
-   "falcon": "${ call('https://swapi.dev/api/starships/?search=Millennium').results[0].name}"
-}
-> .svg --port=4042
-Server is running on port 4042
-"http://localhost:4042"
-```
-Access the URL from your web browser to view the SVG diagram.
-![starwars svg](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/df9b46590c28285a06bce7aa4948fe62042345f1/starwarsgraph.svg)
-
 # YAML
 Input can be provided in YAML. YAML is convenient because JSONata prorgrams are often multi-line, and json does not 
 support text blocks with line returns in a way that is readable. For instance if we compare ex12.json and ex12.yaml, 
@@ -1027,99 +1346,8 @@ as it's parsed in-memory JS representation.
   "game$": "$fetch(url) ~> respHandler$ ~> |$|{'player':'dlightman'}|"
 }
 ```
-##Setting Values in the stated REPL
 
-The stated REPL also allows you to dynamically set values in your templates, further aiding in debugging and development.
-In the example below `.set /a/0 100` sets a[0] to 100. The syntax of `/a/0` is [RFC-6901 JSON Pointer](https://datatracker.ietf.org/doc/html/rfc6901).
 
-```json
-> .init -f "example/ex09.json"
-{
-  "a": [
-    0,
-    1,
-    "${ $[0] + $[1] }"
-  ]
-}
-> .set /a/0 100
-{
-  "a": [
-    100,
-    1,
-    101
-  ]
-}
-```
-# DAG
-Templates can grow complex, and embedded expressions have dependencies on both literal fields and other calculated
-expressions. stated is at its core a data flow engine. Stated analyzes the abstract syntax tree (AST) of JSONata 
-expressions and builds a Directed Acyclic Graph (DAG). Stated ensures that when fields in your JSON change, that the
-changes flow through the DAG in an optimal order that avoids redundant expression calculation.
-
-stated helps you track and debug transitive dependencies in your templates. You can use the
-``from`` and ``to`` commands to track the flow of data. Their output is an ordered list of JSON Pointers, showing
-you the order in which changes propagate.
-
-```json
-> .init -f "example/ex01.json"
-{
-"a": 42,
-"b": "${a}",
-"c": "${'the answer is: '& b}"
-}
-> .out
-{
-"a": 42,
-"b": 42,
-"c": "the answer is: 42"
-}
-> .from /a
-[
-"/a",
-"/b",
-"/c"
-]
-> .to /b
-[
-"/a",
-"/b"
-]
-> .to /c
-[
-"/a",
-"/b",
-"/c"
-]
-```
-The `.plan` command shows you the execution plan for evaluating the entire template as a whole, which is what happens
-when you run the `out` command. The execution plan always ensures the optimal data flow so that no expression is
-evaluated twice.
-```json
-> .init -f "example/ex08.json"
-{
-  "a": "${c}",
-  "b": "${d+1+e}",
-  "c": "${b+1}",
-  "d": "${e+1}",
-  "e": 1
-}
-> .plan
-[
-  "/d",
-  "/b",
-  "/c",
-  "/a"
-]
-> .out
-{
-  "a": 5,
-  "b": 4,
-  "c": 5,
-  "d": 2,
-  "e": 1
-}
-
-```
 
 # Complex Data Processing
 The example below uses JSONata `$zip` function to combine related data.
@@ -1291,11 +1519,528 @@ then rolled up to the totalCost. Note the difference in the execution `plan` bet
 }
 
 ```
-
-
 # Functions
-stated let's you define and call functions.
-## Simple Function Example
+## JSONata built-in
+
+Stated functions behave exactly as functions described in [JSONata Functions](https://docs.jsonata.org/programming#functions).
+All JSONata functions are available in Stated.
+
+## Stated functions
+Stated provides many functions not provided out of the box by JSONata. 
+
+### $timeout
+
+### $interval
+
+### $fetch
+JSONata provides the standard JS fetch function. You can use it exactly as you would in JS, except that
+Stated wraps fetch so that any exceptions are caught and converted to error objects. This is because JSONata
+does not have excpetions as a language construct.
+
+This example fetches JSON over the network and uses the JSONata transform operator to set the
+`player` field on the fetched JSON.
+[Here is the JSON file](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json) that it downloads and operates on.
+You can see why DAG and evaluation order matter. selectedGame does not exist until the game field has been populated by
+fetch.
+```json
+> .init -f "example/ex12.json"
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "${game.selected}",
+  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
+  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
+}
+> .out
+{
+  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
+  "selectedGame": "Global Thermonuclear War",
+  "respHandler": "{function:}",
+  "game": {
+    "titles": [
+      "chess",
+      "checkers",
+      "backgammon",
+      "poker",
+      "Theaterwide Biotoxic and Chemical Warfare",
+      "Global Thermonuclear War"
+    ],
+    "selected": "Global Thermonuclear War",
+    "player": "dlightman"
+  }
+}
+```
+### $import
+The sequence below explains by example that the $import function which is used to fetch and initialize
+remote templates (or local literal templates) into the current template
+```json
+> .note "let's take a simple template..."
+"============================================================="
+> .init -f "example/ex17.json"
+{
+  "commanderDetails": {
+    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+    "systemsUnderCommand": "../${$count(systems)}"
+  },
+  "organization": "NORAD",
+  "location": "Cheyenne Mountain Complex, Colorado",
+  "commander": {
+    "firstName": "Jack",
+    "lastName": "Beringer",
+    "rank": "General"
+  },
+  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+  "systems": [
+    "Ballistic Missile Early Warning System (BMEWS)",
+    "North Warning System (NWS)",
+    "Space-Based Infrared System (SBIRS)",
+    "Cheyenne Mountain Complex"
+  ]
+}
+> .note "now let's see what it produced"
+"============================================================="
+> .out
+{
+  "commanderDetails": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "organization": "NORAD",
+  "location": "Cheyenne Mountain Complex, Colorado",
+  "commander": {
+    "firstName": "Jack",
+    "lastName": "Beringer",
+    "rank": "General"
+  },
+  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+  "systems": [
+    "Ballistic Missile Early Warning System (BMEWS)",
+    "North Warning System (NWS)",
+    "Space-Based Infrared System (SBIRS)",
+    "Cheyenne Mountain Complex"
+  ]
+}
+> .note "what happens if we put it on the web and fetch it?"
+"============================================================="
+> .init -f "example/ex19.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes }",
+  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
+}
+>  .note "If we look at the output, it's just the template."
+"============================================================="
+> .out
+{
+  "noradCommander": {
+    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+    "systemsUnderCommand": "../${$count(systems)}"
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+      "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+      "systemsUnderCommand": "../${$count(systems)}"
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  },
+  "handleRes": "{function:}"
+}
+> .note "Now let's use the import function on the template"
+"============================================================="
+> .init -f example/ex16.json
+{
+   "noradCommander": "${ norad.commanderDetails  }",
+   "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import}",
+   "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
+}
+> .out
+{
+   "noradCommander": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+   },
+   "norad": {
+      "commanderDetails": {
+         "fullName": "Jack Beringer",
+         "salutation": "General Jack Beringer",
+         "systemsUnderCommand": 4
+      },
+      "organization": "NORAD",
+      "location": "Cheyenne Mountain Complex, Colorado",
+      "commander": {
+         "firstName": "Jack",
+         "lastName": "Beringer",
+         "rank": "General"
+      },
+      "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+      "systems": [
+         "Ballistic Missile Early Warning System (BMEWS)",
+         "North Warning System (NWS)",
+         "Space-Based Infrared System (SBIRS)",
+         "Cheyenne Mountain Complex"
+      ]
+   },
+   "handleRes": "{function:}"
+}
+> .note "You can see above that 'import' makes it behave as a template, not raw JSON."
+"============================================================="
+> .note "We don't have to fetch ourselves to use import, it will do it for us."
+"============================================================="
+> .init -f "example/ex18.json"
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json')}"
+}
+> .out
+{
+  "noradCommander": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  }
+}
+```
+#### Importing bits of other templates
+Suppose you just want to import a function defined in another template. The `$import` function understands
+URL fragments with JSON Pointers. In this example we use a URL with a fragment to import just a function
+from a remote template. Note that the URL ends in `#/resourceMapperFn`
+```json
+> .init -f "example/resourceMapperB.json"
+{
+  "input": {
+    "foo": 42,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperAFn": "${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/resourceMapperA.json#/resourceMapperFn')}",
+  "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
+  "BEntities": "${ (resourceMapperBFn(input))}",
+  "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
+}
+> .out
+{
+  "input": {
+    "foo": 42,
+    "bar": "something",
+    "zap": "zing"
+  },
+  "resourceMapperAFn": "{function:}",
+  "resourceMapperBFn": "{function:}",
+  "BEntities": [],
+  "entities": [
+    {
+      "Type": "A",
+      "id": 42,
+      "bar": "something"
+    }
+  ]
+}
+```
+#### Setting up local imports with --importPath
+You can import local files by specifying a folder where stated will look for the imported files
+```json
+> .init -f "example/localImport.json" --importPath=./example
+{
+  "noradCommander": "${ norad.commanderDetails  }",
+  "norad": "${ $import('ex17.json')}"
+}
+> .out
+{
+  "noradCommander": {
+    "fullName": "Jack Beringer",
+    "salutation": "General Jack Beringer",
+    "systemsUnderCommand": 4
+  },
+  "norad": {
+    "commanderDetails": {
+      "fullName": "Jack Beringer",
+      "salutation": "General Jack Beringer",
+      "systemsUnderCommand": 4
+    },
+    "organization": "NORAD",
+    "location": "Cheyenne Mountain Complex, Colorado",
+    "commander": {
+      "firstName": "Jack",
+      "lastName": "Beringer",
+      "rank": "General"
+    },
+    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+    "systems": [
+      "Ballistic Missile Early Warning System (BMEWS)",
+      "North Warning System (NWS)",
+      "Space-Based Infrared System (SBIRS)",
+      "Cheyenne Mountain Complex"
+    ]
+  }
+}
+
+```
+#### Import JS functions
+Repl and cli support importing javascript functions. If provided file to --xf has a .js or .mjs extension, it will be
+loaded and all exported functions will be added to TemplateProcessor's execution context.
+
+An example "src/test/test-export.js" exports 2 functions
+```js
+const barFunc = (input) => `bar: ${input}`;
+
+// explicitly define exported functions and their names
+export const foo = () => "foo";
+export const bar = barFunc;
+```
+
+Which can be used in the stated tempalate context
+```json
+> .init -f example/importJS.json --xf=example/test-export.js
+{
+  "res": "${ $bar($foo()) }"
+}
+> .out
+{
+  "res": "bar: foo"
+}
+```
+
+This can be combined with the `--importPath` option to import files relative to that path
+```json
+> .init -f example/importJS.json --importPath=example --xf=test-export.js
+{
+  "res": "${ $bar($foo()) }"
+}
+> .out
+{
+  "res": "bar: foo"
+}
+```
+### $open
+Allowing expressions to open local files is a security risk. For this reason the core TemplateProcessor does
+not support the $open function. However, the CLI/REPL which are for local usage allow the $open function. Additionally,
+programs that want to allow properly guarded `$open` operations may inject a `$open` function of their choosing
+into the TemplateProcessor contexet. $open accepts a relative path, and parses the JSON or YAML file on that path into
+an object.
+```json [false, "true", false, "a.c='the answer is: 42' and b.c='the answer is: 42'", "true"]
+> .note This shows two equivalent ways to open a json or yaml file using $open
+"============================================================="
+> .cd example
+"Current directory changed to: /Users/falken/proj/jsonataexperiments/example"
+> .init -f "importLocal.json"
+{
+   "a": "${'ex01.json'~>$open~>$import}",
+   "b": "${$import($open('ex01.json'))}"
+}
+> .out
+{
+   "a": {
+      "a": 42,
+      "b": 42,
+      "c": "the answer is: 42"
+   },
+   "b": {
+      "a": 42,
+      "b": 42,
+      "c": "the answer is: 42"
+   }
+}
+> .cd ..
+"Current directory changed to: /Users/falken/proj/jsonataexperiments"
+```
+### $set
+You have already seen how the REPL `.set` command works. The REPL simply calls the internal $set function.
+The `$set` function can be called from your JSONata blocks or function. The `$set` function is used to push data into
+other parts of the template. The function signature is `$set(jsonPointer, value)`. The
+set command returns an array of JSON Pointers that represent the transitive updates that resulted from calling `set`.
+In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "JOSHUA" onto the `systems` array.
+
+```json
+> .init -f "example/ex13.json"
+{
+  "systems": [
+    "WOPR"
+  ],
+  "onBoot": "${ $set('/systems/1', 'JOSHUA')}",
+  "newSystem": "${systems[1]}"
+}
+> .out
+{
+  "newSystem": "JOSHUA",
+  "onBoot": [
+    "/systems/1",
+    "/newSystem"
+  ],
+  "systems": [
+    "WOPR",
+    "JOSHUA"
+  ]
+}
+```
+### $debounce
+Debouncing is a technique used in software development, particularly in web development and event handling,
+to control or limit the frequency of a particular action or event when it occurs rapidly or frequently.
+It helps prevent excessive or redundant executions of the action, making applications more efficient and
+responsive.
+
+In this example we rapidly change a counter and feed it into a debounced function that appends the count to
+an accumulator array, `acc`. The `interval` is terminated when `count` reaches 100, and due to debouncing,
+only a single value, 100, is written into `acc`. We use the `--tail "/ until acc[0]=100"` to tail the
+root document (`/`) until a jsonata expression condition is met. The condition we check is
+`acc[0]=100` which is the expected debounced value.
+
+```json
+> .init -f "example/debounce.yaml"
+{
+   "acc": [],
+   "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $debounce(15)}",
+   "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
+   "count": 0,
+   "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
+   "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }"
+}
+```
+```json ["data.acc=[100] and data.stop='done' and data.count=100"]
+> .init -f "example/debounce.yaml" --tail "/ until acc[0]=100"
+Started tailing... Press Ctrl+C to stop.
+{
+  "acc": [
+    100
+  ],
+  "counter": "{function:}",
+  "count": 100,
+  "rapidCaller": "--interval/timeout--",
+  "stop": "done"
+}
+```
+### $defer
+While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
+"slowed down" version of a rapidly changing variable. $defer takes two arguments:
+1. The json pointer to the field you wish to defer (or "slow down")
+2. An optional number of milliseconds, T.
+
+`$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a
+subsequent value until the deferred field has remained unchanges for T ms.
+For example, suppose you are collecting a query string from a user
+input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
+pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
+the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer! The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged
+until the `query`stops receiving changes and reaches its final state of "Would you like to play a game? How about a nice game of chess?"
+
+```json
+> .init -f "example/defer.yaml"
+{
+   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+   "query": "",
+   "deferredQuery$": "$defer('/query', 100)",
+   "counter$": "function(){  $set('/count', count+1)}",
+   "count": 0,
+   "appendQuery$": "$set('/query', sampleQuery~>$substring(0,count))",
+   "rapidCaller$": "$setInterval(counter$, 25)",
+   "stop$": "count=$length(sampleQuery)\n  ?($clearInterval(rapidCaller$);'done')\n  :'simulating typing'  \n"
+}
+```
+To watch the data changing we can use the `--tail until` to tail the changing template output until it reaches the final state.
+```json ["data.deferredQuery$ = data.sampleQuery"]
+> .init -f example/defer.yaml --tail "/ until deferredQuery$ = 'Would you like to play a game? How about a nice game of chess?'"
+Started tailing... Press Ctrl+C to stop.
+{
+  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
+  "query": "Would you like to play a game? How about a nice game of chess?",
+  "deferredQuery$": "Would you like to play a game? How about a nice game of chess?",
+  "counter$": "{function:}",
+  "count": 62,
+  "appendQuery$": [
+    "/query"
+  ] ,
+  "rapidCaller$": "--interval/timeout--",
+  "stop$": "done"
+}
+```
+Here is a screencapture showing the two commands above executed in the REPL.
+![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
+### $rateLimit
+Rate limiting allows to ensure than no than one function call is executed withing some time. For exameple,
+we want to ensure that a function calling external APIs does not overload it.
+```json
+>.init -f example/rateLimit.yaml
+{
+  "acc": [],
+  "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $rateLimit(100)}",
+  "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
+  "count": 0,
+  "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
+  "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }",
+  "accCount": "${ $count(acc) }"
+}
+```
+Below output demonstrates, that `rateLimit` function calls to to set `acc` to once in no less than 100ms, which will
+result in only 10 counts added o the `acc` array, the first one, the last one, and 10 in between.
+```json ["data.accCounter = 12"]
+>.init -f example/rateLimit.yaml --tail "/ until accCount=12"
+Started tailing... Press Ctrl+C to stop.
+{
+  "acc": [
+    1,
+    10,
+    19,
+    28,
+    38,
+    48,
+    57,
+    66,
+    75,
+    85,
+    94,
+    100
+  ],
+  "counter": "{function:}",
+  "count": 100,
+  "rapidCaller": "--interval/timeout--",
+  "stop": "done",
+  "accCount": 12
+}
+```
+
+
+## Custom Functions
+Stated let's you define and call functions. Custom functions are simply JSONata functions. Functions
+are not a feature of Stated, they are a feature of JSONata.
+
+### Simple Custom Function Example
 ```json
 > .init -f "example/ex05.json"
 {
@@ -1313,7 +2058,7 @@ stated let's you define and call functions.
 }
 
 ```
-## More Complex Function Example
+### More Complex Function Example
 Here is an elaborate example of functions. The `fibonnaci` function itself is pulled into the last element of `x`
 using the expression ``/${fibonacci}``. The first element of the array contains `$[2]($[1])`. Can you see that
 it invokes the `fibonacci` function passing it the value 6? Hint: `$[2]` is the last element of the array which
@@ -1505,626 +2250,7 @@ Let's take a more complex example where we generate MySQL instances:
   ]
 }
 ```
-# Fetch
-This example fetches JSON over the network and uses the JSONata transform operator to set the 
-`player` field on the fetched JSON.
-[Here is the JSON file](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json) that it downloads and operates on.
-You can see why DAG and evaluation order matter. selectedGame does not exist until the game field has been populated by 
-fetch.
-```json
-> .init -f "example/ex12.json"
-{
-  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
-  "selectedGame": "${game.selected}",
-  "respHandler": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }",
-  "game": "${ $fetch(url) ~> respHandler ~> |$|{'player':'dlightman'}| }"
-}
-> .out
-{
-  "url": "https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/games.json",
-  "selectedGame": "Global Thermonuclear War",
-  "respHandler": "{function:}",
-  "game": {
-    "titles": [
-      "chess",
-      "checkers",
-      "backgammon",
-      "poker",
-      "Theaterwide Biotoxic and Chemical Warfare",
-      "Global Thermonuclear War"
-    ],
-    "selected": "Global Thermonuclear War",
-    "player": "dlightman"
-  }
-}
-```
-# Import
-The sequence below explains by example that the $import function which is used to fetch and initialize
-remote templates (or local literal templates) into the current template
-```json
-> .note "let's take a simple template..."
-"============================================================="
-> .init -f "example/ex17.json"
-{
-  "commanderDetails": {
-    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
-    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
-    "systemsUnderCommand": "../${$count(systems)}"
-  },
-  "organization": "NORAD",
-  "location": "Cheyenne Mountain Complex, Colorado",
-  "commander": {
-    "firstName": "Jack",
-    "lastName": "Beringer",
-    "rank": "General"
-  },
-  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-  "systems": [
-    "Ballistic Missile Early Warning System (BMEWS)",
-    "North Warning System (NWS)",
-    "Space-Based Infrared System (SBIRS)",
-    "Cheyenne Mountain Complex"
-  ]
-}
-> .note "now let's see what it produced"
-"============================================================="
-> .out
-{
-  "commanderDetails": {
-    "fullName": "Jack Beringer",
-    "salutation": "General Jack Beringer",
-    "systemsUnderCommand": 4
-  },
-  "organization": "NORAD",
-  "location": "Cheyenne Mountain Complex, Colorado",
-  "commander": {
-    "firstName": "Jack",
-    "lastName": "Beringer",
-    "rank": "General"
-  },
-  "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-  "systems": [
-    "Ballistic Missile Early Warning System (BMEWS)",
-    "North Warning System (NWS)",
-    "Space-Based Infrared System (SBIRS)",
-    "Cheyenne Mountain Complex"
-  ]
-}
-> .note "what happens if we put it on the web and fetch it?"
-"============================================================="
-> .init -f "example/ex19.json"
-{
-  "noradCommander": "${ norad.commanderDetails  }",
-  "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes }",
-  "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
-}
->  .note "If we look at the output, it's just the template."
-"============================================================="
-> .out
-{
-  "noradCommander": {
-    "fullName": "../${commander.firstName & ' ' & commander.lastName}",
-    "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
-    "systemsUnderCommand": "../${$count(systems)}"
-  },
-  "norad": {
-    "commanderDetails": {
-      "fullName": "../${commander.firstName & ' ' & commander.lastName}",
-      "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
-      "systemsUnderCommand": "../${$count(systems)}"
-    },
-    "organization": "NORAD",
-    "location": "Cheyenne Mountain Complex, Colorado",
-    "commander": {
-      "firstName": "Jack",
-      "lastName": "Beringer",
-      "rank": "General"
-    },
-    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-    "systems": [
-      "Ballistic Missile Early Warning System (BMEWS)",
-      "North Warning System (NWS)",
-      "Space-Based Infrared System (SBIRS)",
-      "Cheyenne Mountain Complex"
-    ]
-  },
-  "handleRes": "{function:}"
-}
-> .note "Now let's use the import function on the template"
-"============================================================="
-> .init -f example/ex16.json
-{
-   "noradCommander": "${ norad.commanderDetails  }",
-   "norad": "${ $fetch('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json') ~> handleRes ~> $import}",
-   "handleRes": "${ function($res){$res.ok? $res.json():{'error': $res.status}} }"
-}
-> .out
-{
-   "noradCommander": {
-      "fullName": "Jack Beringer",
-      "salutation": "General Jack Beringer",
-      "systemsUnderCommand": 4
-   },
-   "norad": {
-      "commanderDetails": {
-         "fullName": "Jack Beringer",
-         "salutation": "General Jack Beringer",
-         "systemsUnderCommand": 4
-      },
-      "organization": "NORAD",
-      "location": "Cheyenne Mountain Complex, Colorado",
-      "commander": {
-         "firstName": "Jack",
-         "lastName": "Beringer",
-         "rank": "General"
-      },
-      "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-      "systems": [
-         "Ballistic Missile Early Warning System (BMEWS)",
-         "North Warning System (NWS)",
-         "Space-Based Infrared System (SBIRS)",
-         "Cheyenne Mountain Complex"
-      ]
-   },
-   "handleRes": "{function:}"
-}
-> .note "You can see above that 'import' makes it behave as a template, not raw JSON."
-"============================================================="
-> .note "We don't have to fetch ourselves to use import, it will do it for us."
-"============================================================="
-> .init -f "example/ex18.json"
-{
-  "noradCommander": "${ norad.commanderDetails  }",
-  "norad": "${ $import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/norad.json')}"
-}
-> .out
-{
-  "noradCommander": {
-    "fullName": "Jack Beringer",
-    "salutation": "General Jack Beringer",
-    "systemsUnderCommand": 4
-  },
-  "norad": {
-    "commanderDetails": {
-      "fullName": "Jack Beringer",
-      "salutation": "General Jack Beringer",
-      "systemsUnderCommand": 4
-    },
-    "organization": "NORAD",
-    "location": "Cheyenne Mountain Complex, Colorado",
-    "commander": {
-      "firstName": "Jack",
-      "lastName": "Beringer",
-      "rank": "General"
-    },
-    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-    "systems": [
-      "Ballistic Missile Early Warning System (BMEWS)",
-      "North Warning System (NWS)",
-      "Space-Based Infrared System (SBIRS)",
-      "Cheyenne Mountain Complex"
-    ]
-  }
-}
-```
-## Importing bits of other templates
-Suppose you just want to import a function defined in another template. The `$import` function understands
-URL fragments with JSON Pointers. In this example we use a URL with a fragment to import just a function
-from a remote template. Note that the URL ends in `#/resourceMapperFn`
-```json
-> .init -f "example/resourceMapperB.json"
-{
-  "input": {
-    "foo": 42,
-    "bar": "something",
-    "zap": "zing"
-  },
-  "resourceMapperAFn": "${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/resourceMapperA.json#/resourceMapperFn')}",
-  "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
-  "BEntities": "${ (resourceMapperBFn(input))}",
-  "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
-}
-> .out
-{
-  "input": {
-    "foo": 42,
-    "bar": "something",
-    "zap": "zing"
-  },
-  "resourceMapperAFn": "{function:}",
-  "resourceMapperBFn": "{function:}",
-  "BEntities": [],
-  "entities": [
-    {
-      "Type": "A",
-      "id": 42,
-      "bar": "something"
-    }
-  ]
-}
-```
-## Setting up local imports with --importPath
-You can import local files by specifying a folder where stated will look for the imported files
-```json
-> .init -f "example/localImport.json" --importPath=./example
-{
-  "noradCommander": "${ norad.commanderDetails  }",
-  "norad": "${ $import('ex17.json')}"
-}
-> .out
-{
-  "noradCommander": {
-    "fullName": "Jack Beringer",
-    "salutation": "General Jack Beringer",
-    "systemsUnderCommand": 4
-  },
-  "norad": {
-    "commanderDetails": {
-      "fullName": "Jack Beringer",
-      "salutation": "General Jack Beringer",
-      "systemsUnderCommand": 4
-    },
-    "organization": "NORAD",
-    "location": "Cheyenne Mountain Complex, Colorado",
-    "commander": {
-      "firstName": "Jack",
-      "lastName": "Beringer",
-      "rank": "General"
-    },
-    "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
-    "systems": [
-      "Ballistic Missile Early Warning System (BMEWS)",
-      "North Warning System (NWS)",
-      "Space-Based Infrared System (SBIRS)",
-      "Cheyenne Mountain Complex"
-    ]
-  }
-}
 
-```
-## Import JS functions
-Repl and cli support importing javascript functions. If provided file to --xf has a .js or .mjs extension, it will be
-loaded and all exported functions will be added to TemplateProcessor's execution context.
-
-An example "src/test/test-export.js" exports 2 functions
-```js
-const barFunc = (input) => `bar: ${input}`;
-
-// explicitly define exported functions and their names
-export const foo = () => "foo";
-export const bar = barFunc;
-```
-
-Which can be used in the stated tempalate context
-```json
-> .init -f example/importJS.json --xf=example/test-export.js
-{
-  "res": "${ $bar($foo()) }"
-}
-> .out
-{
-  "res": "bar: foo"
-}
-```
-
-This can be combined with the `--importPath` option to import files relative to that path
-```json
-> .init -f example/importJS.json --importPath=example --xf=test-export.js
-{
-  "res": "${ $bar($foo()) }"
-}
-> .out
-{
-  "res": "bar: foo"
-}
-```
-## The $open function
-Allowing expressions to open local files is a security risk. For this reason the core TemplateProcessor does
-not support the $open function. However, the CLI/REPL which are for local usage allow the $open function. Additionally,
-programs that want to allow properly guarded `$open` operations may inject a `$open` function of their choosing
-into the TemplateProcessor contexet. $open accepts a relative path, and parses the JSON or YAML file on that path into
-an object.
-```json [false, "true", false, "a.c='the answer is: 42' and b.c='the answer is: 42'", "true"]
-> .note This shows two equivalent ways to open a json or yaml file using $open
-"============================================================="
-> .cd example
-"Current directory changed to: /Users/falken/proj/jsonataexperiments/example"
-> .init -f "importLocal.json"
-{
-   "a": "${'ex01.json'~>$open~>$import}",
-   "b": "${$import($open('ex01.json'))}"
-}
-> .out
-{
-   "a": {
-      "a": 42,
-      "b": 42,
-      "c": "the answer is: 42"
-   },
-   "b": {
-      "a": 42,
-      "b": 42,
-      "c": "the answer is: 42"
-   }
-}
-> .cd ..
-"Current directory changed to: /Users/falken/proj/jsonataexperiments"
-```
-# The set function
-You have already seen how the REPL `.set` command works. The REPL simply calls the internal $set function. 
-The `$set` function can be called from your JSONata blocks or function. The `$set` function is used to push data into 
-other parts of the template. The function signature is `$set(jsonPointer, value)`. The 
-set command returns an array of JSON Pointers that represent the transitive updates that resulted from calling `set`.
-In the example below `$set('/systems/1', 'JOSHUA')` is used to push the string "JOSHUA" onto the `systems` array.
-
-```json
-> .init -f "example/ex13.json"
-{
-  "systems": [
-    "WOPR"
-  ],
-  "onBoot": "${ $set('/systems/1', 'JOSHUA')}",
-  "newSystem": "${systems[1]}"
-}
-> .out
-{
-  "newSystem": "JOSHUA",
-  "onBoot": [
-    "/systems/1",
-    "/newSystem"
-  ],
-  "systems": [
-    "WOPR",
-    "JOSHUA"
-  ]
-}
-```
-# options
-The cli and REPL both support `--options`. Options are set using a json object
-## strict
-The `strict` option currently supports the `refs` property. Setting `{"strict":{"refs":true}}` will cause templates
-to throw an Exception when references in the template cannot be resolved. Reference checking is only performed against 
-the template itself; it is not performed agains variables that are injected into the execution context by the TemplateProcessor
-library.
-```json
-> .log silent
-{
-  "log level": "silent"
-}
-> .init -f "example/strictref.json" --options={"strict":{"refs":true}}
-{
-  "a": 42,
-  "b": "${a}",
-  "c": "${z}"
-}
-> .out
-{
-  "a": 42,
-  "b": 42,
-  "c": {
-    "error": {
-      "name": "strict.refs",
-      "message": "/z does not exist, referenced from /c (strict.refs option enabled)"
-    }
-  }
-}
-```
-Options can also be used in oneshot mode. Note the use of backslashes to escape quotes in the JSON on the CLI
-```shell
-falken$ stated --options={\"strict\":{\"refs\":true}} example/strictref.json
-error: /z does not exist, referenced from /c (strict.refs option enabled)
-{
-  a: 42,
-  b: 42,
-  c: {
-    error: {
-      name: 'strict.refs',
-      message: '/z does not exist, referenced from /c (strict.refs option enabled)'
-    }
-  }
-}
-```
-## Setting the context with --xf
-The `--xf` argument can be used to provide a context file. Context is used
-to provide [JSONata Bindings](https://docs.jsonata.org/embedding-extending#expressionevaluateinput-bindings-callback)
-```shell
-> .note here is a regular json file
-"============================================================="
-> .init -f "example/env.json" 
-{
-  "env": {
-    "name": "Dr. Stephen Falken",
-    "addr": "Goose Island, OR, USA"
-  }
-}
-> .note let's use it as context to a stated template
-"============================================================="
-> .init -f "example/useEnv.json" --xf=example/env.json
-{
-  "name": "${$env.name}",
-  "address": "${$env.addr}"
-}
-> .out
-{
-  "name": "Dr. Stephen Falken",
-  "address": "Goose Island, OR, USA"
-}
-```
-## Setting the context with --ctx
-The `--ctx` argument can be used to inject context variables into the template. Variables with a sinle `$` like `$foo` 
-refer to the JSONata Context. You can inject variables into the context using `--ctx.<dot-path>=val`. 
-```shell
-> .init -f example/ctx.json --ctx.name david --ctx.games.choice1=chess --ctx.games.choice2 "global thermonuclear war"
-{
-  "msg": "${'Hello, ' & $name & ', how about a nice game of ' & $games.choice1}",
-  "games": "${$games}"
-}
-> .out
-{
-  "msg": "Hello, david, how about a nice game of chess",
-  "games": {
-    "choice1": "chess",
-    "choice2": "global thermonuclear war"
-  }
-}
-
-```
-# Debounce, Defer, and Rate Limit
-## $debounce function
-Debouncing is a technique used in software development, particularly in web development and event handling, 
-to control or limit the frequency of a particular action or event when it occurs rapidly or frequently. 
-It helps prevent excessive or redundant executions of the action, making applications more efficient and 
-responsive.
-
-In this example we rapidly change a counter and feed it into a debounced function that appends the count to 
-an accumulator array, `acc`. The `interval` is terminated when `count` reaches 100, and due to debouncing, 
-only a single value, 100, is written into `acc`. We use the `--tail "/ until acc[0]=100"` to tail the 
-root document (`/`) until a jsonata expression condition is met. The condition we check is 
-`acc[0]=100` which is the expected debounced value.
- 
-```json
-> .init -f "example/debounce.yaml"
-{
-   "acc": [],
-   "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $debounce(15)}",
-   "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
-   "count": 0,
-   "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
-   "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }"
-}
-```
-```json ["data.acc=[100] and data.stop='done' and data.count=100"]
-> .init -f "example/debounce.yaml" --tail "/ until acc[0]=100"
-Started tailing... Press Ctrl+C to stop.
-{
-  "acc": [
-    100
-  ],
-  "counter": "{function:}",
-  "count": 100,
-  "rapidCaller": "--interval/timeout--",
-  "stop": "done"
-}
-```
-## $defer function
-While `$debounce` is used to create a debounced function, `$defer` can be a more concise approach when you simply want a
-"slowed down" version of a rapidly changing variable. $defer takes two arguments:
-1. The json pointer to the field you wish to defer (or "slow down")
-2. An optional number of milliseconds, T. 
-
-`$defer` will always produce one initial value, which comes from the deferred field. `$defer` will not produce a 
-subsequent value until the deferred field has remained unchanges for T ms.
-For example, suppose you are collecting a query string from a user
-input. Each character entered mutates the `query` field, but we don't want to do anything with `query` unless the user
-pauses or stops typing characters. In the example below, an `$setInterval` call is used to simulate a user entering
-the characters of a `sampleQuery` into the `query` field at a rate of one every 25ms. Fast typer! The `deferredQuery$` will begin with the inital value of `query` ("") and remain unchanged 
-until the `query`stops receiving changes and reaches its final state of "Would you like to play a game? How about a nice game of chess?"
-
-```json
-> .init -f "example/defer.yaml"
-{
-   "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
-   "query": "",
-   "deferredQuery$": "$defer('/query', 100)",
-   "counter$": "function(){  $set('/count', count+1)}",
-   "count": 0,
-   "appendQuery$": "$set('/query', sampleQuery~>$substring(0,count))",
-   "rapidCaller$": "$setInterval(counter$, 25)",
-   "stop$": "count=$length(sampleQuery)\n  ?($clearInterval(rapidCaller$);'done')\n  :'simulating typing'  \n"
-}
-```
-To watch the data changing we can use the `--tail until` to tail the changing template output until it reaches the final state.
-```json ["data.deferredQuery$ = data.sampleQuery"]
-> .init -f example/defer.yaml --tail "/ until deferredQuery$ = 'Would you like to play a game? How about a nice game of chess?'"
-Started tailing... Press Ctrl+C to stop.
-{
-  "sampleQuery": "Would you like to play a game? How about a nice game of chess?",
-  "query": "Would you like to play a game? How about a nice game of chess?",
-  "deferredQuery$": "Would you like to play a game? How about a nice game of chess?",
-  "counter$": "{function:}",
-  "count": 62,
-  "appendQuery$": [
-    "/query"
-  ] ,
-  "rapidCaller$": "--interval/timeout--",
-  "stop$": "done"
-}
-```
-Here is a screencapture showing the two commands above executed in the REPL. 
-![tailing deferred](https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/taildefer.gif)
-## $rateLimit function
-Rate limiting allows to ensure than no than one function call is executed withing some time. For exameple,
-we want to ensure that a function calling external APIs does not overload it.
-```json
->.init -f example/rateLimit.yaml
-{
-  "acc": [],
-  "appendAcc": "${ function($v){$set('/acc/-', $v)} ~> $rateLimit(100)}",
-  "counter": "${   function(){($set('/count', $$.count+1); $$.count)}    }",
-  "count": 0,
-  "rapidCaller": "${$setInterval(counter~>appendAcc, 10)}",
-  "stop": "${ count=100?($clearInterval($$.rapidCaller);'done'):'not done'  }",
-  "accCount": "${ $count(acc) }"
-}
-```
-Below output demonstrates, that `rateLimit` function calls to to set `acc` to once in no less than 100ms, which will 
-result in only 10 counts added o the `acc` array, the first one, the last one, and 10 in between. 
-```json ["data.accCounter = 12"]
->.init -f example/rateLimit.yaml --tail "/ until accCount=12"
-Started tailing... Press Ctrl+C to stop.
-{
-  "acc": [
-    1,
-    10,
-    19,
-    28,
-    38,
-    48,
-    57,
-    66,
-    75,
-    85,
-    94,
-    100
-  ],
-  "counter": "{function:}",
-  "count": 100,
-  "rapidCaller": "--interval/timeout--",
-  "stop": "done",
-  "accCount": 12
-}
-```
-# Logging
-the `.log` command can set the log level to `[silent, error, warn, info, verbose, debug]`. Enabling high
-log levels like debug can help you track down problems with expressions.
-```json
-> .log debug
-{
-  "log level": "debug"
-}
-```
-```shell
- .init -f "example/errors.json"
-arguments: {"_":[],"f":"example/errors.json","filepath":"example/errors.json","tags":[],"oneshot":false,"options":{}}
-verbose: initializing...
-debug: tags: {}
-verbose: evaluating template...
-error: Error evaluating expression at /b
-error: The right side of the "+" operator must evaluate to a number {"code":"T2002","position":3,"stack":"Error\n    at evaluateNumericExpression (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:4122:25)\n    at evaluateBinary (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3900:30)\n    at async evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:3490:26)\n    at async Object.evaluate (/Users/ghendrey/proj/jsonataexperiments/node_modules/jsonata/jsonata.js:5558:26)\n    at async TemplateProcessor._evaluateExprNode (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:637:25)\n    at async TemplateProcessor._evaluateExpression (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:556:28)\n    at async TemplateProcessor.evaluateJsonPointersInOrder (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:515:31)\n    at async TemplateProcessor.evaluateDependencies (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:358:16)\n    at async TemplateProcessor.evaluate (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:123:9)\n    at async TemplateProcessor.initialize (file:///Users/ghendrey/proj/jsonataexperiments/src/TemplateProcessor.ts:113:9)","token":"+","value":" is not a string"}
-debug: Expression: a + ' is not a string'
-debug: Target: {
-  "a": 42,
-  "b": "${a + ' is not a string'}"
-}
-debug: Result: null
-verbose: _evaluateExpression at /b completed in 13 ms.
-verbose: evaluation complete in 13 ms...
-verbose: initialization complete...
-{
-  "a": 42,
-  "b": "${a + ' is not a string'}"
-}
-```
 # Error Handling
 ## The error object
 if a JSONata expression evaluation throws an exception, the exception is converted to an error and placed
