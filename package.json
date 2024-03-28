@@ -22,7 +22,7 @@
   "scripts": {
     "clean": "rm -rf dist",
     "build": "tsc && npm run webpack && npm run docs",
-    "webpack": "webpack && webpack --config webpack.config.cjs.js",
+    "webpack": "webpack && webpack --config webpack.config.cjs.js && webpack --config webpack.nodeSingleBin.cjs.js",
     "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
     "test-fast": "node --experimental-vm-modules node_modules/jest/bin/jest.js",
     "stated": "node --experimental-vm-modules dist/stated.js",

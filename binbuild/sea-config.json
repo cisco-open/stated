@@ -1,0 +1,1 @@
+{ "main": "../dist/bundle-node-single-bin.cjs", "output": "sea-prep.blob" }
