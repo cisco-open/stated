@@ -1286,7 +1286,7 @@ export default class TemplateProcessor {
         const {compiledExpr__, exprTargetJsonPointer__, expr__} = metaInfo;
         let target;
         try {
-            target = jp.get(output, exprTargetJsonPointer__); //an expression is always relative to a target
+            target = jp.get(output, exprTargetJsonPointer__ as JsonPointerString); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
             const jittedFunctions: { [key: string]: (arg: any) => Promise<any> } = {};
             for (const k of this.functionGenerators.keys()) {
@@ -1316,7 +1316,7 @@ export default class TemplateProcessor {
             ...{"set": safe(this.generateSet(planStep))},
             ...jittedFunctions
             };
-            evaluated = await compiledExpr__.evaluate(
+            evaluated = await compiledExpr__?.evaluate(
                 target,
                 context
             );
@@ -1466,9 +1466,11 @@ export default class TemplateProcessor {
             //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". queueParent() allows us to
             //pickup the /rxLog array as being an implicit dependency of its array elements. So if an element
             //is added or removed, we will recognize anyone who depends on /rxLog as a dependent
+            //@ts-ignore
             if (!jp.has(this.templateMeta, currentPtr)){
                 continue;
             }
+            //@ts-ignore
             const metaInf = jp.get(this.templateMeta, currentPtr) as MetaInfo;
             if(metaInf.isFunction__){
                 continue; //function never gets re-evaluated
