@@ -98,7 +98,7 @@ export default class VizGraph {
         return dotString;
     }
 
-    static escapeSpecialCharacters(str) {
+    static escapeSpecialCharacters(str:string) {
         // Define the characters to escape and their escaped counterparts
         const specialCharacters = {
             '&': '&amp;',
@@ -109,6 +109,6 @@ export default class VizGraph {
         };
 
         // Replace special characters with their escaped counterparts
-        return str.replace(/[&"'<>]/g, char => specialCharacters[char]);
+        return str.replace(/[&"'<>]/g, char => (specialCharacters as any)[char]);
     }
 }

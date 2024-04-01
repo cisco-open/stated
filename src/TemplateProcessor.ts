@@ -12,20 +12,18 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-import { default as jp } from './JsonPointer.js';
+import {default as jp} from './JsonPointer.js';
 import isEqual from "lodash-es/isEqual.js";
 import merge from 'lodash-es/merge.js';
 import yaml from 'js-yaml';
-import Debugger from './Debugger.js';
 import MetaInfoProducer, {JsonPointerString, JsonPointerStructureArray, MetaInfo} from './MetaInfoProducer.js';
 import DependencyFinder from './DependencyFinder.js';
 import path from 'path';
 import fs from 'fs';
-import ConsoleLogger, {StatedLogger} from "./ConsoleLogger.js";
+import ConsoleLogger, {Levels, LOG_LEVELS, StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
-import { LOG_LEVELS } from "./ConsoleLogger.js";
 import {TimerManager} from "./TimerManager.js";
-import { stringifyTemplateJSON } from './utils/stringify.js';
+import {stringifyTemplateJSON} from './utils/stringify.js';
 import {debounce} from "./utils/debounce.js"
 import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
@@ -65,7 +63,16 @@ export type PlanStep = {
     forkId:string,
     didUpdate:boolean
 }
+/**
+ * a FunctionGenerator is used to generate functions that need the context of which expression they were called from
+ * which is made available to them in the MetaInf
+ */
+export type FunctionGenerator = (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => (Promise<(arg: any) => Promise<any>>);
 
+/**
+ * defines the function signature for data change callbacks, called when data at the ptr changes
+ */
+export type DataChangeCallback = (data:any, ptr:JsonPointerString, removed?:boolean)=>void
 
 
 
@@ -183,7 +190,7 @@ export default class TemplateProcessor {
      * @param {Object} [context={}] - Optional context data for the template.
      * @returns {Promise<TemplateProcessor>} Returns an initialized instance of `TemplateProcessor`.
      */
-    static async load(template, context = {}) {
+    static async load(template:object, context = {}):Promise<TemplateProcessor> {
         const t = new TemplateProcessor(template, context);
         await t.initialize();
         return t;
@@ -226,35 +233,36 @@ export default class TemplateProcessor {
     context: any;
 
     /** Contains the processed output after template processing. */
-    output: {};
+    output: {}={};
 
     /** Represents the raw input for the template processor. */
     input: any;
 
-    /** Meta information related to the template being processed. */
+    /** This object mirrors the template output in structure but where the output contains actual data,
+     * this object contains MetaInfo nodes that track metadata on the actual nodes */
     templateMeta: any;
 
     /** List of warnings generated during template processing. */
-    warnings: any[];
+    warnings: any[] = [];
 
     /** Maps JSON pointers of import paths to their associated meta information. */
-    metaInfoByJsonPointer: MetaInfoMap;
+    metaInfoByJsonPointer: MetaInfoMap={};
 
     /** A set of tags associated with the template. */
-    tagSet: Set<unknown>;
+    tagSet: Set<string>;
 
     /** Configuration options for the template processor. */
-    options: any;
+    options: any = {};
 
     /** Debugger utility for the template processor. */
     debugger: any;
 
     /** Contains any errors encountered during template processing. */
-    errorReport: {};
+    errorReport: {[key: JsonPointerString]:any}={};
 
     /** Execution plans 'from' a given JSON Pointer. So key is JSON Pointer and value is array of JSON
      * pointers (a plan) */
-    private executionPlans: { [key: JsonPointerString]: JsonPointerString[] };
+    private executionPlans: { [key: JsonPointerString]: JsonPointerString[] }={};
 
     /** A queue of execution plans awaiting processing. */
     private readonly executionQueue:(Plan|SnapshotPlan)[] = [];
@@ -268,12 +276,12 @@ export default class TemplateProcessor {
      *  is actually genrated on the fly, using knowledge of the json path that it was
      *  called at, to replace the content of the template at that path with the downloaded
      *  content.*/
-    functionGenerators: Map<string, (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => Promise<(arg: any) => Promise<any>>>;
+    functionGenerators: Map<string, FunctionGenerator>;
 
     /** for every json pointer, we have multiple callbacks that are stored in a Set
      * @private
      */
-    private changeCallbacks:Map<JsonPointerString, Set<(data:any, jsonPointer: JsonPointerString|JsonPointerString[], removed:boolean)=>void>>;
+    private changeCallbacks:Map<JsonPointerString, Set<DataChangeCallback>>;
 
     /** Flag indicating if the template processor is currently initializing. */
     private isInitializing: boolean;
@@ -281,7 +289,7 @@ export default class TemplateProcessor {
     /** A unique identifier for the template processor instance. */
     private readonly uniqueId;
 
-    private tempVars:JsonPointerString[];
+    private tempVars:JsonPointerString[]=[];
 
     private timerManager:TimerManager;
 
@@ -330,7 +338,6 @@ export default class TemplateProcessor {
         this.setupContext(context);
         this.resetTemplate(template);
         this.options = options;
-        this.debugger = new Debugger(this.templateMeta, this.logger);
         this.isInitializing = false;
         this.changeCallbacks = new Map();
         this.functionGenerators = new Map();
@@ -340,7 +347,7 @@ export default class TemplateProcessor {
     }
 
     // resetting template means that we are resetting all data holders and set up new template
-    private resetTemplate(template) {
+    private resetTemplate(template:object) {
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
         this.templateMeta = JSON.parse(JSON.stringify(template));// Copy the given template to `initialize the templateMeta
@@ -354,7 +361,7 @@ export default class TemplateProcessor {
         this.context = merge(
             {},
             TemplateProcessor.DEFAULT_FUNCTIONS,
-            {"save": (output:object, args?:any[])=>{ //default implementation of save just logs the execution status
+            {"save": (output:object)=>{ //default implementation of save just logs the execution status
                     if (this.isEnabled("debug")){
                         console.debug(this.executionStatus.toJsonString());
                     }
@@ -388,7 +395,7 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {} = undefined, jsonPtr: string = "/", snapshottedOutput: {} = undefined):Promise<void> {
+    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", snapshottedOutput: {}|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
             this.executionStatus.clear();
@@ -422,14 +429,14 @@ export default class TemplateProcessor {
 
             if (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web') {
                 const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
-                this.logger = await FancyLogger.getLogger();
+                this.logger = await FancyLogger.getLogger() as StatedLogger;
                 this.logger.level = _level;
             }
 
             this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
             this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
             this.executionPlans = {}; //clear execution plans
-            let parsedJsonPtr = jp.parse(jsonPtr);
+            let parsedJsonPtr:JsonPointerStructureArray = jp.parse(jsonPtr);
             parsedJsonPtr = parsedJsonPtr.filter(e=>e!=="");//isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
             let compilationTarget;
             if(jsonPtr === "/"){ //this is the root, not an imported sub-importedSubtemplate
@@ -489,8 +496,8 @@ export default class TemplateProcessor {
 
     //this is used to wrap all functions that we expose to jsonata expressions so that
     //they do not throw exceptions, but instead return {"error":{...the error...}}
-    private withErrorHandling(fn) {
-        return (...args) => {
+    private withErrorHandling<T extends any[]>(fn:(...args:T)=>any) {
+        return (...args:T) => {
             try {
                 const result = fn(...args);
                 if (result instanceof Promise) {
@@ -506,7 +513,7 @@ export default class TemplateProcessor {
                     });
                 }
                 return result;
-            } catch (error) {
+            } catch (error:any) {
                 this.logger.error(error.toString());
                 return {
                     "error": {
@@ -531,7 +538,7 @@ export default class TemplateProcessor {
         await this.import(expression, jsonPointer);
     }
 
-    async import(template, jsonPtrImportPath) {
+    async import(template:object|string, jsonPtrImportPath:JsonPointerString) {
         jp.set(this.output, jsonPtrImportPath, template);
         await this.initialize(template, jsonPtrImportPath);
     }
@@ -551,10 +558,9 @@ export default class TemplateProcessor {
                 resp = importMe; //literally a direction expression like '/${foo}'
             }else {
                 this.logger.debug(`Attempting local file import of '${importMe}'`);
-                const mightBeAFilename= importMe;
                 try {
                     if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
-                        resp = await this.localImport(mightBeAFilename);
+                        resp = await this.localImport(importMe);
                     }
                 }catch (error){
                     this.logger.debug("argument to import doesn't seem to be a file path");
@@ -573,7 +579,7 @@ export default class TemplateProcessor {
             return TemplateProcessor.NOOP;
         }
     }
-    private parseURL(input) {
+    private parseURL(input:string):URL|false {
         try {
             return new URL(input);
         } catch (e) {
@@ -581,7 +587,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async fetchFromURL(url) {
+    private async fetchFromURL(url:URL) {
         try {
             this.logger.debug(`fetching ${url}`);
             const resp = await fetch(url);
@@ -625,7 +631,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private extractFragmentIfNeeded(response, url) {
+    private extractFragmentIfNeeded(response:any, url:URL) {
         const jsonPointer = url.hash && url.hash.substring(1);
         if (jsonPointer && jp.has(response, jsonPointer)) {
             this.logger.debug(`Extracting fragment at ${jsonPointer}`);
@@ -636,7 +642,7 @@ export default class TemplateProcessor {
         return response;
     }
 
-    private validateAsJSON(obj) {
+    private validateAsJSON(obj:string) {
         try {
             const jsonString = JSON.stringify(obj);
             const parsedObject = JSON.parse(jsonString);
@@ -650,16 +656,16 @@ export default class TemplateProcessor {
         }
     }
 
-    private async setContentInTemplate(literalTemplateToImport, metaInfo: MetaInfo):Promise<void> {
+    private async setContentInTemplate(literalTemplateToImport:any, metaInfo: MetaInfo):Promise<void> {
         const jsonPtrIntoTemplate:string = metaInfo.jsonPointer__ as string;
         jp.set(this.output, jsonPtrIntoTemplate, literalTemplateToImport);
         await this.initialize(literalTemplateToImport, jsonPtrIntoTemplate); //, jp.parse(metaInfo.exprTargetJsonPointer__)
     }
 
-    private async createMetaInfos(template, rootJsonPtr = []) {
+    private async createMetaInfos(template:object, rootJsonPtr:JsonPointerStructureArray = []) {
         let initialMetaInfos = await MetaInfoProducer.getMetaInfos(template);
 
-        let metaInfos = initialMetaInfos.reduce((acc, metaInfo) => {
+        return initialMetaInfos.reduce((acc: MetaInfo[], metaInfo) => {
             metaInfo.jsonPointer__ = [...rootJsonPtr, ...metaInfo.jsonPointer__];
             metaInfo.exprTargetJsonPointer__ = metaInfo.jsonPointer__.slice(0, -1);
             const cdUpPath = metaInfo.exprRootPath__;
@@ -668,14 +674,14 @@ export default class TemplateProcessor {
                 if (cdUpParts) { // ../../{...}
                     metaInfo.exprTargetJsonPointer__ = metaInfo.exprTargetJsonPointer__.slice(0, -cdUpParts.length);
                 } else if (cdUpPath.match(/^\/$/g)) { // /${...}
-                    metaInfo.exprTargetJsonPointer__ = this.adjustRootForSimpleExpressionImports(template,rootJsonPtr);
-                } else if(cdUpPath.match(/^\/\/$/g)){ // //${...}
+                    metaInfo.exprTargetJsonPointer__ = this.adjustRootForSimpleExpressionImports(template, rootJsonPtr);
+                } else if (cdUpPath.match(/^\/\/$/g)) { // //${...}
                     metaInfo.exprTargetJsonPointer__ = []; //absolute root
-                } else{
+                } else {
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `unexpected 'path' expression '${cdUpPath} (see https://github.com/cisco-open/stated#rerooting-expressions)`;
-                    const errorObject = {name:'invalidExpRoot', message: msg}
-                    this.errorReport[jsonPtr] = {error:errorObject};
+                    const errorObject = {name: 'invalidExpRoot', message: msg}
+                    this.errorReport[jsonPtr as string] = {error: errorObject};
                     this.logger.error(msg);
                 }
             }
@@ -685,14 +691,14 @@ export default class TemplateProcessor {
                     const depFinder = new DependencyFinder(metaInfo.expr__);
                     metaInfo.compiledExpr__ = depFinder.compiledExpression;
                     //we have to filter out "" from the dependencies as these are akin to 'no-op' path steps
-                    metaInfo.dependencies__ = depFinder.findDependencies().map(depArray=>depArray.filter(pathPart=>pathPart!==""));
+                    metaInfo.dependencies__ = depFinder.findDependencies().map(depArray => depArray.filter(pathPart => pathPart !== ""));
                     acc.push(metaInfo);
-                } catch(e) {
+                } catch (e) {
                     this.logger.error(JSON.stringify(e));
                     const jsonPtr = jp.compile(metaInfo.jsonPointer__);
                     const msg = `problem analysing expression : ${metaInfo.expr__}`;
-                    const errorObject = {name:"badJSONata", message: msg}
-                    this.errorReport[jsonPtr] = {error:errorObject};
+                    const errorObject = {name: "badJSONata", message: msg}
+                    this.errorReport[jsonPtr] = {error: errorObject};
                     this.logger.error(msg);
                 }
             } else {
@@ -701,24 +707,16 @@ export default class TemplateProcessor {
 
             return acc;
         }, []);
-
-        return metaInfos;
     }
 
-    //for deps [[a,b,c], [d,e,f]] we convert to [[a,b,c], [a,b], [a],[d,e,f], [d,e], [d]] thus producing all ancestors of a.b.c as well as a.b.c
-    private static getAncestors(deps) {  //
-        return deps.map(d => d.map((_, index, self) => self.slice(0, index + 1))).flat(1).filter(d => d.length > 1 || !["", "$"].includes(d[0])); //the final filter is to remove dependencies on "" or $ (root)
-    }
-
-
-    private sortMetaInfos(metaInfos) {
+    private sortMetaInfos(metaInfos:MetaInfo[]) {
         metaInfos.sort((a, b) => a.jsonPointer__ < b.jsonPointer__ ? -1 : (a.jsonPointer__ > b.jsonPointer__ ? 1 : 0));
     }
 
-    private populateTemplateMeta(metaInfos) {
+    private populateTemplateMeta(metaInfos:MetaInfo[]) {
         metaInfos.forEach(meta => {
-            const initialDependenciesPathParts = this.removeLeadingDollarsFromDependencies(meta);
-            meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.exprTargetJsonPointer__, initialDependenciesPathParts);
+            const initialDependenciesPathParts:JsonPointerStructureArray[] = this.removeLeadingDollarsFromDependencies(meta);
+            meta.absoluteDependencies__ = this.makeDepsAbsolute(meta.exprTargetJsonPointer__ as JsonPointerStructureArray, initialDependenciesPathParts);
             meta.dependencies__ = initialDependenciesPathParts;
             //so if we will never allow replacement of the entire root document. But modulo that if-statement we can setup the templateMeta
             if (meta.jsonPointer__.length > 0) {
@@ -730,17 +728,17 @@ export default class TemplateProcessor {
     }
 
     //mutates all the pieces of metaInf that are path parts and turns them into JSON Pointer syntax
-    private static compileToJsonPointer(meta) {
-        meta.absoluteDependencies__ = [...new Set(meta.absoluteDependencies__.map(jp.compile))];
-        meta.dependencies__ = meta.dependencies__.map(jp.compile);
-        meta.exprTargetJsonPointer__ = jp.compile(meta.exprTargetJsonPointer__);
-        meta.jsonPointer__ = jp.compile(meta.jsonPointer__);
-        meta.parent__ = jp.compile(meta.parent__);
+    private static compileToJsonPointer(meta:MetaInfo) {
+        meta.absoluteDependencies__ = [...new Set((meta.absoluteDependencies__ as JsonPointerStructureArray[]).map(jp.compile))];
+        meta.dependencies__ = (meta.dependencies__ as JsonPointerStructureArray[]).map(jp.compile);
+        meta.exprTargetJsonPointer__ = jp.compile(meta.exprTargetJsonPointer__ as JsonPointerStructureArray);
+        meta.jsonPointer__ = jp.compile(meta.jsonPointer__ as JsonPointerStructureArray);
+        meta.parent__ = jp.compile(meta.parent__ as JsonPointerStructureArray);
     }
 
-    private setupDependees(metaInfos) {
+    private setupDependees(metaInfos:MetaInfo[]) {
         metaInfos.forEach(i => {
-            i.absoluteDependencies__?.forEach(ptr => {
+            (i.absoluteDependencies__ as JsonPointerString[])?.forEach((ptr:JsonPointerString) => {
                 if (!jp.has(this.templateMeta, ptr)) {
                     const parent = jp.parent(ptr);
                     const  nonMaterialized = {
@@ -757,7 +755,7 @@ export default class TemplateProcessor {
                     metaInfos.push(nonMaterialized); //create metaInfos node for non-materialized node
 
                 }
-                const meta = jp.get(this.templateMeta, ptr);
+                const meta = jp.get(this.templateMeta, ptr) as MetaInfo;
                 //so there is still the possibility that the node in the templateMeta existed, but it was just created
                 //as an empty object or array node when a "deeper" json pointer was set. Like /view/0/0/0/name would
                 //result in 2 empty intermediate array objects. And then someone can have a dependency on /view/0 or
@@ -777,12 +775,12 @@ export default class TemplateProcessor {
                     merge(meta, nonMaterialized);
                 }
 
-                meta.dependees__.push(i.jsonPointer__);
+                (meta.dependees__ as JsonPointerString[]).push(i.jsonPointer__ as JsonPointerString);
             });
         });
     }
 
-    private async evaluateInitialPlanDependencies(metaInfos) {
+    private async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.executePlan({
             sortedJsonPtrs:evaluationPlan,
@@ -794,36 +792,36 @@ export default class TemplateProcessor {
         });
     }
 
-    private makeDepsAbsolute(parentJsonPtr, localJsonPtrs) {
+    private makeDepsAbsolute(parentJsonPtr:JsonPointerStructureArray, localJsonPtrs:JsonPointerStructureArray[]) {
         return localJsonPtrs.map(localJsonPtr => { //both parentJsonPtr and localJsonPtr are like ["a", "b", "c"] (array of parts)
             return [...parentJsonPtr, ...localJsonPtr]
         })
     }
 
-    private removeLeadingDollarsFromDependencies(metaInfo) {
+    private removeLeadingDollarsFromDependencies(metaInfo:MetaInfo):JsonPointerStructureArray[] {
         // Extract dependencies__ and jsonPointer__ from metaInfo
-        const {dependencies__,} = metaInfo;
+        const {dependencies__} = metaInfo;
         // Iterate through each depsArray in dependencies__ using reduce function
-        dependencies__.forEach((depsArray) => {
+        dependencies__.forEach(depsArray => {
             const root = depsArray[0];
             if (root === "" || root === "$") {
-                depsArray.shift();
+                (depsArray as JsonPointerStructureArray).shift();
             }
         });
-        return dependencies__;
+        return dependencies__ as JsonPointerStructureArray[];
     }
 
-    private propagateTags(metaInfos) {
+    private propagateTags(metaInfos:MetaInfo[]) {
         // Set of visited nodes to avoid infinite loops
         const visited = new Set();
 
         // Recursive function for DFS
-        const dfs = (node)=> {
+        const dfs = (node:MetaInfo)=> {
             if (node.jsonPointer__==undefined || visited.has(node.jsonPointer__)) return;
             visited.add(node.jsonPointer__);
             // Iterate through the node's dependencies
             node.absoluteDependencies__?.forEach(jsonPtr => {
-                const dependency = jp.get(this.templateMeta, jsonPtr);
+                const dependency: MetaInfo = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
                 // Recurse on the dependency to ensure we collect all its tags
                 dfs(dependency);
                 // Propagate tags from the dependency to the node
@@ -836,10 +834,10 @@ export default class TemplateProcessor {
     }
 
     private cacheTmpVarLocations(metaInfos:MetaInfo[]):JsonPointerString[]{
-        const tmpVars = [];
+        const tmpVars:JsonPointerString[] = [];
         metaInfos.forEach(metaInfo => {
             if (metaInfo.temp__ === true) {
-                tmpVars.push(metaInfo.jsonPointer__);
+                tmpVars.push(metaInfo.jsonPointer__ as JsonPointerString);
             }
         })
         return tmpVars
@@ -856,15 +854,15 @@ export default class TemplateProcessor {
     }
 
 
-    private topologicalSort(metaInfos, exprsOnly = true, fanout=true):JsonPointerString[] {
+    private topologicalSort(metaInfos:MetaInfo[], exprsOnly = true, fanout=true):JsonPointerString[] {
         const visited = new Set();
-        const recursionStack = new Set(); //for circular dependency detection
+        const recursionStack:Set<JsonPointerString> = new Set(); //for circular dependency detection
         const orderedJsonPointers:Set<string> = new Set();
         const templateMeta = this.templateMeta;
 
         //--------------- utility sub-functions follow ----------------//
 
-        const listDependencies = (metaInfo) => {
+        const listDependencies = (metaInfo:MetaInfo) => {
             markAsVisited(metaInfo);
             addToScope(metaInfo);
 
@@ -875,25 +873,25 @@ export default class TemplateProcessor {
             removeFromScope(metaInfo);
         }
 
-        const hasJsonPointer = (metaInfo) => {
+        const hasJsonPointer = (metaInfo:MetaInfo) => {
             return metaInfo.jsonPointer__ !== undefined;
         }
 
-        const markAsVisited = (metaInfo) => {
+        const markAsVisited = (metaInfo:MetaInfo) => {
             visited.add(metaInfo.jsonPointer__);
         }
 
-        const addToScope = (metaInfo) => {
-            recursionStack.add(metaInfo.jsonPointer__);
+        const addToScope = (metaInfo:MetaInfo) => {
+            recursionStack.add(metaInfo.jsonPointer__ as JsonPointerString);
         }
 
-        const removeFromScope = (metaInfo) => {
-            recursionStack.delete(metaInfo.jsonPointer__);
+        const removeFromScope = (metaInfo:MetaInfo) => {
+            recursionStack.delete(metaInfo.jsonPointer__ as JsonPointerString);
         }
 
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
         //template. Fields that don't end in "__" are children of the given object in the template
-        const followChildren = (metaInfoNode) => {
+        const followChildren = (metaInfoNode:any) => {
             for (const childKey in metaInfoNode) {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
                     const child = metaInfoNode[childKey];
@@ -903,12 +901,12 @@ export default class TemplateProcessor {
                 }
             }
         }
-        const searchUpForExpression = (childNode):MetaInfo=> {
-            let pathParts = jp.parse(childNode.jsonPointer__);
+        const searchUpForExpression = (childNode:MetaInfo):MetaInfo|undefined=> {
+            let pathParts = jp.parse(childNode.jsonPointer__ as JsonPointerString);
             while (pathParts.length > 1) {
                 pathParts = pathParts.slice(0, -1); //get the parent expression
                 const jsonPtr = jp.compile(pathParts);
-                const ancestorNode = jp.get(this.templateMeta, jsonPtr);
+                const ancestorNode = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
                 if (ancestorNode.materialized__ === true) {
                     return ancestorNode;
                 }
@@ -917,31 +915,31 @@ export default class TemplateProcessor {
 
         }
 
-        const followDependencies = (metaInfo) => {
+        const followDependencies = (metaInfo:MetaInfo) => {
             if (!metaInfo.absoluteDependencies__) return;
 
             for (const dependency of metaInfo.absoluteDependencies__) {
-                if (recursionStack.has(dependency)) {
-                    logCircularDependency(dependency);
+                if (recursionStack.has(dependency as JsonPointerString)) {
+                    logCircularDependency(dependency as JsonPointerString);
                     continue;
                 }
 
                 if (visited.has(dependency)) continue;
 
-                const dependencyNode = jp.get(templateMeta, dependency);
+                const dependencyNode = jp.get(templateMeta, dependency) as MetaInfo;
                 processUnmaterializedDependency(dependencyNode);
                 listDependencies(dependencyNode);
             }
         }
 
-        const logCircularDependency = (dependency) => {
+        const logCircularDependency = (dependency:JsonPointerString) => {
             const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ') + " → " + dependency;
             this.warnings.push(e);
             this.logger.log('warn', e);
         }
 
-        const processUnmaterializedDependency = (dependencyNode) => {
-            if (dependencyNode.materialized__ === false) {
+        const processUnmaterializedDependency = (dependencyNode:MetaInfo) => {
+            if (!dependencyNode.materialized__) {
                 const ancestor = searchUpForExpression(dependencyNode);
                 if (ancestor) {
                     listDependencies(ancestor);
@@ -949,19 +947,19 @@ export default class TemplateProcessor {
             }
         }
 
-        const emit = (metaInfo) => {
+        const emit = (metaInfo:MetaInfo) => {
             if (exprsOnly && !metaInfo.expr__) return;
-            orderedJsonPointers.add(metaInfo.jsonPointer__);
+            orderedJsonPointers.add(metaInfo.jsonPointer__ as JsonPointerString);
         }
 
-        const removeExtraneous = (orderedJsonPointers):JsonPointerString[]=>{
+        const removeExtraneous = (orderedJsonPointers:Set<string>):JsonPointerString[]=>{
             const desiredToRetain:Set<JsonPointerString> = new Set();
             metaInfos.forEach(m=>{
-                desiredToRetain.add(m.jsonPointer__);
+                desiredToRetain.add(m.jsonPointer__ as JsonPointerString);
             });
-            return [...orderedJsonPointers].reduce((acc, jsonPtr)=>{
+            return [...orderedJsonPointers].reduce((acc:JsonPointerString[], jsonPtr)=>{
                 if(desiredToRetain.has(jsonPtr)){
-                    acc.push(jsonPtr);
+                    acc.push(jsonPtr as JsonPointerString);
                 }
                 return acc;
             }, []);
@@ -996,7 +994,7 @@ export default class TemplateProcessor {
      * @param {"set"|"delete"|"setDeferred"} [op="set"] - The operation to perform - setDeferred is for internal use
      * @returns {Promise<<JsonPointerString[]>} A promise with the list of json pointers touched by the plan
      */
-    async setData(jsonPtr, data=null, op:Op="set"):Promise<JsonPointerString[]> {
+    async setData(jsonPtr:JsonPointerString, data=null, op:Op="set"):Promise<JsonPointerString[]> {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
@@ -1024,13 +1022,12 @@ export default class TemplateProcessor {
      * await this method. Just let 'er rip.
      * @param planStep
      */
-    pro
-    public async setDataForked(planStep?:PlanStep):Promise<JsonPointerString[]>{
+    public async setDataForked(planStep:PlanStep):Promise<JsonPointerString[]>{
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
         const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, didUpdate:[]};
-        await this.executePlan(mutationPlan);
+        await this.executePlan(mutationPlan as Plan);
         return fromPlan;
     }
 
@@ -1055,11 +1052,11 @@ export default class TemplateProcessor {
         }
     }
 
-    private isEnabled(logLevel:string):boolean{
+    private isEnabled(logLevel:Levels):boolean{
         return LOG_LEVELS[this.logger.level] >= LOG_LEVELS[logLevel];
     }
 
-    private logOutput(output) {
+    private logOutput(output:any) {
         if (this.isEnabled("debug")) {
             this.logger.debug(`----------------TEMPLATE OUTPUT (${this.uniqueId})-----------------`)
             this.logger.debug(stringifyTemplateJSON(output));
@@ -1104,7 +1101,7 @@ export default class TemplateProcessor {
 
     private async executeDataChangeCallbacks(plan:Plan) {
         let anyUpdates = false;
-        const thoseThatUpdated = plan.didUpdate.reduce((acc,did,i)=>{
+        const thoseThatUpdated = plan.didUpdate.reduce((acc:JsonPointerString[],did,i)=>{
             if(did){
                 acc.push(plan.sortedJsonPtrs[i]);
                 anyUpdates = true;
@@ -1123,14 +1120,14 @@ export default class TemplateProcessor {
 
     private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
         if(plan.lastCompletedStep){
-            return; //this is a one-step plan, so if it has a completed step, it's already done
+            return false; //this is a one-step plan, so if it has a completed step, it's already done
         }
         this.executionStatus.begin(plan);
-        let theStep;
+        let theStep:PlanStep|undefined;
         try {
             const {sortedJsonPtrs} = plan;
             const jsonPtr = sortedJsonPtrs[0];
-            theStep = {jsonPtr, ...plan}
+            theStep = {jsonPtr, ...plan, didUpdate:false}
             const didUpdate =  await this.mutate(theStep);
             plan.didUpdate.push(didUpdate);
             return didUpdate;
@@ -1149,7 +1146,7 @@ export default class TemplateProcessor {
                 return  await this.evaluateNode(planStep);
             } else {
                 // Check if the node contains an expression. If so, print a warning and return.
-                const firstMeta = jp.get(this.templateMeta, entryPoint);
+                const firstMeta = jp.get(this.templateMeta, entryPoint) as MetaInfo;
                 if (firstMeta.expr__ !== undefined && op !== "forceSetInternal") { //setDeferred allows $defer('/foo') to 'self replace' with a value
                     this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
                     return false;
@@ -1161,7 +1158,7 @@ export default class TemplateProcessor {
                     return planStep.didUpdate;
                 }
             }
-        }catch(error){
+        }catch(error:any){
             this.logger.error(`mutation failed: ${planStep.jsonPtr} with error msg '${error.message}'`);
             throw error;
         }
@@ -1193,7 +1190,7 @@ export default class TemplateProcessor {
 
         const {templateMeta} = this;
         let data;
-        const metaInfo = jp.get(templateMeta, jsonPtr);
+        const metaInfo = jp.get(templateMeta, jsonPtr) as MetaInfo;
         const {expr__, tags__} = metaInfo;
         let success = false;
         if (expr__ !== undefined) {
@@ -1202,7 +1199,7 @@ export default class TemplateProcessor {
                     this._strictChecks(metaInfo);
                     data = await this._evaluateExprNode(planStep); //run the jsonata expression
                     success = true;
-                }catch(error){
+                }catch(error: any){
                     const errorObject = {name:error.name, message: error.message}
                     data = {error:errorObject}; //errors get placed into the template output
                     this.errorReport[jsonPtr] = errorObject;
@@ -1230,11 +1227,11 @@ export default class TemplateProcessor {
         return success; //true means that the data was new/fresh/changed and that subsequent updates must be propagated
     }
 
-    private _strictChecks(metaInfo) {
+    private _strictChecks(metaInfo:MetaInfo) {
         const {strict} = this.options;
         if (strict?.refs) {
             metaInfo.absoluteDependencies__?.forEach(ptr => {
-                if (jp.get(this.templateMeta, ptr).materialized__ === false) {
+                if ((jp.get(this.templateMeta, ptr) as MetaInfo).materialized__ === false) {
                     const msg = `${ptr} does not exist, referenced from ${metaInfo.jsonPointer__} (strict.refs option enabled)`;
                     this.logger.error(msg);
                     const error = new Error(msg);
@@ -1245,9 +1242,9 @@ export default class TemplateProcessor {
         }
     }
 
-    private setDataIntoTrackedLocation(templateMeta, planStep:PlanStep ) {
+    private setDataIntoTrackedLocation(templateMeta:MetaInfo, planStep:PlanStep ) {
         const {jsonPtr, data=undefined, op="set"} = planStep;
-        const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr);
+        const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr) as MetaInfo;
         if (treeHasExpressions__ && op !== 'forceSetInternal') {
             this.logger.log('warn', `nodes containing expressions cannot be overwritten: ${jsonPtr}`);
             return false;
@@ -1264,7 +1261,7 @@ export default class TemplateProcessor {
         const {output, jsonPtr, data, op="set"} = planStep;
         if(op==="delete"){
             if(!jp.has(this.output, jsonPtr)){
-                return; // we are being asked to remove something that isn't here
+                return false; // we are being asked to remove something that isn't here
             }
         }
         jp.set(output, jsonPtr, data); //this is just the weird case of setting something into the template that has no effect on any expressions
@@ -1285,20 +1282,28 @@ export default class TemplateProcessor {
     private async _evaluateExprNode(planStep: PlanStep) {
         const {jsonPtr, output} = planStep;
         let evaluated;
-        const metaInfo = jp.get(this.templateMeta, jsonPtr);
+        const metaInfo = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
         const {compiledExpr__, exprTargetJsonPointer__, expr__} = metaInfo;
         let target;
         try {
             target = jp.get(output, exprTargetJsonPointer__); //an expression is always relative to a target
             const safe =  this.withErrorHandling.bind(this);
-            const jittedFunctions = {};
+            const jittedFunctions: { [key: string]: (arg: any) => Promise<any> } = {};
             for (const k of this.functionGenerators.keys()) {
-                const generator = this.functionGenerators.get(k);
-                try {
-                    jittedFunctions[k] = safe(await generator(metaInfo, this));
-                }catch(error){
-                    const msg = `Function generator '${k}' failed to generate a function and erred with:"${error.message}"`
-                    this.logger.error(msg)
+                const generator: FunctionGenerator|undefined = this.functionGenerators.get(k);
+                if (generator) { // Check if generator is not undefined
+                    try {
+                        jittedFunctions[k] = await safe(await generator(metaInfo, this));
+                    } catch (error) {
+                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                        const msg = `Function generator '${k}' failed to generate a function and erred with:"${errorMessage}"`;
+                        this.logger.error(msg);
+                        throw new Error(msg);
+                    }
+                } else {
+                    // Optionally handle the case where generator is undefined
+                    const msg = `Function generator for key '${k}' is undefined.`;
+                    this.logger.error(msg);
                     throw new Error(msg);
                 }
             }
@@ -1319,7 +1324,7 @@ export default class TemplateProcessor {
                 evaluated = this.wrapInOrdinaryFunction(evaluated);
                 metaInfo.isFunction__ = true;
             }
-        } catch (error) {
+        } catch (error:any) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
@@ -1333,7 +1338,7 @@ export default class TemplateProcessor {
         return evaluated;
     }
 
-    private allTagsPresent(tagSetOnTheExpression) {
+    private allTagsPresent(tagSetOnTheExpression:Set<string>) {
         if(tagSetOnTheExpression.size === 0 && this.tagSet.size > 0){
             return false;
         }
@@ -1369,7 +1374,7 @@ export default class TemplateProcessor {
 
     }
 
-    from(jsonPtr) {
+    from(jsonPtr:JsonPointerString) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
             const affectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
@@ -1379,9 +1384,9 @@ export default class TemplateProcessor {
         return this.executionPlans[jsonPtr];
     }
 
-    getDependents(jsonPtr) {
+    getDependents(jsonPtr:JsonPointerString) {
         if (jp.has(this.templateMeta, jsonPtr)) {
-            return jp.get(this.templateMeta, jsonPtr).dependees__
+            return (jp.get(this.templateMeta, jsonPtr) as MetaInfo).dependees__
         } else {
             return [];
         }
@@ -1402,12 +1407,12 @@ export default class TemplateProcessor {
             return data__ && this.timerManager.isInterval(data__);
         }
 
-        const isFunction = (jsonPointer)=>{
+        const isFunction = (jsonPointer:JsonPointerString)=>{
 
             if(!jp.has(this.templateMeta, jsonPointer)){
                 return false;
             }
-            const metaInf = jp.get(this.templateMeta, jsonPointer);
+            const metaInf = jp.get(this.templateMeta, jsonPointer) as MetaInfo;
             //treat intervals same as immutable functions. Changes should not propagate through an interval causing
             //interval re-evaluation
             if(isInterval(metaInf)){
@@ -1416,9 +1421,9 @@ export default class TemplateProcessor {
             return !!metaInf.isFunction__;
         }
 
-        const queueParent = (jsonPtr)=>{
+        const queueParent = (jsonPtr:JsonPointerString)=>{
             //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
-            const parentPointer = jp.parent(jsonPtr);//jp.compile(parts.slice(0, parts.length - 1));
+            const parentPointer = jp.parent(jsonPtr) as JsonPointerString;
             if (parentPointer !== '' && !visited.has(parentPointer)) {
                 !isFunction(parentPointer) && queue.push(parentPointer);
                 visited.add(parentPointer);
@@ -1428,9 +1433,9 @@ export default class TemplateProcessor {
         const queueDependees = (metaInf: MetaInfo)=>{
             if (metaInf.dependees__) {
                 metaInf.dependees__.forEach(dependee => {
-                    if (!visited.has(dependee)) {
-                        !isFunction(dependee) && queue.push(dependee);
-                        visited.add(dependee);
+                    if (!visited.has(dependee as JsonPointerString)) {
+                        !isFunction(dependee as JsonPointerString) && queue.push(dependee as JsonPointerString);
+                        visited.add(dependee as JsonPointerString);
                     }
                 });
             }
@@ -1440,7 +1445,7 @@ export default class TemplateProcessor {
             // Recursively traverse into children nodes.
             for (let key in metaInf) {
                 // Skip fields that end in "__" and non-object children
-                if (key.endsWith('__') || typeof metaInf[key] !== 'object') {
+                if (key.endsWith('__') || typeof (metaInf as any)[key] !== 'object') {
                     continue;
                 }
                 // Generate json pointer for child
@@ -1456,7 +1461,7 @@ export default class TemplateProcessor {
 
         while (queue.length > 0) {
             const currentPtr = queue.shift();
-            queueParent(currentPtr); //these are IMPLICIT dependees
+            queueParent(currentPtr as JsonPointerString); //these are IMPLICIT dependees
             //calling queueParent before the templateMeta existence check allows us to find ancestors of
             //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". queueParent() allows us to
             //pickup the /rxLog array as being an implicit dependency of its array elements. So if an element
@@ -1464,7 +1469,7 @@ export default class TemplateProcessor {
             if (!jp.has(this.templateMeta, currentPtr)){
                 continue;
             }
-            const metaInf = jp.get(this.templateMeta, currentPtr);
+            const metaInf = jp.get(this.templateMeta, currentPtr) as MetaInfo;
             if(metaInf.isFunction__){
                 continue; //function never gets re-evaluated
             }
@@ -1472,26 +1477,26 @@ export default class TemplateProcessor {
                 dependents.push(metaInf);
             }
             queueDependees(metaInf); //these are EXPLICIT dependees
-            queueDescendents(metaInf, currentPtr); //these are IMPLICIT dependees
+            queueDescendents(metaInf, currentPtr as JsonPointerString); //these are IMPLICIT dependees
         }
 
         return dependents;
     }
 
 
-    getDependencies(jsonPtr) {
+    getDependencies(jsonPtr:JsonPointerString) {
         if (jp.has(this.templateMeta, jsonPtr)) {
-            return jp.get(this.templateMeta, jsonPtr).dependencies__
+            return (jp.get(this.templateMeta, jsonPtr) as MetaInfo).dependencies__
         }
         return [];
 
     }
 
     //this is the .to repl
-    to(jsonPtr) {
+    to(jsonPtr:JsonPointerString) {
         if (jp.has(this.templateMeta, jsonPtr)) {
-            const node = jp.get(this.templateMeta, jsonPtr);
-            return this.topologicalSort(node, false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
+            const node = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
+            return this.topologicalSort([node], false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
         }
         return [];
     }
@@ -1501,7 +1506,7 @@ export default class TemplateProcessor {
      * @param jsonPtr
      * @param cbFn of form (data, ptr:JsonPointerString, removed?:boolean)=>void
      */
-    setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:(data, ptr:JsonPointerString, removed?:boolean)=>void){
+    setDataChangeCallback(jsonPtr:JsonPointerString, cbFn:DataChangeCallback){
         this.logger.debug(`data change callback set on ${jsonPtr} `)
         let callbacks = this.changeCallbacks.get(jsonPtr);
         if(!callbacks){
@@ -1512,7 +1517,7 @@ export default class TemplateProcessor {
     }
 
 
-    removeDataChangeCallback(jsonPtr:JsonPointerString, cbFn?:(data:any, jsonPointer: JsonPointerString, removed:boolean)=>void) {
+    removeDataChangeCallback(jsonPtr:JsonPointerString, cbFn?:DataChangeCallback) {
         this.logger.debug(`data change callback removed on ${jsonPtr} `)
         if(cbFn){
             const callbacks = this.changeCallbacks.get(jsonPtr);
@@ -1525,7 +1530,7 @@ export default class TemplateProcessor {
     }
 
     private async callDataChangeCallbacks(data: any, jsonPointer: JsonPointerString|JsonPointerString[], removed: boolean = false) {
-        let _jsonPointer:string;
+        let _jsonPointer:JsonPointerString;
         if(Array.isArray(jsonPointer)){
             _jsonPointer = "/"; //when an array of pointers is provided, it means it was a change callback on "/"
         }else{
@@ -1540,13 +1545,13 @@ export default class TemplateProcessor {
         if (callbacks) {
             const promises = Array.from(callbacks).map(cbFn =>
                 Promise.resolve().then(() => {
-                    cbFn(data, jsonPointer, removed)
+                    cbFn(data, jsonPointer as JsonPointerString, removed)
                 }) //works with cbFn that is either sync or async by wrapping in promise
             );
 
             try {
                 await Promise.all(promises);
-            } catch (error) {
+            } catch (error:any) {
                 this.logger.error(`Error in dataChangeCallback at ${jsonPointer}: ${error.message}`);
             }
         }
@@ -1563,18 +1568,18 @@ export default class TemplateProcessor {
     //that have dependencies to something inside the target template. Otherwise we will get looping
     //where the expression in the enclosing root template that performs the import gets re-evaluated
     //upon import
-    private static dependsOnImportedTemplate(metaInfos, importPathJsonPtr) {
-        return metaInfos.filter(metaInof => metaInof.absoluteDependencies__.some(dep => dep.startsWith(importPathJsonPtr)));
+    private static dependsOnImportedTemplate(metaInfos:MetaInfo[], importPathJsonPtr:JsonPointerString) {
+        return metaInfos.filter(metaInof => metaInof.absoluteDependencies__.some(dep => (dep as JsonPointerString).startsWith(importPathJsonPtr)));
     }
 
-    out(jsonPointer){
+    out(jsonPointer:JsonPointerString){
         if(jp.has(this.output, jsonPointer)){
             return jp.get(this.output, jsonPointer)
-        };
+        }
         return null;
     }
 
-    private async localImport(filePathInPackage) {
+    private async localImport(filePathInPackage:string) {
         // Resolve the package path
         const {importPath} = this.options;
         let fullPath = filePathInPackage;
@@ -1602,8 +1607,8 @@ export default class TemplateProcessor {
         return content;
     }
 
-    private wrapInOrdinaryFunction(jsonataLambda) {
-        const wrappedFunction = (...args)=> {
+    private wrapInOrdinaryFunction(jsonataLambda:any) {
+        const wrappedFunction = (...args:any[])=> {
             // Call the 'apply' method of jsonataLambda with the captured arguments
             return jsonataLambda.apply(jsonataLambda, args);
         };
@@ -1611,7 +1616,7 @@ export default class TemplateProcessor {
         wrappedFunction._stated_function__ = true;
 
         //preserve backward compatibility with code that may be expecting to call the jsonata apply function
-        wrappedFunction.apply = (_this, args)=>{
+        wrappedFunction.apply = (_this:any, args:any[])=>{
             return jsonataLambda.apply(_this, args);
         }
         return wrappedFunction;
@@ -1644,7 +1649,7 @@ export default class TemplateProcessor {
 
 
     private generateDeferFunction(metaInfo: any) {
-        const deferFunc =  (jsonPointer, timeoutMs)=>{
+        const deferFunc =  (jsonPointer:JsonPointerString, timeoutMs:number)=>{
 
             if(jp.has(this.output, jsonPointer)){
                 const dataChangeCallback =  debounce(async (data)=>{
@@ -1774,21 +1779,21 @@ export default class TemplateProcessor {
         const metaInfos:MetaInfo[] = await MetaInfoProducer.getMetaInfos(template);
         const jsonPointersToMetaInfo:Map<JsonPointerString, MetaInfo> = metaInfos.reduce((acc, metaInf)=>{
             if(metaInf.treeHasExpressions__){
-                acc.set(jp.compile(metaInf.jsonPointer__), metaInf);
+                acc.set(jp.compile(metaInf.jsonPointer__ as JsonPointerStructureArray), metaInf);
             }
             return acc;
         }, new Map<JsonPointerString, MetaInfo>());
 
         //descend callback wil prevent descending further when it reaches a node that is an expression in the template
-        const descend = (value, jsonPointer:JsonPointerString)=>{
-            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer).expr__ !== undefined){
+        const descend = (value:any, jsonPointer:JsonPointerString)=>{
+            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer as JsonPointerString)?.expr__ !== undefined){
                 return false; //the location in the output tree corresponds to an expression in the template
             }
             const type = Object.prototype.toString.call(value);
             return type === '[object Object]' || type === '[object Array]';
         }
-        const transferDataToTemplate = (val, jsonPointer)=>{
-            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer).treeHasExpressions__){
+        const transferDataToTemplate = (val:any, jsonPointer:JsonPointerString)=>{
+            if(jsonPointersToMetaInfo.has(jsonPointer) && (jsonPointersToMetaInfo.get(jsonPointer) as MetaInfo).treeHasExpressions__){
                 return; //don't replace any expression or ancestor of expression in the template
             }
             //update the template with fields from the output that may not have been present in the template (like they got $set into template at runtime before snapshot)
@@ -1807,7 +1812,7 @@ export default class TemplateProcessor {
      * @param planStep
      */
     public generateForked(planStep: PlanStep) {
-        return async (jsonPtr, data, op:Op='set')=>{
+        return async (jsonPtr:JsonPointerString, data:any, op:Op='set')=>{
             const {output=this.output, forkStack, forkId} = planStep; //defaulting output to this.output is important for when this call is used by ExecutionStatus to restore
             const mvccSnapshot = TemplateProcessor.deepCopy(output); //every call to $forked creates a new planStep with its own output copy
             const mvccForkstack:Fork[] = TemplateProcessor.deepCopy(forkStack); //every call to $forked creates a new planStep with its own forkStack that is a copy if current forkstack
@@ -1840,7 +1845,7 @@ export default class TemplateProcessor {
         if(!isInsideFork){
             return this.setData
         }
-        return async (jsonPtr, data, op:Op='set')=>{
+        return async (jsonPtr: JsonPointerString, data:any, op:Op='set')=>{
             this.setDataForked(planStep); //behaves like setData, except operates on the forked output
         }
     }
@@ -1852,7 +1857,7 @@ export default class TemplateProcessor {
      * @private
      */
     private generateJoined(planStep: PlanStep) {
-        return async (jsonPtr, data, op:Op='set')=>{
+        return async (jsonPtr:JsonPointerString, data:any, op:Op='set')=>{
             const {output, forkId} = planStep.forkStack.pop() || {output:this.output, forkId:"ROOT"};
             if(forkId === "ROOT"){
                 this.setData(jsonPtr, data, op); //return to 'normal' non-forked operation
@@ -1882,7 +1887,7 @@ export default class TemplateProcessor {
         }
 
         // If the value is an Object, create a new object and copy every property recursively.
-        const copiedObj = {};
+        const copiedObj:any = {};
         for (const [key, value] of Object.entries(output)) {
             copiedObj[key] = TemplateProcessor.deepCopy(value);
         }
@@ -1902,7 +1907,7 @@ export default class TemplateProcessor {
      * @returns either the original rootJsonPointer, or one that has been trimmed to point to the parent of rootJsonPtr
      * @private
      */
-    private adjustRootForSimpleExpressionImports(template, rootJsonPtr: any[]) {
+    private adjustRootForSimpleExpressionImports(template:any, rootJsonPtr: any[]) {
         if(typeof template === 'string' || template instanceof String){ //
             return rootJsonPtr.slice(0,-1);
         }

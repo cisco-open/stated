@@ -15,26 +15,29 @@ import fs from 'fs';
 import path from 'path';
 import TemplateProcessor from './TemplateProcessor.js';
 import yaml from 'js-yaml';
-import minimist from 'minimist';
+import minimist from "minimist";
 import parseArgsStringToArgv from 'string-argv';
-import {LOG_LEVELS} from "./ConsoleLogger.js";
+import {Levels, LOG_LEVELS} from "./ConsoleLogger.js";
 import * as repl from 'repl';
 import {stringifyTemplateJSON} from "./utils/stringify.js";
 import jsonata from "jsonata";
 import VizGraph from "./VizGraph.js";
 import { exec } from 'child_process';
 import  http from  'http';
+import * as child_process from "child_process";
 
 
 export default class CliCore {
     private templateProcessor: TemplateProcessor;
     private logLevel: keyof typeof LOG_LEVELS;
     private currentDirectory:string;
-    private server; //http server to serve SVG images
-    replServer:repl.REPLServer;
+    //@ts-ignore
+    private server: http.Server; //http server to serve SVG images
+    //@ts-ignore
+    public replServer:repl.REPLServer;
     public onInit: () => Promise<void>|void;
 
-    constructor(templateProcessor: TemplateProcessor = null) {
+    constructor(templateProcessor: TemplateProcessor) {
         this.templateProcessor = templateProcessor;
         this.logLevel = "info";
         this.currentDirectory = process.cwd();
@@ -50,12 +53,12 @@ export default class CliCore {
     }
 
 
-    static minimistArgs(replCmdInputStr) {
+    static minimistArgs(replCmdInputStr:string) {
         const args = parseArgsStringToArgv(replCmdInputStr);
         return minimist(args);
 
     }
-    static parseInitArgs(replCmdInputStr){
+    static parseInitArgs(replCmdInputStr:string){
 
         const parsed = CliCore.minimistArgs(replCmdInputStr);
         let {_:bareArgs ,f:filepath, o:oneshot,options="{}", ctx={}} = parsed;
@@ -66,11 +69,11 @@ export default class CliCore {
         if(tags===""){
             tags=[];
         }else {
-            tags = tags.split(',').map(s => s.trim()); //tags are provided as JSON array
+            tags = tags.split(',').map((s:string) => s.trim()); //tags are provided as JSON array
         }
         try {
             options = JSON.parse(options);
-        }catch(e){
+        }catch(e:any){
             console.error("failed to parse --options json: " + e.message);
             throw e;
         }
@@ -81,7 +84,7 @@ export default class CliCore {
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
 
-    async readFileAndParse(filepath, importPath?) {
+    async readFileAndParse(filepath:string, importPath?:string) {
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
         if (fileExtension === 'js' || fileExtension === 'mjs') {
             return await import(CliCore.resolveImportPath(filepath, importPath));
@@ -144,7 +147,7 @@ export default class CliCore {
      * @param fromSnapshot - when set to true, template processor will treat input as a snapshot of a previous
      * templateProcessor state
      */
-    async init(replCmdInputStr, fromSnapshot: boolean=false) {
+    async init(replCmdInputStr:string, fromSnapshot: boolean=false) {
         if(this.templateProcessor){
             this.templateProcessor.close();
         }
@@ -175,7 +178,7 @@ export default class CliCore {
             this.replServer.context.template = this.templateProcessor;
         }
         this.templateProcessor.onInitialize.set("CLI",this.onInit);
-        tags.forEach(a => this.templateProcessor.tagSet.add(a));
+        tags.forEach((a:string) => this.templateProcessor.tagSet.add(a));
         // set options
         this.templateProcessor.logger.level = this.logLevel;
         this.templateProcessor.logger.debug(`arguments: ${JSON.stringify(parsed)}`);
@@ -199,7 +202,7 @@ export default class CliCore {
             }
             return this.templateProcessor.input;
 
-        } catch (error) {
+        } catch (error:any) {
             return {
                 name: error.name,
                 message: error.message
@@ -217,8 +220,8 @@ export default class CliCore {
     }
 
 
-    async set(args) {
-        const options = args.match(/(?:[^\s"]+|"[^"]*")+/g);
+    async set(args:string) {
+        const options:any = args.match(/(?:[^\s"]+|"[^"]*")+/g);
         let [path, data] = options;
         let jsonPtr = path;
         if (path === '-f') {
@@ -255,7 +258,7 @@ export default class CliCore {
         return this.templateProcessor.input;
     }
 
-    out(replCmdInputStr) {
+    out(replCmdInputStr:string) {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
@@ -277,7 +280,7 @@ export default class CliCore {
         return this.templateProcessor.templateMeta;
     }
 
-    from(args) {
+    from(args:string) {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
@@ -285,7 +288,7 @@ export default class CliCore {
         return option === '--shallow' ? this.templateProcessor.getDependents(jsonPtr) : this.templateProcessor.from(jsonPtr);
     }
 
-    to(args) {
+    to(args:string) {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
@@ -300,7 +303,7 @@ export default class CliCore {
         return await this.templateProcessor.getEvaluationPlan();
     }
 
-    log(level) {
+    log(level:Levels) {
         this.logLevel = level;
         if(this.templateProcessor){
             this.templateProcessor.logger.level = level;
@@ -312,7 +315,7 @@ export default class CliCore {
         return "=============================================================";
     }
 
-    async debug(replCmdInputStr) {
+    async debug(replCmdInputStr:string) {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
@@ -327,7 +330,7 @@ export default class CliCore {
         return this.templateProcessor.errorReport;
     }
 
-    private extractArgsInfo(args) {
+    private extractArgsInfo(args:string) {
         // Define the regex patterns
         const jsonPointerNumberPattern = /^(?<jsonPointer>\/[^\s]*)(?:\s+(?<number>\d+))?$/;
         const untilJsonataPattern = /^(?<jsonPointer>\/[^\s]*)\s+until\s+(?<jsonataExpression>[^\n]+)$/;
@@ -358,7 +361,7 @@ export default class CliCore {
 
     public async tail(args: string): Promise<any> {
         console.log("Started tailing... Press Ctrl+C to stop.")
-        let {format, jsonPointer, number:countDown=NaN, jsonataExpression="false"} = this.extractArgsInfo(args);
+        let {jsonPointer, number:countDown=NaN, jsonataExpression="false"} = this.extractArgsInfo(args);
         const compiledExpr = jsonata(jsonataExpression);
 
         let currentOutputLines = 0;
@@ -373,7 +376,7 @@ export default class CliCore {
             this.replServer.on('SIGINT', onSigInt);
         }
 
-        let resolve; //resolve function that will act as a latch to cause tail to return when the 'until' criterion is met
+        let resolve: ()=>void; //resolve function that will act as a latch to cause tail to return when the 'until' criterion is met
         // Function to stop tailing
         const unplug = () => {
             // Stop tailing without clearing the screen to keep the exit message
@@ -448,7 +451,7 @@ export default class CliCore {
             directory = this.currentDirectory;
         }
 
-        let files: string[] = undefined;
+        let files: string[]|undefined = undefined;
         try {
             // Read all files from the directory
             files = await fs.promises.readdir(directory);
@@ -518,7 +521,7 @@ export default class CliCore {
         }
     }
 
-    public svg(replCmdInputStr) {
+    public svg(replCmdInputStr:string):string {
         const {port=3000} = CliCore.minimistArgs(replCmdInputStr);
 
         const startServer = () => {
@@ -526,7 +529,7 @@ export default class CliCore {
                 // Check for a specific URL path or request method if needed
 
                 // Execute 'dot' to convert the DOT code to SVG
-                const dotProcess = exec(`dot -Tsvg`, (error, stdout, stderr) => {
+                const dotProcess:child_process.ChildProcess = exec(`dot -Tsvg`, (error, stdout, stderr) => {
                     if (error) {
                         console.error(`Error converting DOT to SVG: ${error.message}`);
                         res.writeHead(500, { 'Content-Type': 'text/plain' });
@@ -546,15 +549,15 @@ export default class CliCore {
                     // Send the SVG data as the HTTP response
                     res.end(stdout);
                 });
-                if(this.templateProcessor) {
+                if(this.templateProcessor && dotProcess) {
                     const dot = VizGraph.dot(this.templateProcessor);
                     // Pipe the DOT code string to the 'dot' process
-                    dotProcess.stdin.write(dot);
-                    dotProcess.stdin.end();
+                    dotProcess.stdin?.write(dot);
+                    dotProcess.stdin?.end();
                 }
             });
 
-            this.server.on('error', (error) => {
+            this.server.on('error', (error:any) => {
                 if (error.code === 'EADDRINUSE') {
                     console.error(`Port ${port} is already in use.`);
                 } else {

@@ -63,7 +63,7 @@ export class ExecutionStatus {
 
         };
         if(lastCompletedStep){
-            json['lastCompletedStep'] = lastCompletedStep.jsonPtr; //all we need to record is jsonpointer of last completed step
+            (json as any)['lastCompletedStep'] = lastCompletedStep.jsonPtr; //all we need to record is jsonpointer of last completed step
         }
         return json;
     }

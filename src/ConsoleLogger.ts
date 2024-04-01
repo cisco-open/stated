@@ -13,15 +13,24 @@
 // limitations under the License.
 
 export interface StatedLogger{
-    debug(...args):void;
-    error(...args):void;
-    warn(...args):void;
-    info(...args):void;
-    verbose(...args):void;
-    log(level, ...args): void;
-    level:string;
+    debug(...args:any[]):void;
+    error(...args:any[]):void;
+    warn(...args:any[]):void;
+    info(...args:any[]):void;
+    verbose(...args:any[]):void;
+    log(level:Levels, ...args:any[]): void;
+    level:Levels;
 }
-export const LOG_LEVELS = {
+export type Levels = "silent"|"error"|"warn"|"info"|"verbose"|"debug";
+export type LogLevel = {
+    silent: number;
+    error: number;
+    warn: number;
+    info: number;
+    verbose: number;
+    debug: number;
+};
+export const LOG_LEVELS:LogLevel = {
     silent: 0,
     error: 1,
     warn: 2,
@@ -31,42 +40,43 @@ export const LOG_LEVELS = {
 };
 export default class ConsoleLogger implements StatedLogger{
 
-    public level: string;
-    constructor(initialLevel = 'verbose') {
+    public level: Levels;
+    constructor(initialLevel:Levels = 'verbose') {
         this.level = initialLevel;
     }
 
-    debug(...args) {
+    debug(...args: any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.debug) {
             console.debug(...args);
         }
     }
 
-    error(...args) {
+    error(...args:any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.error) {
             console.error(...args);
         }
     }
 
-    warn(...args) {
+    warn(...args:any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.warn) {
             console.warn(...args);
         }
     }
 
-    info(...args) {
+    info(...args: any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.info) {
             console.info(...args);
         }
     }
 
-    verbose(...args) {
+    verbose(...args:any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.verbose) {
             console.log(...args);
         }
     }
 
-    log(level, ...args) {
+    log(level:Levels, ...args:any[]) {
+        // @ts-ignore
         this[level](args);
     }
 }

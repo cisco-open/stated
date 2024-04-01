@@ -21,9 +21,10 @@ import TemplateProcessor from "./TemplateProcessor.js";
 
 export default class StatedREPL {
     private readonly cliCore: CliCore;
+    //@ts-ignore
     r: repl.REPLServer;
-    private isColorized:boolean;
-    constructor(templateProcessor: TemplateProcessor = null) {
+    private isColorized:boolean=false;
+    constructor(templateProcessor: TemplateProcessor) {
         this.cliCore = new CliCore(templateProcessor);
     }
 
@@ -103,6 +104,7 @@ export default class StatedREPL {
                 try {
                     console.log('Available commands:');
                     Object.entries(this.r.commands).forEach(([name, command]) => {
+                        //@ts-ignore
                         console.log(`  .${name} - ${command.help}`);
                     });
                 } catch (e) {
@@ -113,10 +115,10 @@ export default class StatedREPL {
         });
     }
 
-    async cli(cliCoreMethodName, args){
+    async cli(cliCoreMethodName:string, args:string){
         let result="";
         try{
-            const method = this.cliCore[cliCoreMethodName].bind(this.cliCore);
+            const method = (this.cliCore as any)[cliCoreMethodName].bind(this.cliCore);
             result = await method(args);
             if(!this.tookOverIO(cliCoreMethodName, result)){
                 let stringify = StatedREPL.stringify(result);
@@ -125,7 +127,7 @@ export default class StatedREPL {
                 }
                 console.log(stringify);
             }
-        } catch (e) {
+        } catch (e:any) {
             const stringify = StatedREPL.stringify(e.message);
             console.error(stringify);
             result = "";
@@ -133,7 +135,7 @@ export default class StatedREPL {
         this.r.displayPrompt();
     }
 
-    static printFunc(key, value) {
+    static printFunc(key:string, value:any) {
         return circularReplacer(key, value);
     }
 
@@ -158,7 +160,7 @@ export default class StatedREPL {
             });
     }
 
-    private tookOverIO(methodName, result) {
+    private tookOverIO(methodName:string, result:any) {
         return methodName === 'open' || result.__tailed
     }
 }

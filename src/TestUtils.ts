@@ -44,10 +44,12 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
   let match;
   const testData = [];
   while ((match = codeBlockRegex.exec(markdownContent)) !== null) {
+    //@ts-ignore
     const { codeBlock } = match.groups;
     let jsonataExpressionsArrayJson;
     let _match = jsonataExpressionsArrayRegex.exec(codeBlock);
     if (_match !== null) {
+      //@ts-ignore
       const { jsonataExpressionsArrayString } = _match.groups;
       if (jsonataExpressionsArrayString !== undefined) {
         try {
@@ -59,11 +61,11 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
     }
     let i = 0;
     while ((_match = commandRegex.exec(codeBlock)) !== null) {
-      const { command, expectedResponse } = _match.groups;
+      const { command, expectedResponse } = _match.groups as any;
       const args = command.trim().split(' ');
       if (args.length > 0) {
         const cmdName = args.shift();
-        const method = cliInstance[cmdName];
+        const method = (cliInstance as any)[cmdName];
         if (typeof method === 'function') {
           let jsonataExpr = jsonataExpressionsArrayJson ? jsonataExpressionsArrayJson[i] : false;
           testData.push({
@@ -98,7 +100,7 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
     });
     testData.forEach(({cmdName, args, expectedResponse, jsonataExpr}) => {
       test(`${cmdName} ${args.join(' ')}`, async () => {
-        const method = cliCore[cmdName];
+        const method = (cliCore as any)[cmdName];
         const response = await method.apply(cliCore, [args.join(' ')]);
         let responseNormalized;
         try {

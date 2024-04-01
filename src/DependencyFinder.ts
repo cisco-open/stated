@@ -22,6 +22,9 @@ import {ExprNode} from "jsonata";
  */
 interface GeneratedExprNode extends jsonata.ExprNode {
     pseudoType?: string;
+    expr?:{value:any, type:string, position:number}; //this actually comes from jsonata itself, but oddly is not captured in their ExprNode interface
+    usesReturnedValueFromFunction?:boolean;
+    consarray?:boolean; //another field from jsonata itself, not documents in ExprNode
 }
 
 /*
@@ -35,7 +38,9 @@ interface StepRecord{
 
 
 export default class DependencyFinder {
+    //@ts-ignore
     compiledExpression: jsonata.Expression;
+    //@ts-ignore
     private ast: jsonata.ExprNode;
     private readonly currentSteps: StepRecord[][]; //logically, [[a,b,c],[d,e,f]]
     private nodeStack: GeneratedExprNode[];
@@ -84,13 +89,13 @@ export default class DependencyFinder {
             this.currentSteps.push([]); //initialize a container for steps
         }
         if (node === undefined) {
-            return;
+            return [];
         }
         if (Array.isArray(node)) {
             node.forEach(c => {
                 this.findDependencies(c);
             });
-            return;
+            return [];
         }
 
         if (typeof node === 'object' && node !== null) {
@@ -123,7 +128,7 @@ export default class DependencyFinder {
             //now we are coming out of the recursion, so the switch below is over the just-finished subtree
             switch (type) {
                 case "variable":
-                    if (!this.hasAncestor(n => n.type === "path")) {
+                    if (!this.hasAncestor((n:ExprNode) => n.type === "path")) {
                         this.emitPaths(); //every independent variable should be separately emitted. But if it is under a path then don't emit it since it should be glimmered onto the path
                     }
                     break;
@@ -133,12 +138,12 @@ export default class DependencyFinder {
             }
             //we are exiting the scope so pop
             const scopeWeExited = this.nodeStack.pop()
-            this.markScopeWhenFunctionReturnsValue(scopeWeExited);
+            this.markScopeWhenFunctionReturnsValue(scopeWeExited as GeneratedExprNode);
         }
         return this.dependencies;
     }
 
-    private markScopeWhenFunctionReturnsValue(scopeWeExited) {
+    private markScopeWhenFunctionReturnsValue(scopeWeExited:GeneratedExprNode) {
         if (scopeWeExited?.type === 'function') { //function has returned
             const currentScope = DependencyFinder.peek(this.nodeStack);
             if (currentScope !== undefined) {
@@ -150,7 +155,7 @@ export default class DependencyFinder {
         }
     }
 
-    static peek(array){
+    static peek(array:any[]){
         if(array.length > 0){
             return array[array.length-1];
         }
@@ -159,7 +164,7 @@ export default class DependencyFinder {
 
 
     collectChildren(node: GeneratedExprNode):GeneratedExprNode[] {
-        function ensureProcedureBeforeArguments(arr):string[] {
+        function ensureProcedureBeforeArguments(arr:any[]):string[] {
             const procedureIndex = arr.indexOf("procedure");
             const argumentsIndex = arr.indexOf("arguments");
 
@@ -171,8 +176,8 @@ export default class DependencyFinder {
 
             return arr;
         }
-        function introducePseudoTypes(node, key):GeneratedExprNode {
-            const value:jsonata.ExprNode = node[key];
+        function introducePseudoTypes(node:ExprNode, key:string):GeneratedExprNode|null {
+            const value:ExprNode = (node as any)[key] as ExprNode;
             if (!value) return null;
 
             if (Array.isArray(value)) {
@@ -201,27 +206,32 @@ export default class DependencyFinder {
         return result;
     }
 
-    captureArrayIndexes(node):void {
+    captureArrayIndexes(node:GeneratedExprNode):void {
         const {type, expr} = node;
-        if (type === "filter" && expr?.type === "number" && !this.hasAncestor(node=>node.usesReturnedValueFromFunction)) {
+        if (type === "filter" && expr?.type === "number" && !this.hasAncestor((node:GeneratedExprNode)=>node.usesReturnedValueFromFunction)) {
+            //@ts-ignore
             last(this.currentSteps).push({type, "value": expr.value, "emit": expr?.type === "number"});
         }
+
     }
     //this is where we capture the path and name expressions like a.b.c or $.a
-    capturePathExpressions(node) {
+    capturePathExpressions(node:GeneratedExprNode) {
         const {type, value} = node;
         if (type !== "name" && type !== "variable") {
             return;
         }
         if (this.isRootedIn$$(value)) { //if the root of the expression is $$ then we will always accept the navigation downwards
+            //@ts-ignore
             last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
         if (this.isInsideAScopeWhere$IsLocal(node)) { //path expressions inside a transform are ignored modulo the $$ case just checked for above
+            //@ts-ignore
             last(this.currentSteps).push({type, value, "emit": false});
             return;
         }
         if (this.isSingle$Var(type, value)) {  //accept the "" variable which comes from single-dollar like $.a.b when we are not inside a transform. We won't accept $foo.a.b
+            //@ts-ignore
             last(this.currentSteps).push({type, value, "emit": true});
             return;
         }
@@ -229,49 +239,54 @@ export default class DependencyFinder {
             //if we are here then the variable must be an ordinary locally named variable since it is neither $$ or $.
             //variables local to a closure cannot cause/imply a dependency for this expression
             if (!this.hasParent("function")) { //the function name is actually a variable, we want to skip such variables
+                //@ts-ignore
                 last(this.currentSteps).push({type, value, "emit": false});
             }
             return;
 
         }
 
-        if(this.hasAncestor(node=>node.usesReturnedValueFromFunction)){
+        if(this.hasAncestor((node:GeneratedExprNode)=>node.usesReturnedValueFromFunction)){
+            //@ts-ignore
             last(this.currentSteps).push({type, value, "emit": false});
             return;
         };
 
         const stepRecord: StepRecord = {type, value, "emit": true};
+        //@ts-ignore
         last(this.currentSteps).push(stepRecord);
 
     }
 
 
-    hasParent(parentType) {
+    hasParent(parentType:string) {
         return this.nodeStack.length !==0  &&
-            ( last(this.nodeStack).type === parentType || last(this.nodeStack).pseudoType === parentType);
+            ( last(this.nodeStack)?.type === parentType || last(this.nodeStack)?.pseudoType === parentType);
     }
 
+    //@ts-ignore
     hasAncestor(matcher) {
         return this.nodeStack.some(matcher);
     }
 
+    //@ts-ignore
     ancestors(matcher) {
         return this.nodeStack.filter(matcher);
     }
 
-    isSingle$Var(type, value) {
+    isSingle$Var(type:string, value:any) {
         return type === "variable" && value === ""; // $ or $.<whatever> means the variable whose name is empty/"".
     }
 
-    isRootedIn$$(value) {
+    isRootedIn$$(value:any) {
         const _last = last(this.currentSteps);
         return _last && (_last.length === 0 && value === "$"
             || _last.length > 0 && _last[0].value === "$");
     }
 
 
-    isInsideAScopeWhere$IsLocal(node): boolean {
-        let matches = this.ancestors(n => {
+    isInsideAScopeWhere$IsLocal(node:GeneratedExprNode): boolean {
+        let matches = this.ancestors((n:GeneratedExprNode) => {
             const {type:t, pseudoType:p, value:v} = n;
             return (t === "unary" && ["(", "{", "[", "^"].includes(v)) //(map, {reduce, [filter, ^sort
                 || t === "filter"
@@ -287,10 +302,12 @@ export default class DependencyFinder {
         //if we are following a consarray like [1..count].{"foo"+$}} then $ is a local scope. So we have to make
         //sure we are not IN a consarray as count is in and then if we are not in a consarray, are we following
         //a consarray (immediately or later)
-        matches = !this.hasAncestor(n=>n.consarray !== undefined) && this.ancestors(n => {
+        //@ts-ignore
+        matches = !this.hasAncestor((n:GeneratedExprNode)=>n.consarray !== undefined) && this.ancestors((n:GeneratedExprNode) => {
             const {type:t,  steps} = n;
             //iterate the steps array and determine if there is a consarray that comes before this node's position in the steps
-            return t==="path" && steps.find(nn=>nn.consarray && nn.position < node.position);
+            //@ts-ignore
+            return t==="path" && steps.find((nn:GeneratedExprNode)=>nn.consarray && nn.position < node.position);
         });
         if (matches.length > 0){
             return true;
@@ -298,7 +315,7 @@ export default class DependencyFinder {
 
 
         //If we are in a transform, scope is local
-        matches = this.ancestors(n => {
+        matches = this.ancestors((n:GeneratedExprNode) => {
             const {type:t} = n;
             return t === "transform";
         });
@@ -309,8 +326,9 @@ export default class DependencyFinder {
         if(this.currentSteps?.length === 0){
            return;
         }
+        //@ts-ignore
         const lastStepsArray:StepRecord[] = last(this.currentSteps);
-        let emitted;
+        let emitted:string[];
         if(DependencyFinder.isNoOpSteps(lastStepsArray)){
             emitted = [];
         }else if(DependencyFinder.stepsRootedIn$(lastStepsArray)){

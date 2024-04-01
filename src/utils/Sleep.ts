@@ -6,7 +6,7 @@ export class Sleep{
         this.timerManager = timerManager;
     }
 
-    public sleep = async (delayMs)=>{
+    public sleep = async (delayMs:number)=>{
         await new Promise(resolve => this.timerManager.setTimeout(resolve, delayMs))
     }
 }

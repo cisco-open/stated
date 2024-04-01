@@ -25,8 +25,9 @@ SOFTWARE.
 /*
     This class is mostly a cut-n-paste of the MIT licensed source code noted above
  */
-import {JsonPointerString} from "./MetaInfoProducer.js";
-
+import {JsonPointerString, JsonPointerStructureArray} from "./MetaInfoProducer.js";
+export type DescentCallback = (value:any, jsonPointer:JsonPointerString) => boolean;
+export type DescentIterator = (value:any, localFieldName:string) => void;
 export default class JsonPointer {
     /**
      * Convenience wrapper around jp.
@@ -39,7 +40,7 @@ export default class JsonPointer {
      * @param value
      * @returns {*}
      */
-    static api(obj, pointer, value) {
+    public static api(obj:any, pointer:JsonPointerString|JsonPointerStructureArray, value:any):any {
         // .set()
         if (arguments.length === 3) {
             return JsonPointer.set(obj, pointer, value);
@@ -49,12 +50,13 @@ export default class JsonPointer {
             return JsonPointer.get(obj, pointer);
         }
         // Return a partially applied function on `obj`.
+        // @ts-ignore
         const wrapped = JsonPointer.api.bind(JsonPointer, obj);
 
         // Support for oo style
         for (const name in JsonPointer) {
             if (JsonPointer.hasOwnProperty(name)) {
-                wrapped[name] = JsonPointer[name].bind(wrapped, obj);
+                (wrapped as any)[name] = (JsonPointer as any)[name].bind(wrapped, obj);
             }
         }
         return wrapped;
@@ -67,15 +69,15 @@ export default class JsonPointer {
      * @param {String|Array} pointer
      * @returns {*}
      */
-    static get(obj, pointer) {
-        const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
+    static get(obj:object, pointer:JsonPointerString|JsonPointerStructureArray) {
+        const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer as JsonPointerString);
 
         for (let i = 0; i < refTokens.length; ++i) {
             const tok = refTokens[i];
             if (!(typeof obj === 'object' && tok in obj)) {
                 throw new Error('Invalid reference token: ' + tok);
             }
-            obj = obj[tok];
+            obj = (obj as any)[tok];
         }
         return obj;
     }
@@ -87,7 +89,7 @@ export default class JsonPointer {
      * @param {String|Array} pointer
      * @param value
      */
-    static set(obj, pointer, value) {
+    static set(obj:object, pointer:JsonPointerString|JsonPointerStructureArray, value:any) {
         const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         let nextTok = refTokens[0];
 
@@ -109,18 +111,18 @@ export default class JsonPointer {
             nextTok = refTokens[i + 1];
 
             if (!(tok in obj)) {
-                if (nextTok.match(/^(\d+|-)$/)) {
-                    obj[tok] = [];
+                if ((nextTok as any).match(/^(\d+|-)$/)) {
+                    (obj as any)[tok] = [];
                 } else {
-                    obj[tok] = {};
+                    (obj as any)[tok] = {};
                 }
             }
-            obj = obj[tok];
+            obj = (obj as any)[tok];
         }
         if (nextTok === '-' && Array.isArray(obj)) {
             nextTok = obj.length;
         }
-        obj[nextTok] = value;
+        (obj as any)[nextTok] = value;
         return this;
     }
 
@@ -130,7 +132,7 @@ export default class JsonPointer {
      * @param {Object} obj
      * @param {String|Array} pointer
      */
-    static remove(obj, pointer) {
+    static remove(obj:object, pointer:JsonPointerString|JsonPointerStructureArray) {
         const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         const finalToken = refTokens[refTokens.length - 1];
         if (finalToken === undefined) {
@@ -146,7 +148,7 @@ export default class JsonPointer {
 
             Array.prototype.splice.call(parent, index, 1);
         } else {
-            delete parent[finalToken];
+            delete (parent as any)[finalToken];
         }
     }
 
@@ -157,10 +159,10 @@ export default class JsonPointer {
      * @param {function} descend
      * @returns {}
      */
-    static dict(obj, descend) {
+    static dict(obj:object, descend:DescentCallback) {
         const results = {};
         JsonPointer.walk(obj, function (value, pointer) {
-            results[pointer] = value;
+            (results as any)[pointer as string] = value;
         }, descend);
         return results;
     }
@@ -173,10 +175,10 @@ export default class JsonPointer {
      * @param {function} iterator
      * @param {function} descend
      */
-    static walk(obj, iterator, descend?) {
+    static walk(obj:object, iterator:DescentIterator, descend?:DescentCallback) {
         const refTokens = [];
 
-        descend = descend || function (value, ptrString:JsonPointerString) {
+        descend = descend || function (value:any, ptrString:JsonPointerString) {
             const type = Object.prototype.toString.call(value);
             return type === '[object Object]' || type === '[object Array]';
         };
@@ -202,7 +204,7 @@ export default class JsonPointer {
      * @param pointer
      * @returns {boolean}
      */
-    static has(obj, pointer) {
+    static has(obj:object, pointer:JsonPointerString|JsonPointerStructureArray) {
         try {
             JsonPointer.get(obj, pointer);
         } catch (e) {
@@ -217,7 +219,7 @@ export default class JsonPointer {
      * @param str
      * @returns {string}
      */
-    static escape(str) {
+    static escape(str:JsonPointerString|number) {
         return str.toString().replace(/~/g, '~0').replace(/\//g, '~1');
     }
 
@@ -227,7 +229,7 @@ export default class JsonPointer {
      * @param str
      * @returns {string}
      */
-    static unescape(str) {
+    static unescape(str:JsonPointerString) {
         return str.replace(/~1/g, '/').replace(/~0/g, '~');
     }
 
@@ -237,7 +239,7 @@ export default class JsonPointer {
      * @param pointer
      * @returns {Array}
      */
-    static parse(pointer) {
+    static parse(pointer:JsonPointerString) {
         if (pointer === '') { return []; }
         if (pointer.charAt(0) !== '/') { throw new Error('Invalid JSON pointer: ' + pointer); }
         return pointer.substring(1).split(/\//).map(JsonPointer.unescape);
@@ -249,12 +251,12 @@ export default class JsonPointer {
      * @param refTokens
      * @returns {string}
      */
-    static compile(refTokens) {
+    static compile(refTokens:JsonPointerStructureArray) {
         if (refTokens.length === 0) { return ''; }
         return '/' + refTokens.map(JsonPointer.escape).join('/');
     }
 
-    static parent(pointer){
+    static parent(pointer:JsonPointerString|JsonPointerStructureArray){
         const asArray = Array.isArray(pointer);
         const refTokens =  Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         return asArray?refTokens.slice(0,-1):this.compile(refTokens.slice(0,-1));

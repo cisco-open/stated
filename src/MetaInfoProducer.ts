@@ -49,12 +49,12 @@ export default class MetaInfoProducer {
     );
 
 
-    static async getMetaInfos(template):Promise<MetaInfo[]> {
+    static async getMetaInfos(template:any):Promise<MetaInfo[]> {
 
         const stack: MetaInfo[] = [];
         const emit: MetaInfo[] = [];
 
-        async function getPaths(o, path: JsonPointerStructureArray = [], isTemp=false) {
+        async function getPaths(o:any, path: JsonPointerStructureArray = [], isTemp=false) {
             const type = typeof o;
             const metaInfo: MetaInfo = {
                 "materialized__": true,
@@ -82,7 +82,8 @@ export default class MetaInfoProducer {
                 }
             } else {
                 const match = MetaInfoProducer.EMBEDDED_EXPR_REGEX.exec(o);
-                const getMatchGroup = (groupName) => match && match.groups[groupName];
+                //@ts-ignore
+                const getMatchGroup = (groupName:string) => match && match.groups[groupName];
 
                 const keyEndsWithDollars = typeof path[path.length - 1] === 'string' && String(path[path.length - 1]).endsWith('$');
                 const tag = getMatchGroup('tag');
@@ -97,6 +98,7 @@ export default class MetaInfoProducer {
                 if (hasExpression) {
                     stack[stack.length - 1] = {
                         ...metaInfo,
+                        //@ts-ignore
                         "exprRootPath__": slashOrCdUp,
                         "expr__": expr,
                         "exprTargetJsonPointer__": jp.parent(path)
@@ -113,6 +115,7 @@ export default class MetaInfoProducer {
                     stack.forEach(metaInfo => metaInfo.treeHasExpressions__ = true);
                 }
             }
+            //@ts-ignore
             emit.push(stack.pop());
         }
 

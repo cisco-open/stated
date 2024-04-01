@@ -12,7 +12,7 @@
  * object structure is: { error: { message: string } }.
  *
  */
-export const saferFetch = async (url, opts) => {
+export const saferFetch = async (url:string, opts:object) => {
     const response = await fetch(url, opts);
     if (!response.ok) {
         console.error(`HTTP response not OK for '${url}', status: ${response.status}, statusText: ${response.statusText}`);
