@@ -30,6 +30,8 @@ import {ExecutionStatus} from "./ExecutionStatus.js";
 import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
 
+declare const BUILD_TARGET: string | undefined;
+
 type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 export type Snapshot = {template:object, options:{}, output: any, prepared?:boolean}
 export type StatedError = {
@@ -994,7 +996,7 @@ export default class TemplateProcessor {
      * @param {"set"|"delete"|"setDeferred"} [op="set"] - The operation to perform - setDeferred is for internal use
      * @returns {Promise<<JsonPointerString[]>} A promise with the list of json pointers touched by the plan
      */
-    async setData(jsonPtr:JsonPointerString, data=null, op:Op="set"):Promise<JsonPointerString[]> {
+    async setData(jsonPtr:JsonPointerString, data:any=null, op:Op="set"):Promise<JsonPointerString[]> {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy

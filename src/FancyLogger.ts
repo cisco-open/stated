@@ -13,6 +13,9 @@
 // limitations under the License.
 
 import { LOG_LEVELS } from "./ConsoleLogger.js";
+declare const BUILD_TARGET: string | undefined;
+
+
 
 export default class FancyLogger {
     static async getLogger() {
