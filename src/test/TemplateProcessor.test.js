@@ -40,7 +40,7 @@ test("test 1", async () => {
         received.push({data, jsonPtr})
     });
     tp.setDataChangeCallback("/", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
+        received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
     });
     await tp.setData("/a", 42);
     expect(received).toEqual([
@@ -63,21 +63,25 @@ test("test 1", async () => {
             ]
         }
     ]);
+    received.length = 0; //clear
     //set the same data, expect plan to short circuit and not call callbacks
     await tp.setData("/a", 42);
+    expect(received).toEqual([]);
+    //now we change data to 2600 we expect callbacks to be called
+    await tp.setData("/a", 2600);
     expect(received).toEqual([
         {
-            "data": 42,
+            "data": 2600,
             "jsonPtr": "/a"
         },
         {
-            "data": 42,
+            "data": 2600,
             "jsonPtr": "/b"
         },
         {
             "data": {
-                "a": 42,
-                "b": 42
+                "a": 2600,
+                "b": 2600
             },
             "jsonPtr": [
                 "/a",
@@ -85,39 +89,22 @@ test("test 1", async () => {
             ]
         }
     ]);
-    //now we change data to 2600 we expect callbacks to be called
-    await tp.setData("/a", 2600);
+    received.length = 0; //clear received
+    //now we change data to empty string we expect callbacks to be called
+    await tp.setData("/a", "");
     expect(received).toEqual([
         {
-            "data": 42,
+            "data": "",
             "jsonPtr": "/a"
         },
         {
-            "data": 42,
+            "data": "",
             "jsonPtr": "/b"
         },
         {
             "data": {
-                "a": 2600,
-                "b": 2600
-            },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        },
-        {
-            "data": 2600,
-            "jsonPtr": "/a"
-        },
-        {
-            "data": 2600,
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": 2600,
-                "b": 2600
+                "a": "",
+                "b": ""
             },
             "jsonPtr": [
                 "/a",
