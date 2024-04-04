@@ -29,9 +29,14 @@ import {expect} from "@jest/globals";
 test("test 1", async () => {
     const tp = new TemplateProcessor({
         "a": "aaa",
-        "b": "${a}"
+        "b": "${a}",
+        "removeMe":"!${'I better get removed because I am temporary variable'}"
     });
+    let theTempvar = "--";
+    tp.postInitialize = async ()=>{ theTempvar = tp.output.removeMe}
     await tp.initialize();
+    //validate thaat postInitialize call happens before temp var removal
+    expect(theTempvar).toBe('I better get removed because I am temporary variable');
     const received = [];
     tp.setDataChangeCallback("/a", (data, jsonPtr) => {
         received.push({data, jsonPtr})
@@ -43,6 +48,7 @@ test("test 1", async () => {
         received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
     });
     await tp.setData("/a", 42);
+    //the temporary variable is not seen by root data change callback
     expect(received).toEqual([
         {
             "data": 42,

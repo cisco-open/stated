@@ -298,6 +298,13 @@ export default class TemplateProcessor {
     /** Allows caller to set a callback to propagate initialization into their framework */
     public readonly onInitialize: Map<string,() => Promise<void>|void>;
 
+    /**
+     * Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are
+     * removed. This function is slated to be replaced with a map of functions like onInitialize
+     * @deprecated
+     */
+    public postInitialize: ()=> Promise<void> = async () =>{};
+
     public executionStatus: ExecutionStatus;
 
 
@@ -454,6 +461,7 @@ export default class TemplateProcessor {
             this.propagateTags(metaInfos);
             this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
             await this.evaluateInitialPlan(jsonPtr);
+            await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars);
             this.logger.verbose("initialization complete...");
             this.logOutput(this.output);
