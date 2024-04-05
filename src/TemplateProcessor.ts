@@ -843,10 +843,25 @@ export default class TemplateProcessor {
         metaInfos.forEach(node => dfs(node));
     }
 
+    /**
+     * temp vars are in scope if all tags are present OR the expression's fieldname ends in !, which makes
+     * it an absolutely temporary variable since.
+     * @param metaInfo
+     * @private
+     */
+    private isTempVarInScope(metaInfo: MetaInfo){
+        return metaInfo.temp__ === true
+            && (
+                (metaInfo.jsonPointer__ as JsonPointerString).endsWith("!")
+                ||
+                this.allTagsPresent(metaInfo.tags__)
+            )
+    }
+
     private cacheTmpVarLocations(metaInfos:MetaInfo[]):JsonPointerString[]{
         const tmpVars:JsonPointerString[] = [];
-        metaInfos.forEach(metaInfo => {
-            if (metaInfo.temp__ === true) {
+        metaInfos.forEach(metaInfo => { //var must also be in scope of tags
+            if (this.isTempVarInScope(metaInfo)) {
                 tmpVars.push(metaInfo.jsonPointer__ as JsonPointerString);
             }
         })
