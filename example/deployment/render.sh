@@ -1,0 +1,1 @@
+stated myKafkaProducer.yaml > tmp.yaml && stated tmp.yaml --tags=RUNTIME

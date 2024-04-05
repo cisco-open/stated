@@ -1,0 +1,34 @@
+config: "!${$open('environments.yaml')~>$import}" # '!' marks this as removed from output after stated runs on this file
+runtime: "@RUNTIME !${$open('runtime.yaml')~>$import}"
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  labels:
+    app: java-kafka-producer
+  name: java-kafka-producer
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: java-kafka-producer
+  template:
+    metadata:
+      labels:
+        app: java-kafka-producer
+    spec:
+      containers:
+        - name: java-kafka-producer
+          image: quay.io/strimzi-examples/java-kafka-producer:latest
+          env:
+            - name: STRIMZI_LOG_LEVEL
+              value: "@RUNTIME /${runtime.logLevel}"
+            - name: KAFKA_BOOTSTRAP_SERVERS
+              value: "@RUNTIME /${runtime.bootstrapServers}"
+            - name: STRIMZI_TOPIC
+              value: /${config.selected.topic}
+            - name: STRIMZI_DELAY_MS
+              value: /${config.selected.delayMs}
+            - name: KAFKA_KEY_SERIALIZER
+              value: /${config.selected.keySerializer}
+            - name: KAFKA_VALUE_SERIALIZER
+              value: /${config.selected.valueSerializer}

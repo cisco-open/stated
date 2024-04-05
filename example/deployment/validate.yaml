@@ -1,0 +1,4 @@
+#THIS FILE IS NOT IMPLEMENTED YET...JUST A SKETCH
+deployment: !${$open(''myKafkaProducer.yaml'})~>$import}
+validationRules: ${$import('.../validators.yaml')}
+isValid: validationRules.($$.deployment~>$) #map over validation functions, passing our deployment to each validation rule

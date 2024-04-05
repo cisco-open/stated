@@ -443,7 +443,7 @@ export default class TemplateProcessor {
             }
 
             this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
-            this.logger.debug(`tags: ${JSON.stringify(this.tagSet)}`);
+            this.logger.debug(`tags: ${JSON.stringify(Array.from(this.tagSet))}`);
             this.executionPlans = {}; //clear execution plans
             let parsedJsonPtr:JsonPointerStructureArray = jp.parse(jsonPtr);
             parsedJsonPtr = parsedJsonPtr.filter(e=>e!=="");//isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
@@ -462,7 +462,7 @@ export default class TemplateProcessor {
             this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
             await this.evaluateInitialPlan(jsonPtr);
             await this.postInitialize();
-            this.removeTemporaryVariables(this.tempVars);
+            this.removeTemporaryVariables(this.tempVars, jsonPtr);
             this.logger.verbose("initialization complete...");
             this.logOutput(this.output);
         }finally {
@@ -853,14 +853,17 @@ export default class TemplateProcessor {
         return tmpVars
     }
 
-    private removeTemporaryVariables(tmpVars:JsonPointerString[]): void{
-        tmpVars.forEach(jsonPtr=>{
-            if(jp.has(this.output, jsonPtr)) {
-                const current = jp.get(this.output, jsonPtr);
-                jp.remove(this.output, jsonPtr);
-                this.callDataChangeCallbacks(current, jsonPtr, true)
-            }
-        });
+    private removeTemporaryVariables(tmpVars:JsonPointerString[], jsonPtrOfTemplate:JsonPointerString): void{
+        //only remove temp variables after all imports are finished and we are finishing render of the root template
+        if(jsonPtrOfTemplate === "/") {
+            tmpVars.forEach(jsonPtr => {
+                if (jp.has(this.output, jsonPtr)) {
+                    const current = jp.get(this.output, jsonPtr);
+                    jp.remove(this.output, jsonPtr);
+                    this.callDataChangeCallbacks(current, jsonPtr, true)
+                }
+            });
+        }
     }
 
 
@@ -1055,7 +1058,7 @@ export default class TemplateProcessor {
                 } else {
                     await this.executePlan(plan);
                 }
-                this.removeTemporaryVariables(this.tempVars);
+                this.removeTemporaryVariables(this.tempVars, "/");
             }finally {
                 this.executionQueue.shift();
             }

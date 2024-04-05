@@ -1,0 +1,2 @@
+bootstrapServers: https://foo.bar
+logLevel: debug

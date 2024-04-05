@@ -1,0 +1,13 @@
+selected: ${myLaptop}
+standardConfigs: ${$import('https://raw.githubusercontent.com/geoffhendrey/jsonataplay/main/stdenvs.yaml')}
+myTopicName: nozzles
+myLaptop:
+    - topic: /${myTopicName}
+    - delayMs: 100
+    - keySerializer: org.apache.kafka.common.serialization.StringSerializer"
+    - valueSerializer: org.apache.kafka.common.serialization.StringSerializer"
+myLocalk9s:
+  - topic: /${myTopicName}
+  - delayMs: 10
+  - keySerializer: org.apache.kafka.common.serialization.StringSerializer"
+  - valueSerializer: org.apache.kafka.common.serialization.StringSerializer"
