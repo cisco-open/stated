@@ -307,10 +307,6 @@ export default class TemplateProcessor {
 
     public executionStatus: ExecutionStatus;
 
-
-
-
-
     public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
             let inferredType: "JSON" | "YAML" | "UNKNOWN" = "UNKNOWN";
 
@@ -1150,7 +1146,7 @@ export default class TemplateProcessor {
         if(plan.lastCompletedStep){
             return false; //this is a one-step plan, so if it has a completed step, it's already done
         }
-        this.executionStatus.begin(plan);
+        await this.executionStatus.begin(plan);
         let theStep:PlanStep|undefined;
         try {
             const {sortedJsonPtrs} = plan;
