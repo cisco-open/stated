@@ -1,26 +1,24 @@
 import { JsonPointerString } from "./MetaInfoProducer.js";
-import TemplateProcessor, {Plan, Op, PlanStep, Fork} from "./TemplateProcessor.js";
+import TemplateProcessor, {Plan, Op, PlanStep, Fork, ExecutionStatusCallback} from "./TemplateProcessor.js";
 import { stringifyTemplateJSON } from './utils/stringify.js';
 
 type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
     private statuses: Set<Plan>;
     /** Callbacks to track forked and joined plans */
-    public readonly onBegin?: () => Promise<void>|void;
-    public readonly onEnd?: () => Promise<void>|void;
-    constructor(onBegin?: () => Promise<void>|void, onEnd?: () => Promise<void>|void) {
+    public onBegin?: ExecutionStatusCallback;
+    public onEnd?: ExecutionStatusCallback;
+    constructor() {
         this.statuses = new Set();
-        this.onBegin = onBegin;
-        this.onEnd = onEnd;
     }
-    public async begin(mutationPlan:Plan) {
+    public begin(mutationPlan:Plan) {
         this.statuses.add(mutationPlan)
-        if (this.onBegin) await this.onBegin();
+        if (this.onBegin) this.onBegin(mutationPlan);
     }
 
-    public async end(mutationPlan: Plan) {
+    public end(mutationPlan: Plan) {
         this.statuses.delete(mutationPlan);
-        if (this.onEnd) await this.onEnd();
+        if (this.onEnd) this.onEnd(mutationPlan);
     }
 
     public clear() {

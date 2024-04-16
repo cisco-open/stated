@@ -76,6 +76,11 @@ export type FunctionGenerator = (metaInfo: MetaInfo, templateProcessor: Template
  */
 export type DataChangeCallback = (data:any, ptr:JsonPointerString, removed?:boolean)=>void
 
+/**
+ * defines the function signature for execution status lifecycle callbacks, called when new plans begin or end
+ */
+export type ExecutionStatusCallback = (mutationPlan: Plan)=>void;
+
 
 
 /**
@@ -1938,6 +1943,20 @@ export default class TemplateProcessor {
             return rootJsonPtr.slice(0,-1);
         }
         return rootJsonPtr;
+    }
+
+    /**
+     * Sets execution status onBegin callback
+     */
+    public setExecutionStatusOnBeginCallback(cbFn:ExecutionStatusCallback){
+        this.executionStatus.onBegin = cbFn;
+    }
+
+    /**
+     * Sets execution status onBegin callback
+     */
+    public setExecutionStatusOnEndCallback(cbFn:ExecutionStatusCallback) {
+        this.executionStatus.onEnd = cbFn;
     }
 }
 

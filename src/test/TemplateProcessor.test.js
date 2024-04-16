@@ -2520,14 +2520,41 @@ test("forked homeworlds", async () => {
     expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
 },5000);
 
-/*
+test("executionStatus onBegin/onEnd", async () => {
+    let savedState;
+    let latch;
+    const latchSaveCommand = new Promise(resolve => {latch=resolve});
+    const tp = TemplateProcessor.fromString(`
+    data: \${['luke'].($forked('/name',$))}
+    name: null
+    personDetails: \${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}
+    homeworldURL: \${ personDetails!=null?personDetails.properties.homeworld:null }
+    homeworldDetails: \${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
+    homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+    homeworlds: []`,
+        {save:(o)=>{
+                savedState = tp.executionStatus.toJsonObject();
+                if (savedState.mvcc.length === 1){
+                    latch();
+                }
+                return o;
+            }}
+    );
+    let latchHomeworlds;
+    const homeworldsPromise = new Promise(resolve=>{latchHomeworlds = resolve});
+    tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
+        if(homeworlds.length === 1){
+            latchHomeworlds();
+        }
+    })
+    tp.setExecutionStatusOnBeginCallback(async (plan) => {
+        console.log("Execution Status onBegin", plan, StatedREPL.stringify(tp.executionStatus.toJsonObject()));
+    })
+    tp.setExecutionStatusOnEndCallback(async (plan) => {
+        console.log("Execution Status onEnd", plan, StatedREPL.stringify(tp.executionStatus.toJsonObject()));
+    })
 
-data: ${['luke', 'han', 'leia', 'chewbacca', 'darth', 'ben', 'c-3po', 'yoda'].(($sleep(100);$forked('/name',$)))}
-name: null
-personDetails: ${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null)~>$save}
-homeworldURL: ${ personDetails!=null?personDetails.properties.homeworld:null }
-homeworldDetails: ${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
-homeworldName: ${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
-homeworlds: []
- */
+    await tp.initialize();
+    await homeworldsPromise;
 
+},5000);
