@@ -2520,14 +2520,35 @@ test("forked homeworlds", async () => {
     expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
 },5000);
 
-/*
 
-data: ${['luke', 'han', 'leia', 'chewbacca', 'darth', 'ben', 'c-3po', 'yoda'].(($sleep(100);$forked('/name',$)))}
-name: null
-personDetails: ${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null)~>$save}
-homeworldURL: ${ personDetails!=null?personDetails.properties.homeworld:null }
-homeworldDetails: ${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
-homeworldName: ${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
-homeworlds: []
- */
+test("performance test with 100 data injections", async () => {
+    const tp = new TemplateProcessor({
+        "data": {
+            "cpu_usage": [],
+            "memory_usage": [],
+            "disk_io": []
+        },
+        "health_rules": {
+            "cpu_rule": "/${$average(data.cpu_usage) > 80 ? 'alert' : 'normal'}",
+            "mem_rule": "/${$average(data.memory_usage) > 80 ? 'alert' : 'normal'}",
+            "io_rule": "/${$max(data.disk_io) > 400 ? 'alert' : 'normal'}",
+        }
+    });
+
+    await tp.initialize();
+    let startTime = Date.now();
+    for (let i = 0; i < 10000; i++) {
+        const newData = {
+            cpu_usage: Array.from({ length: 1000 }, () => Math.random() * 100),
+            memory_usage: Array.from({ length: 1000 }, () => Math.random() * 100),
+            disk_io: Array.from({ length: 1000 }, () => Math.random() * 500)
+        };
+        await tp.setData("/data", newData);
+    }
+    let endTime = Date.now();
+    console.log(`Total execution time for 100 data sets: ${endTime - startTime} ms`);
+    console.log(`rules per second: ${10000/((endTime - startTime)/1000)}`);
+
+});
+
 

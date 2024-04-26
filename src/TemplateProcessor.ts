@@ -891,14 +891,19 @@ export default class TemplateProcessor {
         //--------------- utility sub-functions follow ----------------//
 
         const listDependencies = (metaInfo:MetaInfo) => {
-            markAsVisited(metaInfo);
+            markAsVisited(metaInfo); //visited tells us 'globally' is a node has ever been visited
+            //...however, we also need to track the traversal of dependencies that is 'local' to a single
+            //originating node/expression. Circularity of references is limited to this "local" Scope. If we
+            //detected circularity with the global 'visited' list, it would mean that circularity was somehow
+            //a property of the entire template, which it is not. Circularity is a property of individual expression
+            //fanouts, '.from' a given expression/node
             addToScope(metaInfo);
 
             followDependencies(metaInfo);
             emit(metaInfo);
             followChildren(metaInfo);
 
-            removeFromScope(metaInfo);
+            removeFromScope(metaInfo); //...and clear that 'local' scope now that we finished processing the node
         }
 
         const hasJsonPointer = (metaInfo:MetaInfo) => {
@@ -916,6 +921,19 @@ export default class TemplateProcessor {
         const removeFromScope = (metaInfo:MetaInfo) => {
             recursionStack.delete(metaInfo.jsonPointer__ as JsonPointerString);
         }
+        /**
+         * Used to detect a condition where like "data:${data.foo}" which essentially declares a dependency on the
+         * expression itself. This is inherently circular. You cannot say "use that thing in this expression, where
+         * that thing is a product of evaluating this expression". You also cannot say "use that thing in this
+         * expression where that thing is a direct ancestor of this expression" as that is also circular, implying that
+         * the expression tries to reference an ancestor node, whose descendent includes this very node.
+         * @param exprNode
+         * @param dependency
+         */
+        const isCommonPrefix = (exprNode:JsonPointerString, dependency:JsonPointerString):boolean=>{
+            return exprNode.startsWith(dependency) || dependency.startsWith(exprNode);
+
+        }
 
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
         //template. Fields that don't end in "__" are children of the given object in the template
@@ -929,8 +947,18 @@ export default class TemplateProcessor {
                 }
             }
         }
+
         const searchUpForExpression = (childNode:MetaInfo):MetaInfo|undefined=> {
             let pathParts = jp.parse(childNode.jsonPointer__ as JsonPointerString);
+            /*
+            const directParent = jp.compile(pathParts.slice(0, -1));
+            //if a dependency of an expression is rooted in the expression itself, such as "data:${data.foo}" then this is a circular dependency
+            if (visited.has(directParent) && (jp.get(this.templateMeta, directParent) as MetaInfo).expr__) {
+                logCircularDependency(childNode.jsonPointer__ as JsonPointerString);
+                return undefined;
+            }
+
+             */
             while (pathParts.length > 1) {
                 pathParts = pathParts.slice(0, -1); //get the parent expression
                 const jsonPtr = jp.compile(pathParts);
@@ -947,13 +975,14 @@ export default class TemplateProcessor {
             if (!metaInfo.absoluteDependencies__) return;
 
             for (const dependency of metaInfo.absoluteDependencies__) {
-                if (recursionStack.has(dependency as JsonPointerString)) {
+
+                if (recursionStack.has(dependency as JsonPointerString)
+                    || isCommonPrefix(metaInfo.jsonPointer__ as JsonPointerString, dependency as JsonPointerString)) {
                     logCircularDependency(dependency as JsonPointerString);
-                    continue;
+                    continue; //do not follow circular dependencies
                 }
 
                 if (visited.has(dependency)) continue;
-
                 const dependencyNode = jp.get(templateMeta, dependency) as MetaInfo;
                 processUnmaterializedDependency(dependencyNode);
                 listDependencies(dependencyNode);
