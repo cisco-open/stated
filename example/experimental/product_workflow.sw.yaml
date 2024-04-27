@@ -1,0 +1,88 @@
+id: product_workflow
+version: '1.0.0'
+specVersion: '0.9'
+name: product-workflow
+description: Workflow to extract product entities and their metrics from logs
+events:
+  - name: event-received
+    type: contracts:cloudevent/platform:event.enriched.v1
+    kind: consumed
+  - name: entity-observed
+    type: contracts:cloudevent/platform:entity.observed.v1
+    kind: produced
+  - name: measurement-observed
+    type: contracts:cloudevent/platform:measurement.observed.v1
+    kind: produced
+functions:
+  - name: create-observations
+    type: expression
+    operation: |-
+      (
+        $product := $createEntity(productEntityType, {'product.id': attributes.productId});
+        $measurement := {
+            'entity': {
+              'id': $product.id,
+              'type': $product.type
+            },
+            'type': cartMetricType,
+            'attributes': {
+              'user.id': attributes.userId
+            },
+            'measurements': [
+              {
+                'timestamp': $millis(),
+                'intValue': attributes.quantity
+              }
+            ]
+        };
+      
+        {
+          'entity': $product,
+          'measurement': $measurement
+        }
+      )
+states:
+  - name: filter-traces
+    type: event
+    onEvents:
+      - eventRefs:
+          - event-received
+        eventDataFilter:
+          data: ${ data.attributes }
+          toStateData: ${ attributes }
+    transition: filter
+  - name: filter
+    type: switch
+    dataConditions:
+      - name: match
+        condition: ${ $exists(attributes.productId) }
+        transition: set-types
+    defaultCondition:
+      end: true
+  - name: set-types
+    type: inject
+    data:
+      # sets the type of the observed entities while keeping solution identifier dynamic, which allows to rename the solution without any modifications to this workflow
+      productEntityType: >
+        @INSTALL ${$sys.solutionId & ':product'}
+      cartMetricType: >
+        @INSTALL ${$sys.solutionId & ':cart.products.total'}
+    transition: consume-event
+  - name: consume-event
+    type: operation
+    stateDataFilter:
+      output: ${ result }
+    actions:
+      - name: extract-state
+        functionRef: zip-to-state
+        actionDataFilter:
+          toStateData: ${ zipcodes_states }
+      - name: create-observations
+        functionRef: create-observations
+    end:
+      terminate: true
+      produceEvents:
+        - eventRef: entity-observed
+          data: ${ entities }
+        - eventRef: measurement-observed
+          data: ${ measurements }
