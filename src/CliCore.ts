@@ -25,6 +25,7 @@ import VizGraph from "./VizGraph.js";
 import { exec } from 'child_process';
 import  http from  'http';
 import * as child_process from "child_process";
+import os from "os";
 
 
 export default class CliCore {
@@ -115,14 +116,14 @@ export default class CliCore {
             if (filepath && filepath.startsWith("/")) throw new Error("Cannot use file path starting with '/' with importPath");
             if (importPath.startsWith("/")) return path.resolve(path.join(importPath, filepath))
 
-            if (importPath.startsWith("~")) return path.resolve(path.join(importPath.replace("~", process.env.HOME), filepath));
+            if (importPath.startsWith("~")) return path.resolve(path.join(importPath.replace("~", os.homedir()), filepath));
 
             //relative path
-            return path.resolve(path.join(process.cwd(), importPath, filepath));
+            return path.resolve(path.join(importPath, filepath));
         }
 
-        if (filepath && filepath.includes("~")) return path.resolve(filepath.replace("~", process.env.HOME));
-        if (filepath && filepath.startsWith("/")) return filepath;
+        if (filepath && filepath.includes("~")) return path.normalize(path.resolve(filepath.replace("~", os.homedir())));
+        if (filepath && filepath.startsWith("/")) return path.normalize(filepath);
         return path.join(process.cwd(), filepath);
     }
 
@@ -578,6 +579,15 @@ export default class CliCore {
             startServer();
             return `http://localhost:${port}`;
         }
+    }
+
+    /**
+     * this method is just here as a stub to allow tests to pass. Color is in reality handled only by StatedRepl,
+     * it is not something that is possible to 'see' from the CLI since CLI returns pure JSON which has no concept
+     * of terminal colors.
+     */
+    color(){
+        "";
     }
 }
 

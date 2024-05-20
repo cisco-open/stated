@@ -2546,7 +2546,7 @@ test("performance test with 100 data injections", async () => {
         await tp.setData("/data", newData);
     }
     let endTime = Date.now();
-    console.log(`Total execution time for 100 data sets: ${endTime - startTime} ms`);
+    console.log(`Total execution time for 10000 data sets: ${endTime - startTime} ms`);
     console.log(`rules per second: ${10000/((endTime - startTime)/1000)}`);
 
 });

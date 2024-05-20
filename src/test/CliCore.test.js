@@ -12,37 +12,41 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import path from "path";
+import os from "os";
 import CliCore from "../../dist/src/CliCore.js";
+
+const homeDir = os.homedir();
 
 const testCases = [
   {
     filePath: "file/Path",
     importPath: undefined,
-    expected: `${process.cwd()}/file/Path`,
+    expected: path.resolve(process.cwd(), "file/Path"),
     description: "should resolve a relative filePath"
   },
   {
     filePath: "file/Path",
-    importPath: "import//Path",
-    expected: `${process.cwd()}/import/Path/file/Path`,
+    importPath: "import/Path",
+    expected: path.resolve(process.cwd(), "import/Path", "file/Path"),
     description: "should resolve a relative import path with both filePath and importPath"
   },
   {
     filePath: "file/Path",
     importPath: "/import/Path",
-    expected: "/import/Path/file/Path",
+    expected: path.resolve("/", "import/Path", "file/Path"),
     description: "should resolve an absolute import path"
   },
   {
     filePath: "file/Path",
     importPath: "~/import/Path",
-    expected: `${process.env.HOME}/import/Path/file/Path`,
+    expected: path.resolve(homeDir, "import/Path", "file/Path"),
     description: "should resolve a tilde in importPath with filePath"
   },
   {
     filePath: "~/file/Path",
     importPath: undefined,
-    expected: `${process.env.HOME}/file/Path`,
+    expected: path.resolve(homeDir, "file/Path"),
     description: "should resolve a tilde in filePath"
   },
   {
@@ -53,9 +57,9 @@ const testCases = [
   }
 ];
 
-testCases.forEach(({filePath, importPath, expected, description}) => {
+testCases.forEach(({ filePath, importPath, expected, description }) => {
   test(description, async () => {
-    expect(CliCore.resolveImportPath(filePath, importPath)).toBe(expected);
+    expect(path.normalize(CliCore.resolveImportPath(filePath, importPath))).toBe(path.normalize(expected));
   });
 });
 
@@ -80,7 +84,7 @@ const errorTestCases = [
   }
 ];
 
-errorTestCases.forEach(({filePath, importPath, error, description}) => {
+errorTestCases.forEach(({ filePath, importPath, error, description }) => {
   test(description, async () => {
     expect(() => CliCore.resolveImportPath(filePath, importPath)).toThrowError(error);
   });
@@ -106,7 +110,28 @@ test("tail", async () => {
   expect(res).toStrictEqual({
     "__tailed": true,
     "data": 5
-  })
+  });
   cliCore.close();
 });
+
+test("xf", async () => {
+  const cliCore = new CliCore();
+  const res = await cliCore.init('.init -f "example/useEnv.json" --xf=example/env.json');
+  expect(res).toStrictEqual({
+    "name": "Dr. Stephen Falken",
+    "address": "Goose Island, OR, USA"
+  });
+  cliCore.close();
+});
+
+test("import JS", async () => {
+  const cliCore = new CliCore();
+  const res = await cliCore.init('.init -f example/importJS.json --xf=example/test-export.js');
+  expect(res).toStrictEqual({
+    "res": "bar: foo"
+  });
+  cliCore.close();
+});
+
+
 

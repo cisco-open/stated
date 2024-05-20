@@ -52,7 +52,7 @@ export default class StatedREPL {
 
     async initialize() {
         this.isColorized = false;
-        const cmdLineArgsStr = process.argv.slice(2).join(" ");
+        const cmdLineArgsStr = StatedREPL.getCmdLineArgsStr();
         const {oneshot} = CliCore.parseInitArgs(cmdLineArgsStr)
         const resp = await this.cliCore.init(cmdLineArgsStr)
         if(oneshot){
@@ -67,6 +67,17 @@ export default class StatedREPL {
         });
         this.cliCore.replServer = this.r;
         this.registerCommands();
+    }
+
+    private static getCmdLineArgsStr() {
+        return process.argv.slice(2).map((s) => {
+            if (s.includes(" ")) {
+                if (!s.startsWith('"')) {
+                    return '"' + s + '"';//we need to surround any arguments that have whitespace like "...Program Files ..." with quotes sp we don't break our own argument parsing
+                }
+            }
+            return s;
+        }).join(" ");
     }
 
     close(){
