@@ -20,7 +20,7 @@
     "./dist/src/utils/rateLimit.js": "./dist/src/utils/rateLimit.js"
   },
   "scripts": {
-    "clean": "rm -rf dist",
+    "clean": "rimraf dist",
     "build": "tsc && npm run webpack && npm run docs",
     "webpack": "webpack && webpack --config webpack.config.cjs.js && webpack --config webpack.nodeSingleBin.cjs.js",
     "test": "npm run clean && npm run build && node --experimental-vm-modules node_modules/jest/bin/jest.js --detectOpenHandles",
@@ -69,6 +69,7 @@
     "copy-webpack-plugin": "^11.0.0",
     "jest": "^29.7.0",
     "path-browserify": "^1.0.1",
+    "rimraf": "^5.0.7",
     "typedoc": "^0.25.7",
     "typescript": "^5.3.3",
     "webpack": "^5.88.2",

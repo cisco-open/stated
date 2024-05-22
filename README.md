@@ -39,13 +39,18 @@
   * [Tags](#tags)
 * [Generative Templates](#generative-templates)
 * [Reactive Behavior](#reactive-behavior)
+  * [SVG command](#svg-command)
+  * [YAML](#yaml)
+  * [Setting Values in the stated REPL](#setting-values-in-the-stated-repl)
+  * [Expression Scope](#expression-scope-1)
+  * [Rerooting Expressions](#rerooting-expressions-1)
   * [DAG](#dag)
   * [visualizing the plan with .svg command](#visualizing-the-plan-with-svg-command)
 * [Concurrency](#concurrency)
   * [Serialized Mutations](#serialized-mutations)
   * [Atomic State Updates](#atomic-state-updates)
   * [Multi Version Concurrency Control (MVCC) and  $forked](#multi-version-concurrency-control-mvcc-and-forked)
-* [YAML](#yaml)
+* [YAML](#yaml-1)
 * [Complex Data Processing](#complex-data-processing)
 * [Functions](#functions)
   * [JSONata built-in](#jsonata-built-in)
@@ -56,7 +61,8 @@
     * [$import](#import)
       * [Importing bits of other templates](#importing-bits-of-other-templates)
       * [Setting up local imports with --importPath](#setting-up-local-imports-with---importpath)
-      * [Import JS functions](#import-js-functions)
+      * [Import Javascript ES modules](#import-javascript-es-modules)
+      * [The __init sidecar function](#the-__init-sidecar-function)
     * [$open](#open-1)
     * [$set](#set)
     * [$debounce](#debounce)
@@ -2004,20 +2010,23 @@ You can import local files by specifying a folder where stated will look for the
 }
 
 ```
-#### Import JS functions
+#### Import Javascript ES modules
 Repl and cli support importing javascript functions. If provided file to --xf has a .js or .mjs extension, it will be
 loaded and all exported functions will be added to TemplateProcessor's execution context.
 
-An example "src/test/test-export.js" exports 2 functions
+An example "src/test/test-export.js" exports 3 functions
 ```js
 const barFunc = (input) => `bar: ${input}`;
 
 // explicitly define exported functions and their names
 export const foo = () => "foo";
 export const bar = barFunc;
+export const __init = (templateProcessor) =>{
+  templateProcessor.setData("/messageFromInitFunction", "__init sidecar succeeded");
+}
 ```
 
-Which can be used in the stated tempalate context
+The functions can be used in the stated template context
 ```json
 > .init -f example/importJS.json --xf=example/test-export.js
 {
@@ -2025,6 +2034,7 @@ Which can be used in the stated tempalate context
 }
 > .out
 {
+  "messageFromInitFunction": "__init sidecar succeeded",
   "res": "bar: foo"
 }
 ```
@@ -2037,9 +2047,22 @@ This can be combined with the `--importPath` option to import files relative to 
 }
 > .out
 {
+  "messageFromInitFunction": "__init sidecar succeeded",
   "res": "bar: foo"
 }
 ```
+
+#### The __init sidecar function
+If the es module exports a function named `__init`, this function will be invoked with the initialized TemplateProcessor
+as an argument. This is useful as a 'sidecar' if you want to add code to interact with the template you are loading in
+the REPL. This example will inject a message into the template. Your function can be async. It's return value, if any
+is ignored.
+```javascript
+export const __init = (templateProcessor) =>{
+  templateProcessor.setData("/messageFromInitFunction", "__init sidecar succeeded");
+}
+```
+
 ### $open
 Allowing expressions to open local files is a security risk. For this reason the core TemplateProcessor does
 not support the $open function. However, the CLI/REPL which are for local usage allow the $open function. Additionally,

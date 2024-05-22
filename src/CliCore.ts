@@ -195,6 +195,8 @@ export default class CliCore {
             } else {
                 await this.templateProcessor.initialize(input);
             }
+            const {__init} = contextData;
+            __init && __init(this.templateProcessor); //if a function named __init is found in the --xf, said context function is run
             if(tail !== undefined){
                 return tailPromise;
             }

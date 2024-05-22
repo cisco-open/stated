@@ -128,10 +128,42 @@ test("import JS", async () => {
   const cliCore = new CliCore();
   const res = await cliCore.init('.init -f example/importJS.json --xf=example/test-export.js');
   expect(res).toStrictEqual({
+    "messageFromInitFunction": "__init sidecar succeeded",
     "res": "bar: foo"
   });
   cliCore.close();
 });
+
+test("import and run __init function", async () => {
+
+  let resolve;
+  let reject;
+  const promise = new Promise((r, rej)=>{
+    resolve = r;
+    reject = rej;
+  });
+  let cliCore = new CliCore();
+  const res = await cliCore.init('.init -f example/importJS.json --xf=example/test-export.js');
+
+  let count=0;
+  const x = setInterval(()=>{
+    if(count++>20){
+     reject();
+    }
+    const {messageFromInitFunction=undefined} = cliCore.templateProcessor.output;
+    if(messageFromInitFunction !== undefined){
+      resolve();
+      expect(messageFromInitFunction).toBe("__init sidecar succeeded");
+    }
+  }, 1)
+  try {
+    await promise;
+  }finally {
+    cliCore.close();
+   clearInterval(x);
+  }
+});
+
 
 
 
