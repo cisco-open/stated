@@ -2515,7 +2515,9 @@ test("forked homeworlds", async () => {
 
     // Ensure the array is exactly the same length as the expected array
     expect(homeworlds).toHaveLength(expectedHomeworlds.length);
-
+    if (savedState.mvcc.length !== 6) {
+        throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
+    }
     expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
     expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
 },5000);
