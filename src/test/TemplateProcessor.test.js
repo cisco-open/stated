@@ -118,6 +118,23 @@ test("test 1", async () => {
             ]
         }
     ]);
+    //now we test the ability to receive callbacks even when the data has not changed
+    tp.options.receiveNoOpCallbacksOnRoot = true;
+    received.length = 0; //clear received
+    //now we set a to same value, but since we opted to receive NoOp callbacks, we expect the callback anyway
+    await tp.setData("/a", "");
+    expect(received).toEqual([
+        {
+            "data": {
+                "a": "",
+                "b": ""
+            },
+            "jsonPtr": [
+                "/a",
+                "/b"
+            ]
+        }
+    ]);
 });
 
 test("test 2", async () => {

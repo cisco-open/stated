@@ -1122,15 +1122,14 @@ export default class TemplateProcessor {
 
     private async executePlan(plan:Plan){
         try {
-            const {sortedJsonPtrs, data, op = "set"} = plan;
+            const {data} = plan;
+            let shouldRunDependentExpressions = true;
             if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-                const didUpdate = await this.applyMutationToFirstJsonPointerOfPlan(plan);
-                if (!didUpdate){
-                    return;
-                }
+                shouldRunDependentExpressions = await this.applyMutationToFirstJsonPointerOfPlan(plan);
             }
-            await this.executeDependentExpressions(plan);
-            await this.executeDataChangeCallbacks(plan); //this should be more selective by passing the completed plan and allowing the callbacks to be called based on real truth of whether or not an expression executed
+            // if the plan caused an initial mutation, then continue with the plan's transitive dependencies
+            shouldRunDependentExpressions && await this.executeDependentExpressions(plan);
+            await this.executeDataChangeCallbacks(plan);
         }catch(error){
             this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
             throw error;
@@ -1158,20 +1157,28 @@ export default class TemplateProcessor {
 
     private async executeDataChangeCallbacks(plan:Plan) {
         let anyUpdates = false;
-        const thoseThatUpdated = plan.didUpdate.reduce((acc:JsonPointerString[],did,i)=>{
-            if(did){
-                acc.push(plan.sortedJsonPtrs[i]);
-                anyUpdates = true;
-            }
-            return acc;
-        }, []);
-        if (anyUpdates) {
+        const {receiveNoOpCallbacksOnRoot:everything = false} = this.options;
+        let jsonPtrArray = plan.sortedJsonPtrs;
+        const onlyWhatChanged = (plan:Plan)=>{
+            return  plan.didUpdate.reduce((acc:JsonPointerString[],didUpdate,i)=>{
+                if(didUpdate){
+                    acc.push(plan.sortedJsonPtrs[i]);
+                    anyUpdates = true;
+                }
+                return acc;
+            }, []);
+        }
+        if(!everything){
+            jsonPtrArray = onlyWhatChanged(plan);
+        }
+
+        if (anyUpdates || everything) {
             // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
             const removed = plan.op==="delete";
             //admittedly this structure of this common callback is disgusting. Essentially if you are using the
             //common callback you don't want to get passed any data that changed because you are saying in essence
             //"I don't care what changed".
-            await this.callDataChangeCallbacks(plan.output, thoseThatUpdated, removed);
+            await this.callDataChangeCallbacks(plan.output, jsonPtrArray, removed);
         }
     }
 
@@ -1425,7 +1432,7 @@ export default class TemplateProcessor {
             this.callDataChangeCallbacks(data, jsonPtr, false);
             return true;
         } else {
-            this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
+            if (this.isEnabled("verbose"))this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
             return false;
         }
 
