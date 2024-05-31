@@ -1194,14 +1194,25 @@ export default class TemplateProcessor {
     }
 
     private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
-        if(plan.lastCompletedStep){
-            return false; //this is a one-step plan, so if it has a completed step, it's already done
+        const {sortedJsonPtrs} = plan;
+        // we will identify if the plan is completed, or restart if from the beginning or next to the last completed step
+        let jsonPtr;
+        if(plan.lastCompletedStep !== undefined){
+            if (sortedJsonPtrs[-1] === plan.lastCompletedStep.jsonPtr) {
+                return false; // the plan is already completed
+            }
+            const jsonPtrIdx = sortedJsonPtrs.indexOf(plan.lastCompletedStep.jsonPtr);
+            if (jsonPtrIdx === -1) {
+                throw new Error("lastCompletedStep not found in sortedJsonPtrs");
+            }
+            jsonPtr = sortedJsonPtrs[jsonPtrIdx + 1];
+        } else {
+            jsonPtr = sortedJsonPtrs[0];
         }
         this.executionStatus.begin(plan);
         let theStep:PlanStep|undefined;
         try {
-            const {sortedJsonPtrs} = plan;
-            const jsonPtr = sortedJsonPtrs[0];
+
             theStep = {jsonPtr, ...plan, didUpdate:false}
             const didUpdate =  await this.mutate(theStep);
             plan.didUpdate.push(didUpdate);
