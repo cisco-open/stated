@@ -32,7 +32,7 @@ import {saferFetch} from "./utils/FetchWrapper.js";
 
 declare const BUILD_TARGET: string | undefined;
 
-type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
+export type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
 export type Snapshot = {template:object, options:{}, output: any, prepared?:boolean}
 export type StatedError = {
     error: {
@@ -352,7 +352,7 @@ export default class TemplateProcessor {
         this.functionGenerators = new Map();
         this.tagSet = new Set();
         this.onInitialize = new Map();
-        this.executionStatus = new ExecutionStatus();
+        this.executionStatus = new ExecutionStatus(this.metaInfoByJsonPointer);
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -404,7 +404,7 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", snapshottedOutput: {}|undefined = undefined):Promise<void> {
+    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", snapshottedOutput: {}|undefined = undefined, executionStatus: string|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
             this.executionStatus.clear();
@@ -415,8 +415,14 @@ export default class TemplateProcessor {
         if (importedSubtemplate !== undefined && jsonPtr === "/") {
             this.resetTemplate(importedSubtemplate)
         }
-        if(snapshottedOutput){
+        if(snapshottedOutput !== undefined){
             this.output = snapshottedOutput; //use by restore to set the restored output state
+        } else if (executionStatus !== undefined) {
+            this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(executionStatus);
+            // here we restore metaInfoByJsonPointer from the executionStatus
+            this.metaInfoByJsonPointer = this.executionStatus.metaInfoByJsonPointer;
+            // output is reconstructed from the "ROOT" fork output
+            this.output = Array.from(this.executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
         }
 
         if (jsonPtr === "/" && this.isInitializing) {
@@ -453,14 +459,19 @@ export default class TemplateProcessor {
             }else{
                 compilationTarget = importedSubtemplate; //the case where we already initialized once, and now we are initializing an imported sub-template
             }
-            const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
-            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
-            this.sortMetaInfos(metaInfos);
-            this.populateTemplateMeta(metaInfos);
-            this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
-            this.propagateTags(metaInfos);
-            this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
-            await this.evaluateInitialPlan(jsonPtr);
+            // Recretaing the meta info if execution status is not provided
+            if (executionStatus === undefined) {
+                const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
+                this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
+                this.sortMetaInfos(metaInfos);
+                this.populateTemplateMeta(metaInfos);
+                this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+                this.propagateTags(metaInfos);
+                this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
+                await this.evaluateInitialPlan(jsonPtr);
+            } else {
+                this.executionStatus.restore(this);
+            }
             await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars, jsonPtr);
             this.logger.verbose("initialization complete...");
@@ -553,7 +564,7 @@ export default class TemplateProcessor {
         await this.initialize(template, jsonPtrImportPath);
     }
 
-    private static NOOP = Symbol('NOOP');
+    public static NOOP = Symbol('NOOP');
 
     private getImport(metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
@@ -1120,7 +1131,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:Plan){
+    public async executePlan(plan:Plan){
         try {
             const {data} = plan;
             let shouldRunDependentExpressions = true;
@@ -1816,6 +1827,10 @@ export default class TemplateProcessor {
             throw new Error("Cannot initialize TemplateProcessor from unprepared Snapshot")
         }
         return await this.initialize(undefined, "/", snapshot.output);
+    }
+
+    public async initializeFromExecutionStatusString(exectuionStatus: string):Promise<void> {
+        return await this.initialize(undefined, "/", undefined, exectuionStatus);
     }
 
     /**
