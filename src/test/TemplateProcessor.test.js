@@ -2586,8 +2586,8 @@ test("test that circular reference does not blow up", async () => {
 });
 
 /**
- * This test runs the template, creates a snapshot, and restarts from snapshot. It expects that the
- * plans in snapshot will be persisted.
+ * This test restores from execution status snapshot template started from homeworlds-forked.yaml. It expects that the
+ * plans in snapshot will be restored and template converges to the desired result.
  */
 test("forked homeworlds snapshots", async () => {
     const __filename = fileURLToPath(import.meta.url);
@@ -2596,7 +2596,8 @@ test("forked homeworlds snapshots", async () => {
 
     let executionStatusStr = fs.readFileSync(filePath, 'utf8');
     let savedState;
-    let latch;
+    let latchSave;
+    const savePromise = new Promise(resolve => {latchSave = resolve});
     let saveCalls = 0;
     const tp = new TemplateProcessor({},
         {
@@ -2605,7 +2606,7 @@ test("forked homeworlds snapshots", async () => {
                 saveCalls++;
                 // we validate that all 5 forks and one root plan are executed to the save function
                 if (saveCalls === 6 && savedState.mvcc.length === 6){
-                    latch();
+                    latchSave();
                 }
                 return o;
             },
@@ -2613,9 +2614,9 @@ test("forked homeworlds snapshots", async () => {
                 return o;
             }
         });
-    // tp.logger.level = "debug";
     await tp.initializeFromExecutionStatusString(executionStatusStr);
     expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
+    await savePromise;
     let latchHomeworlds;
     const homeworldsPromise = new Promise(resolve=>{latchHomeworlds = resolve});
     tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
