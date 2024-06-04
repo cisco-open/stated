@@ -2590,428 +2590,32 @@ test("test that circular reference does not blow up", async () => {
  * plans in snapshot will be persisted.
  */
 test("forked homeworlds snapshots", async () => {
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const filePath = path.join(__dirname, '..','..','example', 'executionStatus.json');
+
+    let executionStatusStr = fs.readFileSync(filePath, 'utf8');
     let savedState;
     let latch;
-    let snapshot;
-    let executionStatus = {
-        "mvcc": [
-            {
-                "output": {
-                    "data": null,
-                    "name": null,
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
-                },
-                "forkId": "ROOT"
-            },
-            {
-                "forkId": "acw59w1chomrrx83t89x",
-                "output": {
-                    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-                    "name": "luke",
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
+    let saveCalls = 0;
+    const tp = new TemplateProcessor({},
+        {
+            save:(o)=>{
+                savedState = tp.executionStatus.toJsonObject();
+                saveCalls++;
+                // we validate that all 5 forks and one root plan are executed to the save function
+                if (saveCalls === 6 && savedState.mvcc.length === 6){
+                    latch();
                 }
+                return o;
             },
-            {
-                "forkId": "7o4r055ber657dqfukdg2y",
-                "output": {
-                    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-                    "name": "han",
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
-                }
-            },
-            {
-                "forkId": "oal75sewlmg0aj5wkfp7p8",
-                "output": {
-                    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-                    "name": "leia",
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
-                }
-            },
-            {
-                "forkId": "75w2hkukrbn81knop14de8",
-                "output": {
-                    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-                    "name": "chewbacca",
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
-                }
-            },
-            {
-                "forkId": "m23m9zev9f9nvcwrb1onh8",
-                "output": {
-                    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-                    "name": "Lando",
-                    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-                    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-                    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-                    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-                    "homeworlds": []
-                }
+            snapshot: async (o)=>{
+                return o;
             }
-        ],
-        "metaInfoByJsonPointer": {
-            "/": [
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "",
-                    "dependees__": [],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprTargetJsonPointer__": ""
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/data",
-                    "dependees__": [],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": "['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "data__": null
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/homeworldDetails",
-                    "dependees__": [
-                        "/homeworldName"
-                    ],
-                    "dependencies__": [
-                        "/homeworldURL",
-                        "/homeworldURL"
-                    ],
-                    "absoluteDependencies__": [
-                        "/homeworldURL"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " homeworldURL!=null?$fetch(homeworldURL).json().result:null",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "properties": {
-                        "name": {
-                            "materialized__": false,
-                            "jsonPointer__": "/homeworldDetails/properties/name",
-                            "dependees__": [
-                                "/homeworldName"
-                            ],
-                            "dependencies__": [],
-                            "absoluteDependencies__": [],
-                            "tags__": [],
-                            "treeHasExpressions__": false,
-                            "parent__": "/homeworldDetails/properties"
-                        }
-                    }
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/homeworldName",
-                    "dependees__": [],
-                    "dependencies__": [
-                        "/homeworldDetails",
-                        "/homeworldDetails/properties/name"
-                    ],
-                    "absoluteDependencies__": [
-                        "/homeworldDetails",
-                        "/homeworldDetails/properties/name"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--"
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/homeworldURL",
-                    "dependees__": [
-                        "/homeworldDetails"
-                    ],
-                    "dependencies__": [
-                        "/personDetails",
-                        "/personDetails/properties/homeworld"
-                    ],
-                    "absoluteDependencies__": [
-                        "/personDetails",
-                        "/personDetails/properties/homeworld"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " personDetails!=null?personDetails.properties.homeworld:null ",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--"
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/homeworlds",
-                    "dependees__": [],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": false,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprTargetJsonPointer__": ""
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/name",
-                    "dependees__": [
-                        "/personDetails"
-                    ],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": false,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprTargetJsonPointer__": "",
-                    "data__": "Lando"
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/personDetails",
-                    "dependees__": [
-                        "/homeworldURL"
-                    ],
-                    "dependencies__": [
-                        "/name",
-                        "/name"
-                    ],
-                    "absoluteDependencies__": [
-                        "/name"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "properties": {
-                        "homeworld": {
-                            "materialized__": false,
-                            "jsonPointer__": "/personDetails/properties/homeworld",
-                            "dependees__": [
-                                "/homeworldURL"
-                            ],
-                            "dependencies__": [],
-                            "absoluteDependencies__": [],
-                            "tags__": [],
-                            "treeHasExpressions__": false,
-                            "parent__": "/personDetails/properties"
-                        }
-                    }
-                },
-                {
-                    "materialized__": false,
-                    "jsonPointer__": "/homeworldDetails/properties/name",
-                    "dependees__": [
-                        "/homeworldName"
-                    ],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "tags__": [],
-                    "treeHasExpressions__": false,
-                    "parent__": "/homeworldDetails/properties"
-                },
-                {
-                    "materialized__": false,
-                    "jsonPointer__": "/personDetails/properties/homeworld",
-                    "dependees__": [
-                        "/homeworldURL"
-                    ],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "tags__": [],
-                    "treeHasExpressions__": false,
-                    "parent__": "/personDetails/properties"
-                }
-            ]
-        },
-        "plans": [
-            {
-                "forkId": "ROOT",
-                "forkStack": [],
-                "sortedJsonPtrs": [
-                    "/data",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "__NOOP__",
-                "lastCompletedStep": "/data"
-            },
-            {
-                "forkId": "acw59w1chomrrx83t89x",
-                "forkStack": [
-                    "ROOT"
-                ],
-                "sortedJsonPtrs": [
-                    "/name",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "luke",
-                "lastCompletedStep": "/name"
-            },
-            {
-                "forkId": "7o4r055ber657dqfukdg2y",
-                "forkStack": [
-                    "ROOT"
-                ],
-                "sortedJsonPtrs": [
-                    "/name",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "han",
-                "lastCompletedStep": "/name"
-            },
-            {
-                "forkId": "oal75sewlmg0aj5wkfp7p8",
-                "forkStack": [
-                    "ROOT"
-                ],
-                "sortedJsonPtrs": [
-                    "/name",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "leia",
-                "lastCompletedStep": "/name"
-            },
-            {
-                "forkId": "75w2hkukrbn81knop14de8",
-                "forkStack": [
-                    "ROOT"
-                ],
-                "sortedJsonPtrs": [
-                    "/name",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "chewbacca",
-                "lastCompletedStep": "/name"
-            },
-            {
-                "forkId": "m23m9zev9f9nvcwrb1onh8",
-                "forkStack": [
-                    "ROOT"
-                ],
-                "sortedJsonPtrs": [
-                    "/name",
-                    "/personDetails",
-                    "/homeworldURL",
-                    "/homeworldDetails",
-                    "/homeworldName"
-                ],
-                "op": null,
-                "data": "Lando",
-                "lastCompletedStep": "/name"
-            }
-        ]
-    }
-    const oldSnapshot = {
-        "template": {
-            "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-            "name": null,
-            "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-            "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-            "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-            "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-            "homeworlds": []
-        },
-        "output": {
-            "data": null,
-            "name": null,
-            "personDetails": null,
-            "homeworldURL": null,
-            "homeworldDetails": null,
-            "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}",
-            "homeworlds": []
-        },
-        "options": {}
-    }
-    const latchSaveCommand = new Promise(resolve => {latch=resolve});
-    const tp1 = new TemplateProcessor();
-    const execStatusStr = StatedREPL.stringify(executionStatus);
-    await tp1.initializeFromExecutionStatusString(execStatusStr);
-    // expect(tp1.executionStatus.toJsonString()).toEqual(execStatusStr);
-    const tp = TemplateProcessor.fromString(`
-    data: \${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}
-    name: null
-    personDetails: \${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}
-    homeworldURL: \${ personDetails!=null?personDetails.properties.homeworld:null }
-    homeworldDetails: \${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
-    homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ~>$snapshot}
-    homeworlds: []`,
-    {
-                save:(o)=>{
-                    savedState = tp.executionStatus.toJsonObject();
-                    if (savedState.mvcc.length === 6){
-                        latch();
-                    }
-                    return o;
-                },
-                snapshot: async (o)=>{
-                    snapshot = await tp.snapshot();
-                    return o;
-                }
-            }
-    );
+        });
+    // tp.logger.level = "debug";
+    await tp.initializeFromExecutionStatusString(executionStatusStr);
+    expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
     let latchHomeworlds;
     const homeworldsPromise = new Promise(resolve=>{latchHomeworlds = resolve});
     tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
@@ -3019,7 +2623,7 @@ test("forked homeworlds snapshots", async () => {
             latchHomeworlds();
         }
     })
-    await tp.initialize();
+
     await homeworldsPromise;
     const expectedHomeworlds = [
         "Corellia",
@@ -3029,19 +2633,23 @@ test("forked homeworlds snapshots", async () => {
         "Kashyyyk"
     ];
     const homeworlds = tp.output.homeworlds;
-    const homeworlds1 = tp1.output.homeworlds;
     // Ensure the array contains all the expected elements (we cannot expec them to be in a particular order
     //due to the async nature of $forked
+    // const expectedHomeworlds = {};
     expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
-
-    // Ensure the array does not contain any elements not expected
+    //
+    // // Ensure the array does not contain any elements not expected
     expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
-
-    // Ensure the array is exactly the same length as the expected array
+    //
+    // // Ensure the array is exactly the same length as the expected array
     expect(homeworlds).toHaveLength(expectedHomeworlds.length);
     if (savedState.mvcc.length !== 6) {
         throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
     }
     expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
     expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
+
+
+
+    console.log(StatedREPL.stringify(tp.output));
 },500000);

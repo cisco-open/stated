@@ -7,10 +7,12 @@ type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
     public statuses: Set<Plan>;
     public metaInfoByJsonPointer: MetaInfoMap;
+    public tp:TemplateProcessor;
 
-    constructor(metaInfoByJsonPointer: MetaInfoMap) {
+    constructor(tp:TemplateProcessor) {
         this.statuses = new Set();
-        this.metaInfoByJsonPointer = metaInfoByJsonPointer;
+        this.tp = tp;
+        this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
     public begin(mutationPlan:Plan) {
         this.statuses.add(mutationPlan)
@@ -39,6 +41,8 @@ export class ExecutionStatus {
 
         });
         const snapshot = {
+            template: this.tp.input,
+            options: this.tp.options,
             mvcc:Array.from(outputsByForkId.values()),
             metaInfoByJsonPointer: this.metaInfosToJSON(this.metaInfoByJsonPointer),
             plans: Array.from(this.statuses).map(this.mutationPlanToJSON)
@@ -97,12 +101,14 @@ export class ExecutionStatus {
         });
     }
 
-    public static createExecutionStatusFromJson(json: string): ExecutionStatus {
+    public static createExecutionStatusFromJson(tp:TemplateProcessor, json: string): ExecutionStatus {
         const obj = JSON.parse(json);
 
         const metaInfoByJsonPointer = ExecutionStatus.jsonToMetaInfos(obj.metaInfoByJsonPointer);
-
-        const executionStatus = new ExecutionStatus(metaInfoByJsonPointer);
+        tp.metaInfoByJsonPointer = metaInfoByJsonPointer;
+        const executionStatus = new ExecutionStatus(tp);
+        tp.executionStatus = executionStatus;
+        tp.input = obj.template;
 
         // Reconstruct Forks
         const forks = new Map<string, Fork>();
@@ -130,7 +136,7 @@ export class ExecutionStatus {
             };
             executionStatus.begin(mutationPlan);
         });
-
+        tp.output = Array.from(executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
         return executionStatus;
     }
 

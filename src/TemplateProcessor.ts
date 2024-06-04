@@ -29,6 +29,7 @@ import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
+import * as jsonata from "jsonata";
 
 declare const BUILD_TARGET: string | undefined;
 
@@ -352,7 +353,7 @@ export default class TemplateProcessor {
         this.functionGenerators = new Map();
         this.tagSet = new Set();
         this.onInitialize = new Map();
-        this.executionStatus = new ExecutionStatus(this.metaInfoByJsonPointer);
+        this.executionStatus = new ExecutionStatus(this);
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -418,9 +419,19 @@ export default class TemplateProcessor {
         if(snapshottedOutput !== undefined){
             this.output = snapshottedOutput; //use by restore to set the restored output state
         } else if (executionStatus !== undefined) {
-            this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(executionStatus);
+            this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(this, executionStatus);
             // here we restore metaInfoByJsonPointer from the executionStatus
-            this.metaInfoByJsonPointer = this.executionStatus.metaInfoByJsonPointer;
+            this.templateMeta = {};
+            this.executionStatus.metaInfoByJsonPointer["/"]?.forEach(
+                (metaInfo) => {
+                    // TODO: check for expr__ to have an expression.
+                    if (metaInfo.expr__ !== undefined) {
+                        metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
+                    }
+                    jp.set(this.templateMeta, metaInfo.jsonPointer__ === "" ? "/" : metaInfo.jsonPointer__, metaInfo);
+
+                });
+
             // output is reconstructed from the "ROOT" fork output
             this.output = Array.from(this.executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
         }
@@ -524,12 +535,23 @@ export default class TemplateProcessor {
                 if (result instanceof Promise) {
                     return result.catch(error => {
                         this.logger.error(error.toString());
+
+                        let {
+                            message = 'no message available',
+                            name = 'no name available',
+                            stack = 'no stack available',
+                        } = error;
+                        if (error.cause) {
+                            const {
+                                message: causeMessage = 'no message available',
+                                name: causeName = 'no name available',
+                                stack: causeStack = 'no stack available',
+                            } = error.cause;
+                            if (causeMessage) message = `${message}: ${causeMessage}`;
+                            if (causeName) name = `${name}: ${causeName}`;
+                        }
                         return {
-                            "error": {
-                                message: error.message,
-                                name: error.name,
-                                stack: error.stack,
-                            }
+                            "error": {message, name, stack}
                         };
                     });
                 }
@@ -1143,7 +1165,7 @@ export default class TemplateProcessor {
             await this.executeDataChangeCallbacks(plan);
         }catch(error){
             this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
-            throw error;
+            // throw error;
         }
     }
 
@@ -1195,7 +1217,7 @@ export default class TemplateProcessor {
 
     private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
         if(plan.lastCompletedStep){
-            return false; //this is a one-step plan, so if it has a completed step, it's already done
+            return plan.lastCompletedStep?plan.sortedJsonPtrs.indexOf(plan.lastCompletedStep.jsonPtr)< plan.sortedJsonPtrs.length:false
         }
         this.executionStatus.begin(plan);
         let theStep:PlanStep|undefined;
@@ -1606,6 +1628,7 @@ export default class TemplateProcessor {
         }
     }
 
+    // TODO: change it to pass the plan
     private async callDataChangeCallbacks(data: any, jsonPointer: JsonPointerString|JsonPointerString[], removed: boolean = false) {
         let _jsonPointer:JsonPointerString;
         if(Array.isArray(jsonPointer)){
