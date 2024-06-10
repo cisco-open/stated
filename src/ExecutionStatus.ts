@@ -1,7 +1,9 @@
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import TemplateProcessor, {Plan, Op, PlanStep, Fork, MetaInfoMap} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
+import JsonPointer, {default as jp} from './JsonPointer.js';
 import StatedREPL from "./StatedREPL.js";
+import * as jsonata from "jsonata";
 
 type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
@@ -95,10 +97,38 @@ export class ExecutionStatus {
 
 
     public restore(tp:TemplateProcessor){
+        const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
+        const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
+        expressions.forEach(metaInfo => metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string));
+        const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
+            acc.set(metaInfo.jsonPointer__ as string, metaInfo);
+            return acc;
+            },
+            new Map<JsonPointerString, MetaInfo>());
         this.statuses.forEach(mutationPlan=>{
-            // run async
+            for (const interval of intervals) {
+                let data = jp.get(mutationPlan.output, interval.jsonPointer__);
+                if (typeof(data) === 'string' && data === '--interval/timeout--') {
+                    const jsonPtrStr = Array.isArray(interval.jsonPointer__) ? interval.jsonPointer__[0] as JsonPointerString: interval.jsonPointer__ as JsonPointerString;
+                    const toPointers = tp.to(jsonPtrStr)
+                        .filter(p => p !== jsonPtrStr)
+                        .filter(p => !mutationPlan.sortedJsonPtrs.includes(p))
+                        .filter(p => expressionsByJsonPointer.has(p));
+                    for (const pointer of toPointers) {
+                        mutationPlan.sortedJsonPtrs.push(pointer)
+                    }
+                    mutationPlan.sortedJsonPtrs.push(jsonPtrStr);
+                }
+
+            }
+            expressions.forEach(metaInfo => {
+                jp.set(mutationPlan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
+            })
             tp.executePlan(mutationPlan);
+
         });
+
+
     }
 
     public static createExecutionStatusFromJson(tp:TemplateProcessor, json: string): ExecutionStatus {
