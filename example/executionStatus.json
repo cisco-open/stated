@@ -8,6 +8,15 @@
     "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
     "homeworlds": []
   },
+  "output": {
+    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
+    "name": null,
+    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
+    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
+    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
+    "homeworlds": []
+  },
   "options": {},
   "mvcc": [
     {

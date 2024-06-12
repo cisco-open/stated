@@ -44,6 +44,7 @@ export class ExecutionStatus {
         });
         const snapshot = {
             template: this.tp.input,
+            output: this.tp.output,
             options: this.tp.options,
             mvcc:Array.from(outputsByForkId.values()),
             metaInfoByJsonPointer: this.metaInfosToJSON(this.metaInfoByJsonPointer),
@@ -96,39 +97,29 @@ export class ExecutionStatus {
     }
 
 
-    public restore(tp:TemplateProcessor){
+    public async restore(tp:TemplateProcessor){
         const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
         const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
         expressions.forEach(metaInfo => metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string));
         const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
-            acc.set(metaInfo.jsonPointer__ as string, metaInfo);
-            return acc;
-            },
-            new Map<JsonPointerString, MetaInfo>());
-        this.statuses.forEach(mutationPlan=>{
-            for (const interval of intervals) {
-                let data = jp.get(mutationPlan.output, interval.jsonPointer__);
-                if (typeof(data) === 'string' && data === '--interval/timeout--') {
-                    const jsonPtrStr = Array.isArray(interval.jsonPointer__) ? interval.jsonPointer__[0] as JsonPointerString: interval.jsonPointer__ as JsonPointerString;
-                    const toPointers = tp.to(jsonPtrStr)
-                        .filter(p => p !== jsonPtrStr)
-                        .filter(p => !mutationPlan.sortedJsonPtrs.includes(p))
-                        .filter(p => expressionsByJsonPointer.has(p));
-                    for (const pointer of toPointers) {
-                        mutationPlan.sortedJsonPtrs.push(pointer)
-                    }
-                    mutationPlan.sortedJsonPtrs.push(jsonPtrStr);
+            acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
+        if (this.statuses?.size === 0) {
+            return await tp.createInitializationPlan({
+                    sortedJsonPtrs:[],
+                    initializationJsonPtrs: [],
+                    data: TemplateProcessor.NOOP,
+                    output:tp.output,
+                    forkStack:[],
+                    forkId:"ROOT",
+                    didUpdate:[]
                 }
 
-            }
-            expressions.forEach(metaInfo => {
-                jp.set(mutationPlan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
-            })
+            );
+        }
+        for (const mutationPlan of this.statuses) {
+            await tp.createInitializationPlan(mutationPlan);
             tp.executePlan(mutationPlan);
-
-        });
-
-
+        };
     }
 
     public static createExecutionStatusFromJson(tp:TemplateProcessor, json: string): ExecutionStatus {
@@ -139,6 +130,7 @@ export class ExecutionStatus {
         const executionStatus = new ExecutionStatus(tp);
         tp.executionStatus = executionStatus;
         tp.input = obj.template;
+        tp.output = obj.output;
 
         // Reconstruct Forks
         const forks = new Map<string, Fork>();
@@ -159,6 +151,7 @@ export class ExecutionStatus {
                 forkId: planData.forkId,
                 forkStack,
                 sortedJsonPtrs: planData.sortedJsonPtrs,
+                initializationJsonPtrs: [],
                 op: planData.op,
                 data: planData.data,
                 output: forks.get(planData.forkId)?.output || {}, // Assuming output needs to be set
@@ -166,7 +159,7 @@ export class ExecutionStatus {
             };
             executionStatus.begin(mutationPlan);
         });
-        tp.output = Array.from(executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
+        tp.output = Array.from(executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || obj.output;
         return executionStatus;
     }
 

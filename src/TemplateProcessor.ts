@@ -47,6 +47,7 @@ export type Op = "set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
 export type Plan = {
     sortedJsonPtrs:JsonPointerString[],
+    initializationJsonPtrs:JsonPointerString[], //this is dependencies (functions and intervals/timeouts) we need to initialize on restore from a snapshot before we can evaluate the plan
     didUpdate: boolean[] //peers with sortedJsonPointers, tells us which of those locations in output actually updated
     data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
     output:object,
@@ -490,8 +491,12 @@ export default class TemplateProcessor {
                 this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
                 await this.evaluateInitialPlan(jsonPtr);
             } else {
-                this.executionStatus.restore(this);
-                this.output = Array.from(this.executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
+                await this.executionStatus.restore(this);
+                // const rootPlanOutput = Array.from(this.executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
+                // //check if there is a root plan execution in flight.
+                // if (rootPlanOutput) {
+                //     this.output = rootPlanOutput;
+                // }
             }
             await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars, jsonPtr);
@@ -833,10 +838,11 @@ export default class TemplateProcessor {
         });
     }
 
-    private async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
+    public async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.executePlan({
             sortedJsonPtrs:evaluationPlan,
+            initializationJsonPtrs: [],
             data: TemplateProcessor.NOOP,
             output:this.output,
             forkStack:[],
@@ -1098,7 +1104,7 @@ export default class TemplateProcessor {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const plan:Plan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
+        const plan:Plan = {sortedJsonPtrs: fromPlan, initializationJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${StatedREPL.stringify(plan)}`);
@@ -1126,7 +1132,7 @@ export default class TemplateProcessor {
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, didUpdate:[]};
+        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, initializationJsonPtrs: [], didUpdate:[]};
         await this.executePlan(mutationPlan as Plan);
         return fromPlan;
     }
@@ -1158,6 +1164,68 @@ export default class TemplateProcessor {
         }
     }
 
+    /**
+     * This method is used to compile and evaluate function expressions and their dependencies.
+     *
+     * Based on the metadata, we should identify all functions, and their dependencies
+     * @param plan
+     */
+    public async evaluateIntializationPlan(plan:Plan) {
+        try {
+            let {output, forkStack, forkId, didUpdate:updatesArray,initializationJsonPtrs: dependencies} = plan;
+            const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
+            const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
+            for (let i = startIndex; i < dependencies.length; i++) {
+                const jsonPtr = dependencies[i];
+                const planStep:PlanStep = {jsonPtr, output, forkStack, forkId, didUpdate:false}; //pick up the output and forkStack from the prior step
+                planStep.didUpdate = await this.evaluateNode(planStep);
+                output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
+            }
+        } finally {
+            console.log("evaluated initialization plan", plan.initializationJsonPtrs);
+        }
+    }
+
+    /**
+     * Create an initialization plan from the execution plan
+     * @param plan
+     */
+    public async createInitializationPlan(plan:Plan) {
+        try {
+            let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies, initializationJsonPtrs} = plan;
+            const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
+            const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
+            expressions.forEach(metaInfo => {
+                metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
+                // jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
+            });
+            const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
+                acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
+            for (const expression of [...intervals, ...expressions]) {
+                let data = jp.get(plan.output, expression.jsonPointer__);
+                // if (typeof(data) === 'string' && data === '--deleted-interval--') {
+                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
+                const toPointers = this.to(jsonPtrStr)
+                    .filter(p => p !== jsonPtrStr)
+                    .filter(p => !plan.sortedJsonPtrs.includes(p))
+                    .filter(p => expressionsByJsonPointer.has(p));
+                for (const pointer of toPointers.reverse()) {
+                    plan.initializationJsonPtrs.push(pointer);
+                }
+                plan.initializationJsonPtrs.push(jsonPtrStr);
+                // }
+            }
+            expressions.forEach(metaInfo => {
+                jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
+            })
+            await this.evaluateIntializationPlan(plan);
+            this.output = plan.output;
+        } catch (error) {
+            this.logger.error("plan functions evaluation failed");
+            throw error;
+        }
+    }
+
     public async executePlan(plan:Plan){
         try {
             const {data} = plan;
@@ -1170,7 +1238,7 @@ export default class TemplateProcessor {
             await this.executeDataChangeCallbacks(plan);
         }catch(error){
             this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
-            // throw error;
+            throw error;
         }
     }
 
@@ -1819,6 +1887,12 @@ export default class TemplateProcessor {
         await TemplateProcessor.prepareSnapshotInPlace(parsedSnapshot);
         const tp = TemplateProcessor.constructFromSnapshotObject(parsedSnapshot, context);
         await tp.initialize(undefined, "/", parsedSnapshot.output);
+        return tp;
+    }
+
+    public static async fromExecutionStatusString(snapshot: string, context: {} = {}) {
+        const tp = new TemplateProcessor({}, context);
+        await tp.initializeFromExecutionStatusString(snapshot);
         return tp;
     }
 

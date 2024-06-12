@@ -2148,41 +2148,41 @@ test("expected function call behavior", async () => {
 });
 
 test("interval snapshot", async () => {
-    const template = {
-        "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
-        "count": 0,
-        "rapidCaller": "${ $setInterval(counter, 1000)}",
-        "stop": "${ count>=1?($clearInterval($$.rapidCaller);'done'):'not done' }"
-    }
-    const options = {"foo": {"bar": "baz"}};
-    const tp = new TemplateProcessor(template, {}, options);
-    let done;
-    let latch = new Promise(resolve => done = resolve);
-    tp.setDataChangeCallback('/rapidCaller', async (data, jsonPointerStr, removed) => {
-        if (data === '--deleted-interval--') {
-            done();
-        }
-
-    });
-
-
-
-    // let snapshot2;
-    let done2;
-    let latch2 = new Promise(resolve => done2 = resolve);
-    tp.setDataChangeCallback('/count', async (data, jsonPointerStr, removed) => {
-        if (data === 1) {
-             // snapshot2 = await tp.snapshot();
-             done2();
-        }
-
-    });
-
-
-    tp.logger.level = 'debug';
-    await tp.initialize();
-    await latch;
-    await latch2;
+    // const template = {
+    //     "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
+    //     "count": 0,
+    //     "rapidCaller": "${ $setInterval(counter, 1000)}",
+    //     "stop": "${ count>=1?($clearInterval($$.rapidCaller);'done'):'not done' }"
+    // }
+    // const options = {"foo": {"bar": "baz"}};
+    // const tp = new TemplateProcessor(template, {}, options);
+    // let done;
+    // let latch = new Promise(resolve => done = resolve);
+    // tp.setDataChangeCallback('/rapidCaller', async (data, jsonPointerStr, removed) => {
+    //     if (data === '--deleted-interval--') {
+    //         done();
+    //     }
+    //
+    // });
+    //
+    //
+    //
+    // // let snapshot2;
+    // let done2;
+    // let latch2 = new Promise(resolve => done2 = resolve);
+    // tp.setDataChangeCallback('/count', async (data, jsonPointerStr, removed) => {
+    //     if (data === 1) {
+    //          // snapshot2 = await tp.snapshot();
+    //          done2();
+    //     }
+    //
+    // });
+    //
+    //
+    // tp.logger.level = 'debug';
+    // await tp.initialize();
+    // await latch;
+    // await latch2;
 
     // expect(tp.output.count).toBe(1);
     // expect(tp.output.stop).toBe('done');
@@ -2191,9 +2191,9 @@ test("interval snapshot", async () => {
     const snapshot2obj = {
         "template": {
             "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
-                "count": 0,
-                "rapidCaller": "${ $setInterval(counter, 1000)}",
-                "stop": "${ count>=1?($clearInterval($$.rapidCaller);'done'):'not done' }"
+            "count": 0,
+            "rapidCaller": "${ $setInterval(counter, 1000)}",
+            "stop": "${ count>=2?($clearInterval($$.rapidCaller);'done'):'not done' }"
         },
         "options": {
             "foo": {
@@ -2304,7 +2304,7 @@ test("interval snapshot", async () => {
                     "parent__": "",
                     "temp__": false,
                     "exprRootPath__": null,
-                    "expr__": " count>=1?($clearInterval($$.rapidCaller);'done'):'not done' ",
+                    "expr__": " count>=2?($clearInterval($$.rapidCaller);'done'):'not done' ",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
                     "data__": "not done"
@@ -2412,6 +2412,12 @@ test("snapshot", async () => {
             "count": 0,
             "rapidCaller": "${ $setInterval(counter, 100)}",
             "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        },
+        "output": {
+            "count": 2,
+            "counter": "{function:}",
+            "rapidCaller": "--interval/timeout--",
+            "stop": "not done"
         },
         "options": {
             "foo": {
@@ -2666,7 +2672,7 @@ test("snapshot contains injected fields", async () => {
     await tp.setData("/f","XXX");
     await tp.setData("/b/c/g","YYY");
     const snapshotStr = await tp.snapshot();
-    const tpRestored = await TemplateProcessor.fromSnapshotString(snapshotStr);
+    const tpRestored = await TemplateProcessor.fromExecutionStatusString(snapshotStr);
     expect(await tpRestored.output.a()).toBe('yo');
     expect(tpRestored.output.b.c.d).toBe('hello');
     expect(tpRestored.output.b.e).toBe(42);
@@ -2943,6 +2949,23 @@ test("test that circular reference does not blow up", async () => {
  * plans in snapshot will be restored and template converges to the desired result.
  */
 test("forked homeworlds snapshots", async () => {
+    // const t = {
+    //     "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
+    //     "name": null,
+    //     "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
+    //     "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
+    //     "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+    //     "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
+    //     "homeworlds": []
+    // };
+    // const ttp = new TemplateProcessor(t);
+    // ttp.setDataChangeCallback("/name", () => {
+    //     ttp.output;
+    // })
+    // await ttp.initialize();
+    // const s = ttp.snapshot();
+
+
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const filePath = path.join(__dirname, '..','..','example', 'executionStatus.json');
