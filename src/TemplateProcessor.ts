@@ -1190,10 +1190,10 @@ export default class TemplateProcessor {
      * Create an initialization plan from the execution plan
      * @param plan
      */
-    public async createInitializationPlan(plan:Plan) {
+    public async createInitializationPlan(plan:Plan, evaluateAllExpressions=true) {
         try {
             let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies, initializationJsonPtrs} = plan;
-            const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
+            let intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
             const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
             expressions.forEach(metaInfo => {
                 metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
@@ -1201,18 +1201,27 @@ export default class TemplateProcessor {
             });
             const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
                 acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
-            for (const expression of [...intervals, ...expressions]) {
+            // for (const expression of [...intervals, ...expressions]) {
+            if (evaluateAllExpressions) {
+                intervals = [...intervals, ...expressions];
+            }
+            for (const expression of intervals) {
                 let data = jp.get(plan.output, expression.jsonPointer__);
+                // if (typeof(data) === 'string' && data ===  '--interval/timeout--') {
                 // if (typeof(data) === 'string' && data === '--deleted-interval--') {
-                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-                const toPointers = this.to(jsonPtrStr)
-                    .filter(p => p !== jsonPtrStr)
-                    .filter(p => !plan.sortedJsonPtrs.includes(p))
-                    .filter(p => expressionsByJsonPointer.has(p));
-                for (const pointer of toPointers.reverse()) {
-                    plan.initializationJsonPtrs.push(pointer);
-                }
-                plan.initializationJsonPtrs.push(jsonPtrStr);
+                    const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
+                    const toPointers = this.to(jsonPtrStr)
+                        .filter(p => p !== jsonPtrStr)
+                        .filter((p) => {
+                            return !plan.initializationJsonPtrs.includes(p)
+                        });
+                        // .filter(p => expressionsByJsonPointer.has(p));
+                    for (const pointer of toPointers.reverse()) {
+                        plan.initializationJsonPtrs.push(pointer);
+                    }
+                   if (!plan.initializationJsonPtrs.includes(jsonPtrStr)) {
+                       plan.initializationJsonPtrs.push(jsonPtrStr);
+                   }
                 // }
             }
             expressions.forEach(metaInfo => {

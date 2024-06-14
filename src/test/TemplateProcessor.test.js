@@ -22,7 +22,6 @@ import {dirname} from 'path';
 import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
-import StatedREPL from "../../dist/src/StatedREPL.js";
 import {expect} from "@jest/globals";
 
 
@@ -2090,7 +2089,7 @@ test("functions are immutable and have no 'from'", async () => {
         "/joinResistance",
         "/subscribeParams/to"
     ]);
-    
+
     expect(await tp.getEvaluationPlan()).toEqual([
             "/joinResistance",
             "/subscribeParams/to",
@@ -2109,9 +2108,13 @@ test("don't re-evaluate intervals", async () => {
         "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"
     }
     const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    const from = tp.from("/count");
-    expect(from).toEqual(["/count", "/stop"]);
+    try {
+        await tp.initialize();
+        const from = tp.from("/count");
+        expect(from).toEqual(["/count", "/stop"]);
+    } finally {
+        await tp.close();
+    }
 
 });
 
@@ -2148,47 +2151,8 @@ test("expected function call behavior", async () => {
 });
 
 test("interval snapshot", async () => {
-    // const template = {
-    //     "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
-    //     "count": 0,
-    //     "rapidCaller": "${ $setInterval(counter, 1000)}",
-    //     "stop": "${ count>=1?($clearInterval($$.rapidCaller);'done'):'not done' }"
-    // }
-    // const options = {"foo": {"bar": "baz"}};
-    // const tp = new TemplateProcessor(template, {}, options);
-    // let done;
-    // let latch = new Promise(resolve => done = resolve);
-    // tp.setDataChangeCallback('/rapidCaller', async (data, jsonPointerStr, removed) => {
-    //     if (data === '--deleted-interval--') {
-    //         done();
-    //     }
-    //
-    // });
-    //
-    //
-    //
-    // // let snapshot2;
-    // let done2;
-    // let latch2 = new Promise(resolve => done2 = resolve);
-    // tp.setDataChangeCallback('/count', async (data, jsonPointerStr, removed) => {
-    //     if (data === 1) {
-    //          // snapshot2 = await tp.snapshot();
-    //          done2();
-    //     }
-    //
-    // });
-    //
-    //
-    // tp.logger.level = 'debug';
-    // await tp.initialize();
-    // await latch;
-    // await latch2;
 
-    // expect(tp.output.count).toBe(1);
-    // expect(tp.output.stop).toBe('done');
-
-
-    const snapshot2obj = {
+    const snapshotObj = {
         "template": {
             "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
             "count": 0,
@@ -2325,56 +2289,23 @@ test("interval snapshot", async () => {
             }
         ]
     };
-    const snapshot2 = JSON.stringify(snapshot2obj);
-    let latch3;
-    let done3;
-    const tp2 = new TemplateProcessor();
-    tp2.logger.leve = 'debug';
-    latch3 = new Promise(resolve => done3 = resolve);
-    tp2.setDataChangeCallback('/count', (data, ptr, removed) => {
-        console.log(data, ptr, removed);
+    const snapshot = JSON.stringify(snapshotObj);
+    let latch;
+    let done;
+    const tp = new TemplateProcessor();
+    tp.logger.leve = 'debug';
+    latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/count', (data, ptr, removed) => {
         if (data === 2) {
-            done3()
+            done()
         }
     });
-    await tp2.initializeFromExecutionStatusString(snapshot2);
-    await latch3;
-    console.log(tp2.output);
-
-
-    // expect(StatedREPL.stringify(tp.output)).toEqual(StatedREPL.stringify({
-    //     "counter": "{function:}",
-    //     "count": 1,
-    //     "rapidCaller": {"interval-id": "<UUID>", "status": "cleared", "stats": {"lastRunTime": "<timestamp>", "runCount": 10}},
-    //     "stop": "done"
-    // }));
-    //
-    // const snapshot = JSON.parse(await tp.snapshot());
-    // const rapidCallerMetaInfo = snapshot.metaInfoByJsonPointer["/"].filter(metaInfo => metaInfo.jsonPointer__ === "/rapidCaller")[0];
-    // expect(rapidCallerMetaInfo).toEqual(
-    //     {
-    //         "absoluteDependencies__": [
-    //             "/counter"
-    //         ],
-    //         "compiledExpr__": "--compiled expression--",
-    //         "data__": "--deleted-interval--",
-    //         "dependees__": [
-    //             "/stop"
-    //         ],
-    //         "dependencies__": [
-    //             "/counter"
-    //         ],
-    //         "exprRootPath__": null,
-    //         "exprTargetJsonPointer__": "",
-    //         "expr__": " $setInterval(counter, 100)",
-    //         "jsonPointer__": "/rapidCaller",
-    //         "materialized__": true,
-    //         "parent__": "",
-    //         "tags__": [],
-    //         "temp__": false,
-    //         "treeHasExpressions__": true
-    //     }
-    // );
+    try {
+        await tp.initializeFromExecutionStatusString(snapshot);
+        await latch;
+    } finally {
+        await tp.close();
+    }
 })
 
 
@@ -2931,7 +2862,6 @@ test("performance test with 100 data injections", async () => {
 
 test("test that circular reference does not blow up", async () => {
 
-
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const yamlFilePath = path.join(__dirname, '..','..','example','experimental', 'product_workflow.sw.yaml');
@@ -2949,100 +2879,89 @@ test("test that circular reference does not blow up", async () => {
  * plans in snapshot will be restored and template converges to the desired result.
  */
 test("forked homeworlds snapshots", async () => {
-    // const t = {
-    //     "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-    //     "name": null,
-    //     "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-    //     "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-    //     "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-    //     "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
-    //     "homeworlds": []
-    // };
-    // const ttp = new TemplateProcessor(t);
-    // ttp.setDataChangeCallback("/name", () => {
-    //     ttp.output;
-    // })
-    // await ttp.initialize();
-    // const s = ttp.snapshot();
-
 
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
-    const filePath = path.join(__dirname, '..','..','example', 'executionStatus.json');
+    const filePath = path.join(__dirname, '..', '..', 'example', 'executionStatus.json');
     let executionStatusStr = fs.readFileSync(filePath, 'utf8');
 
     let savedState; // save state of the template processor
     let saveCalls = 0; // number of calls
 
     let latchSave;
-    const savePromise = new Promise(resolve => {latchSave = resolve});
+    const savePromise = new Promise(resolve => {
+        latchSave = resolve
+    });
     const tp = new TemplateProcessor({},
         // sets some functions needed for test validation
         {
-            save:(o)=>{
+            save: (o) => {
                 saveCalls++;
                 savedState = tp.executionStatus.toJsonObject();
                 // we validate that all 5 forks and one root plan are executed to the save function
-                if (saveCalls === 6 && savedState.mvcc.length === 6){
+                if (saveCalls === 6 && savedState.mvcc.length === 6) {
                     latchSave();
                 }
                 return o;
             },
-            snapshot: async (o)=>{
+            snapshot: async (o) => {
                 return o;
             }
         });
     let latchHomeworlds;
-    const homeworldsPromise = new Promise(resolve=>{latchHomeworlds = resolve});
-    tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
-        if(homeworlds.length === 5){
+    const homeworldsPromise = new Promise(resolve => {
+        latchHomeworlds = resolve
+    });
+
+    tp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+        if (homeworlds.length === 5) {
             latchHomeworlds();
         }
     });
-    await tp.initializeFromExecutionStatusString(executionStatusStr);
-    await savePromise;
-    const executionStatus = tp.executionStatus.toJsonObject();
-    const expectedExecutionStatus = JSON.parse(executionStatusStr);
+    try {
+        await tp.initializeFromExecutionStatusString(executionStatusStr);
+        await savePromise;
+        const executionStatus = tp.executionStatus.toJsonObject();
+        const expectedExecutionStatus = JSON.parse(executionStatusStr);
 
-    for (let i = 0; i < 6; i++) {
-        expect(executionStatus.mvcc.includes(expectedExecutionStatus.mvcc[i]));
-        // expect(executionStatus.plans[i]).toStrictEqual(expectedExecutionStatus.plans[i]);
+        for (let i = 0; i < 6; i++) {
+            expect(executionStatus.mvcc.includes(expectedExecutionStatus.mvcc[i]));
+            // expect(executionStatus.plans[i]).toStrictEqual(expectedExecutionStatus.plans[i]);
 
-    }
-    // expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
-
-    tp.setDataChangeCallback('/homeworlds', (homeworlds)=>{
-        if(homeworlds.length === 5){
-            latchHomeworlds();
         }
-    })
+        // expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
 
-    await homeworldsPromise;
-    const expectedHomeworlds = [
-        "Corellia",
-        "Tatooine",
-        "Alderaan",
-        "Socorro",
-        "Kashyyyk"
-    ];
-    const homeworlds = tp.output.homeworlds;
-    // Ensure the array contains all the expected elements (we cannot expec them to be in a particular order
-    //due to the async nature of $forked
-    // const expectedHomeworlds = {};
-    expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
-    //
-    // // Ensure the array does not contain any elements not expected
-    expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
-    //
-    // // Ensure the array is exactly the same length as the expected array
-    expect(homeworlds).toHaveLength(expectedHomeworlds.length);
-    if (savedState.mvcc.length !== 6) {
-        throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
+        tp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+            if (homeworlds.length === 5) {
+                latchHomeworlds();
+            }
+        })
+
+        await homeworldsPromise;
+        const expectedHomeworlds = [
+            "Corellia",
+            "Tatooine",
+            "Alderaan",
+            "Socorro",
+            "Kashyyyk"
+        ];
+        const homeworlds = tp.output.homeworlds;
+        // Ensure the array contains all the expected elements (we cannot expec them to be in a particular order
+        //due to the async nature of $forked
+        // const expectedHomeworlds = {};
+        expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
+        //
+        // // Ensure the array does not contain any elements not expected
+        expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
+        //
+        // // Ensure the array is exactly the same length as the expected array
+        expect(homeworlds).toHaveLength(expectedHomeworlds.length);
+        if (savedState.mvcc.length !== 6) {
+            throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
+        }
+        expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
+        expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
+    } finally {
+        tp.close();
     }
-    expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
-    expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
-
-
-
-    console.log(StatedREPL.stringify(tp.output));
-},500000);
+},30000);

@@ -98,11 +98,11 @@ export class ExecutionStatus {
 
 
     public async restore(tp:TemplateProcessor){
-        const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
-        const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
-        expressions.forEach(metaInfo => metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string));
-        const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
-            acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
+        // const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
+        // const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
+        // expressions.forEach(metaInfo => metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string));
+        // const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
+        //     acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
         if (this.statuses?.size === 0) {
             return await tp.createInitializationPlan({
                     sortedJsonPtrs:[],
@@ -112,12 +112,13 @@ export class ExecutionStatus {
                     forkStack:[],
                     forkId:"ROOT",
                     didUpdate:[]
-                }
+                },
+                true
 
             );
         }
         for (const mutationPlan of this.statuses) {
-            await tp.createInitializationPlan(mutationPlan);
+            await tp.createInitializationPlan(mutationPlan, false);
             tp.executePlan(mutationPlan);
         };
     }
