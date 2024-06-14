@@ -115,8 +115,12 @@ export class ExecutionStatus {
         };
     }
 
-    public static createExecutionStatusFromJson(tp:TemplateProcessor, json: string): ExecutionStatus {
-        const obj = JSON.parse(json);
+    /**
+     * Reconstructs execution status and template processor internal states form an execution status snapshot
+     * @param tp TemplateProcess
+     * @param json
+     */
+    public static createExecutionStatusFromJson(tp:TemplateProcessor, obj: any): ExecutionStatus {
 
         const metaInfoByJsonPointer = ExecutionStatus.jsonToMetaInfos(obj.metaInfoByJsonPointer);
         tp.metaInfoByJsonPointer = metaInfoByJsonPointer;
@@ -127,12 +131,12 @@ export class ExecutionStatus {
 
         // Reconstruct Forks
         const forks = new Map<string, Fork>();
-        obj.mvcc.forEach((forkData: any) => {
+        obj.mvcc?.forEach((forkData: any) => {
             forks.set(forkData.forkId, forkData);
         });
 
         // Reconstruct Plans
-        obj.plans.forEach((planData: any) => {
+        obj.plans?.forEach((planData: any) => {
             const forkStack = planData.forkStack.map((forkId: string) => forks.get(forkId));
             if (planData.data === NOOP_PLACEHOLDER) {
                 planData.data = TemplateProcessor.NOOP;
@@ -152,7 +156,11 @@ export class ExecutionStatus {
             };
             executionStatus.begin(mutationPlan);
         });
-        tp.output = Array.from(executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || obj.output;
+
+        // restore the output from root plan in-flight, or set it to the stored obj.output otherwise
+        tp.output = Array.from(executionStatus.statuses)
+            ?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0]
+            || obj.output;
         return executionStatus;
     }
 
