@@ -1,11 +1,7 @@
-import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
-import TemplateProcessor, {Plan, Op, PlanStep, Fork, MetaInfoMap} from "./TemplateProcessor.js";
+import {MetaInfo} from "./MetaInfoProducer.js";
+import TemplateProcessor, {Fork, MetaInfoMap, Plan, PlanStep} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
-import JsonPointer, {default as jp} from './JsonPointer.js';
-import StatedREPL from "./StatedREPL.js";
-import * as jsonata from "jsonata";
 
-type StoredOp = {forkId:string, jsonPtr:JsonPointerString, data:any, op:string};
 export class ExecutionStatus {
     public statuses: Set<Plan>;
     public metaInfoByJsonPointer: MetaInfoMap;
@@ -96,13 +92,11 @@ export class ExecutionStatus {
         return json;
     }
 
-
+    /**
+     *
+     * @param tp TemplateProcessor
+     */
     public async restore(tp:TemplateProcessor){
-        // const intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
-        // const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
-        // expressions.forEach(metaInfo => metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string));
-        // const expressionsByJsonPointer = expressions.reduce((acc, metaInfo) => {
-        //     acc.set(metaInfo.jsonPointer__ as string, metaInfo);return acc;}, new Map<JsonPointerString, MetaInfo>());
         if (this.statuses?.size === 0) {
             return await tp.createInitializationPlan({
                     sortedJsonPtrs:[],
@@ -112,14 +106,12 @@ export class ExecutionStatus {
                     forkStack:[],
                     forkId:"ROOT",
                     didUpdate:[]
-                },
-                true
-
+                }
             );
         }
         for (const mutationPlan of this.statuses) {
-            await tp.createInitializationPlan(mutationPlan, false);
-            tp.executePlan(mutationPlan);
+            await tp.createInitializationPlan(mutationPlan);
+            tp.executePlan(mutationPlan); // restart the restored plan
         };
     }
 

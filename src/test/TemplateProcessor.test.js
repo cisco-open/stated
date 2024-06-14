@@ -2309,7 +2309,16 @@ test("interval snapshot", async () => {
 })
 
 
-test("snapshot", async () => {
+/**
+ * End to end snapshot/restore test
+ * - Run a simple template with a timeout (setInterval)
+ * - capture a snapshot after template is initialized
+ * - validate and restore from the snapshot
+ * - validate template processor converges to the expected result
+ *
+  */
+
+test("snapshot and restore", async () => {
     let template = {
         "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
         "count": 0,
@@ -2594,6 +2603,10 @@ test("dataChangeCallback on delete op", async () => {
     expect(tp.output.foo).toBeUndefined();
 })
 
+/**
+ * validates that a template restored from a snapshot contains injected fields, and that
+ * fields with functions are callable.
+ */
 test("snapshot contains injected fields", async () => {
     const tp = new TemplateProcessor({
         "a": "${function(){'yo'}}",
