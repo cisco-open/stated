@@ -421,12 +421,13 @@ export default class TemplateProcessor {
             this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(this, executionStatusSnapshot);
             // here we restore metaInfoByJsonPointer from the executionStatus
             this.templateMeta = {};
+
+            // compiles jsonata expressions and recreates templateMeta
             this.executionStatus.metaInfoByJsonPointer["/"]?.forEach(
                 (metaInfo) => {
                     if (metaInfo.expr__ !== undefined) {
                         metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
                     }
-
 
                     jp.set(this.templateMeta, metaInfo.jsonPointer__ === "" ? "/" : metaInfo.jsonPointer__, metaInfo);
 
@@ -481,11 +482,6 @@ export default class TemplateProcessor {
                 await this.evaluateInitialPlan(jsonPtr);
             } else {
                 await this.executionStatus.restore(this);
-                // const rootPlanOutput = Array.from(this.executionStatus.statuses)?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0] || {};
-                // //check if there is a root plan execution in flight.
-                // if (rootPlanOutput) {
-                //     this.output = rootPlanOutput;
-                // }
             }
             await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars, jsonPtr);

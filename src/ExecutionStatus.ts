@@ -93,7 +93,7 @@ export class ExecutionStatus {
     }
 
     /**
-     *
+     * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
      * @param tp TemplateProcessor
      */
     public async restore(tp:TemplateProcessor){
