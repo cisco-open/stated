@@ -1195,6 +1195,9 @@ export default class TemplateProcessor {
             let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies, initializationJsonPtrs} = plan;
             let intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
             const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
+            const functions: MetaInfo[] = this.metaInfoByJsonPointer["/"]
+                ?.filter(metaInfo => metaInfo.expr__ !== undefined)
+                .filter(metaInfo => metaInfo.isFunction__ === true);
             expressions.forEach(metaInfo => {
                 metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
                 // jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
@@ -1205,28 +1208,34 @@ export default class TemplateProcessor {
             if (evaluateAllExpressions) {
                 intervals = [...intervals, ...expressions];
             }
-            for (const expression of intervals) {
+            for (const expression of functions) {
                 let data = jp.get(plan.output, expression.jsonPointer__);
                 // if (typeof(data) === 'string' && data ===  '--interval/timeout--') {
                 // if (typeof(data) === 'string' && data === '--deleted-interval--') {
                     const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-                    const toPointers = this.to(jsonPtrStr)
-                        .filter(p => p !== jsonPtrStr)
-                        .filter((p) => {
-                            return !plan.initializationJsonPtrs.includes(p)
-                        });
-                        // .filter(p => expressionsByJsonPointer.has(p));
-                    for (const pointer of toPointers.reverse()) {
-                        plan.initializationJsonPtrs.push(pointer);
-                    }
+                    // const toPointers = this.to(jsonPtrStr)
+                    //     .filter(p => p !== jsonPtrStr)
+                    //     .filter((p) => {
+                    //         return !plan.initializationJsonPtrs.includes(p)
+                    //     });
+                    //     // .filter(p => expressionsByJsonPointer.has(p));
+                    // for (const pointer of toPointers.reverse()) {
+                    //     plan.initializationJsonPtrs.push(pointer);
+                    // }
                    if (!plan.initializationJsonPtrs.includes(jsonPtrStr)) {
                        plan.initializationJsonPtrs.push(jsonPtrStr);
                    }
                 // }
             }
-            expressions.forEach(metaInfo => {
+            functions.forEach(metaInfo => {
                 jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
             })
+            for (const expression of intervals) {
+                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
+                if (!plan.initializationJsonPtrs.includes(jsonPtrStr)) {
+                    plan.initializationJsonPtrs.push(jsonPtrStr);
+                }
+            }
             await this.evaluateIntializationPlan(plan);
             this.output = plan.output;
         } catch (error) {
