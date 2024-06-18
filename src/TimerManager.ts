@@ -65,9 +65,7 @@ class TimerManager {
             clearInterval(interval);
             const jsonPointerStr: string | undefined = this.jsonPointerByInterval.get(interval);
             if (jsonPointerStr != undefined) {
-                // jp.set(this.tp.output, jsonPointerStr, "--deleted-interval--");
-                // jp.set(this.tp.templateMeta, jsonPointerStr, "--deleted-interval--");
-                await this.tp.setData(jsonPointerStr, "--deleted-interval--", "forceSetInternal");
+                await this.tp.setData(jsonPointerStr, "--cleared-interval", "forceSetInternal");
             }
             this.intervals.delete(interval);
         }
