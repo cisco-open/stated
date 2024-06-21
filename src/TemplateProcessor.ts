@@ -1155,7 +1155,7 @@ export default class TemplateProcessor {
      * Based on the metadata, we should identify all functions, and their dependencies
      * @param plan
      */
-    public async evaluateIntializationPlan(plan:Plan) {
+    public async evaluateRestorePlan(plan:Plan) {
         try {
             let {output, forkStack, forkId, didUpdate:updatesArray,restoreJsonPtrs: dependencies} = plan;
             const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
@@ -1166,8 +1166,10 @@ export default class TemplateProcessor {
                 planStep.didUpdate = await this.evaluateNode(planStep);
                 output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
             }
-        } finally {
-            console.log("evaluated initialization plan", plan.restoreJsonPtrs);
+        } catch (e) {
+            console.error(`failed to initialize restore plan, error=${e}`);
+        }finally {
+            console.log('evaluated restore plan', plan.restoreJsonPtrs);
         }
     }
 
@@ -1202,7 +1204,7 @@ export default class TemplateProcessor {
                     plan.restoreJsonPtrs.push(jsonPtrStr);
                 }
             }
-            await this.evaluateIntializationPlan(plan);
+            await this.evaluateRestorePlan(plan);
             this.output = plan.output;
         } catch (error) {
             this.logger.error("plan functions evaluation failed");

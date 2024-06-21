@@ -23,7 +23,7 @@ import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
 import {expect} from "@jest/globals";
-
+import StatedREPL from "../../dist/src/StatedREPL.js";
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -2939,7 +2939,101 @@ test("forked homeworlds snapshots", async () => {
     }
 },30000);
 
-// This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times./
-test("repeatative snapshots stopped in random execution time", async () => {
+// /**
+//  * This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times.
+//   */
+// test("repeatative snapshots stopped in random execution time", async () => {
+//
+// });
 
-});
+/**
+ * This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times.
+ */
+test("repetitive snapshots stopped in random execution time", async () => {
+    const templateString = `
+    data: \${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}
+    name: null
+    personDetails: \${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}
+    homeworldURL: \${ personDetails!=null?personDetails.properties.homeworld:null }
+    homeworldDetails: \${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
+    homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+    homeworlds: []`;
+
+    const runTest = async () => {
+        let savedState;
+        const tp = TemplateProcessor.fromString(templateString, {
+            save: (o) => {
+                savedState = tp.executionStatus.toJsonObject();
+                return o;
+            }
+        });
+
+        // Random delay between 100ms and 2000ms
+        const randomDelay = Math.floor(Math.random() * 1900) + 100;
+
+        const snapshotPromise = new Promise(resolve => {
+            setTimeout(async () => {
+                const snapshot = await tp.snapshot();
+                resolve(snapshot);
+            }, randomDelay);
+        });
+
+        const initializePromise = tp.initialize();
+
+        const [snapshot] = await Promise.all([snapshotPromise, initializePromise]);
+
+        return { snapshot, savedState };
+    };
+
+    for (let i = 0; i < 10; i++) {
+        const {snapshot, savedState} = await runTest();
+        const snapshotObject = JSON.parse(snapshot);
+
+        expect(snapshotObject).toHaveProperty('output');
+        expect(snapshotObject.output).toHaveProperty('homeworlds');
+        expect(Array.isArray(snapshotObject.output.homeworlds)).toBe(true);
+        expect(snapshotObject.output.homeworlds.length).toBeLessThanOrEqual(5);
+
+        // Restore from snapshot
+        const restoredTp = new TemplateProcessor();
+        await restoredTp.initializeFromExecutionStatusString(snapshot);
+        console.debug(`initialized from snapshot=${StatedREPL.stringify(snapshotObject)},\n restoredTp.output=${StatedREPL.stringify(restoredTp.output)}`);
+
+        // Wait for restored template to complete
+        if (snapshotObject.output.homeworlds.length === 5) {
+            console.log("template finished before we could capture the snapshot, not awaiting for /homeworlds to converge");
+        } else {
+            // if we got less than 5 homeworlds
+            await new Promise(resolve => {
+                restoredTp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+                    if (homeworlds.length === 5) {
+                        resolve();
+                    }
+                });
+            });
+        }
+
+        const expectedHomeworlds = [
+            "Corellia",
+            "Tatooine",
+            "Alderaan",
+            "Socorro",
+            "Kashyyyk"
+        ];
+        const homeworlds = restoredTp.output.homeworlds;
+
+        // Validate results
+        expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
+        expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
+        expect(homeworlds).toHaveLength(expectedHomeworlds.length);
+
+        // Validate MVCC and plans
+        expect(savedState.mvcc.length).toBeGreaterThan(0);
+        expect(savedState.mvcc.length).toBeLessThanOrEqual(6);
+        expect(savedState.plans.length).toBeGreaterThan(0);
+        // root plan + 5 forks max
+        expect(savedState.plans.length).toBeLessThanOrEqual(6);
+
+        console.log(`Iteration ${i + 1} completed successfully`);
+    }
+}, 30000);

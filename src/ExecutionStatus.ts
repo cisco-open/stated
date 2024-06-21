@@ -1,6 +1,7 @@
 import {MetaInfo} from "./MetaInfoProducer.js";
 import TemplateProcessor, {Fork, MetaInfoMap, Plan, PlanStep} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
+import StatedREPL from "./StatedREPL.js";
 
 export class ExecutionStatus {
     public statuses: Set<Plan>;
@@ -99,8 +100,14 @@ export class ExecutionStatus {
     public async restore(tp:TemplateProcessor): Promise<void> {
         // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
         // and create initialization plan from it.
-        if (this.statuses?.size === 0) {
-            return await tp.createRestorePlan({
+        let hasRootPlan = false;
+        this.statuses.forEach((plan:Plan) => {
+            if(plan.forkId === "Root") {
+                hasRootPlan = true;
+            }});
+        if (this.statuses?.size === 0 || !hasRootPlan) {
+            // we need to add new root plan, so the functions/timers are reevaluated and can be used
+            this.statuses = new Set([{
                     sortedJsonPtrs:[],
                     restoreJsonPtrs: [],
                     data: TemplateProcessor.NOOP,
@@ -108,10 +115,12 @@ export class ExecutionStatus {
                     forkStack:[],
                     forkId:"ROOT",
                     didUpdate:[]
-                }
-            );
+                }, ...this.statuses]);
+            console.log(`Reset this.statuses to ${StatedREPL.stringify(this.statuses)}`);
+        } else {
+            console.log(`Has root in this.statuses ${StatedREPL.stringify(this.statuses)}`);
         }
-        // by default we restart all plans.
+        // by default, we restart all plans.
         for (const mutationPlan of this.statuses) {
             // we initialize all functions/timeouts for each plan
             await tp.createRestorePlan(mutationPlan);
