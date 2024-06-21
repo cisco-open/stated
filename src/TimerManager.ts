@@ -14,7 +14,6 @@
 
 import TemplateProcessor, {PlanStep} from "./TemplateProcessor.js";
 import {JsonPointerString} from "./MetaInfoProducer.js";
-import {default as jp} from './JsonPointer.js';
 
 type Timeout = ReturnType<typeof setTimeout>;
 type Interval = ReturnType<typeof setInterval>;

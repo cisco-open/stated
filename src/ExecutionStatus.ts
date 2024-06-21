@@ -96,11 +96,13 @@ export class ExecutionStatus {
      * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
      * @param tp TemplateProcessor
      */
-    public async restore(tp:TemplateProcessor){
+    public async restore(tp:TemplateProcessor): Promise<void> {
+        // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
+        // and create initialization plan from it.
         if (this.statuses?.size === 0) {
-            return await tp.createInitializationPlan({
+            return await tp.createRestorePlan({
                     sortedJsonPtrs:[],
-                    initializationJsonPtrs: [],
+                    restoreJsonPtrs: [],
                     data: TemplateProcessor.NOOP,
                     output:tp.output,
                     forkStack:[],
@@ -109,9 +111,11 @@ export class ExecutionStatus {
                 }
             );
         }
+        // by default we restart all plans.
         for (const mutationPlan of this.statuses) {
-            await tp.createInitializationPlan(mutationPlan);
-            tp.executePlan(mutationPlan); // restart the restored plan
+            // we initialize all functions/timeouts for each plan
+            await tp.createRestorePlan(mutationPlan);
+            tp.executePlan(mutationPlan); // restart the restored plan asynchronously
         };
     }
 
@@ -148,7 +152,7 @@ export class ExecutionStatus {
                 forkId: planData.forkId,
                 forkStack,
                 sortedJsonPtrs: planData.sortedJsonPtrs,
-                initializationJsonPtrs: [],
+                restoreJsonPtrs: [],
                 op: planData.op,
                 data: planData.data,
                 output: forks.get(planData.forkId)?.output || {}, // Assuming output needs to be set

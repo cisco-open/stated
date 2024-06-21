@@ -33,107 +33,112 @@ test("test 1", async () => {
     });
     let theTempvar = "--";
     tp.postInitialize = async ()=>{ theTempvar = tp.output.removeMe}
-    await tp.initialize();
-    //validate thaat postInitialize call happens before temp var removal
-    expect(theTempvar).toBe('I better get removed because I am temporary variable');
-    const received = [];
-    tp.setDataChangeCallback("/a", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
-    });
-    tp.setDataChangeCallback("/b", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
-    });
-    tp.setDataChangeCallback("/", (data, jsonPtr) => {
-        received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
-    });
-    await tp.setData("/a", 42);
-    //the temporary variable is not seen by root data change callback
-    expect(received).toEqual([
-        {
-            "data": 42,
-            "jsonPtr": "/a"
-        },
-        {
-            "data": 42,
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": 42,
-                "b": 42
+    try {
+        await tp.initialize();
+        //validate thaat postInitialize call happens before temp var removal
+        expect(theTempvar).toBe('I better get removed because I am temporary variable');
+        const received = [];
+        tp.setDataChangeCallback("/a", (data, jsonPtr) => {
+            received.push({data, jsonPtr})
+        });
+        tp.setDataChangeCallback("/b", (data, jsonPtr) => {
+            received.push({data, jsonPtr})
+        });
+        tp.setDataChangeCallback("/", (data, jsonPtr) => {
+            received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
+        });
+        await tp.setData("/a", 42);
+        //the temporary variable is not seen by root data change callback
+        expect(received).toEqual([
+            {
+                "data": 42,
+                "jsonPtr": "/a"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    received.length = 0; //clear
-    //set the same data, expect plan to short circuit and not call callbacks
-    await tp.setData("/a", 42);
-    expect(received).toEqual([]);
-    //now we change data to 2600 we expect callbacks to be called
-    await tp.setData("/a", 2600);
-    expect(received).toEqual([
-        {
-            "data": 2600,
-            "jsonPtr": "/a"
-        },
-        {
-            "data": 2600,
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": 2600,
-                "b": 2600
+            {
+                "data": 42,
+                "jsonPtr": "/b"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    received.length = 0; //clear received
-    //now we change data to empty string we expect callbacks to be called
-    await tp.setData("/a", "");
-    expect(received).toEqual([
-        {
-            "data": "",
-            "jsonPtr": "/a"
-        },
-        {
-            "data": "",
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": "",
-                "b": ""
+            {
+                "data": {
+                    "a": 42,
+                    "b": 42
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        received.length = 0; //clear
+        //set the same data, expect plan to short circuit and not call callbacks
+        await tp.setData("/a", 42);
+        expect(received).toEqual([]);
+        //now we change data to 2600 we expect callbacks to be called
+        await tp.setData("/a", 2600);
+        expect(received).toEqual([
+            {
+                "data": 2600,
+                "jsonPtr": "/a"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    //now we test the ability to receive callbacks even when the data has not changed
-    tp.options.receiveNoOpCallbacksOnRoot = true;
-    received.length = 0; //clear received
-    //now we set a to same value, but since we opted to receive NoOp callbacks, we expect the callback anyway
-    await tp.setData("/a", "");
-    expect(received).toEqual([
-        {
-            "data": {
-                "a": "",
-                "b": ""
+            {
+                "data": 2600,
+                "jsonPtr": "/b"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
+            {
+                "data": {
+                    "a": 2600,
+                    "b": 2600
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        received.length = 0; //clear received
+        //now we change data to empty string we expect callbacks to be called
+        await tp.setData("/a", "");
+        expect(received).toEqual([
+            {
+                "data": "",
+                "jsonPtr": "/a"
+            },
+            {
+                "data": "",
+                "jsonPtr": "/b"
+            },
+            {
+                "data": {
+                    "a": "",
+                    "b": ""
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        //now we test the ability to receive callbacks even when the data has not changed
+        tp.options.receiveNoOpCallbacksOnRoot = true;
+        received.length = 0; //clear received
+        //now we set a to same value, but since we opted to receive NoOp callbacks, we expect the callback anyway
+        await tp.setData("/a", "");
+        expect(received).toEqual([
+            {
+                "data": {
+                    "a": "",
+                    "b": ""
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+    } finally {
+        tp.close();
+    }
+
 });
 
 test("test 2", async () => {
@@ -144,10 +149,15 @@ test("test 2", async () => {
         },
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": {"b": 100, "c": 100},
-    });
+
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": {"b": 100, "c": 100},
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 
@@ -163,17 +173,21 @@ test("test 3", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": undefined //because e.f is undefined because e is undefined in this expression. Only f and g are targetable form an expression inside e.
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": undefined //because e.f is undefined because e is undefined in this expression. Only f and g are targetable form an expression inside e.
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 4", async () => {
@@ -188,17 +202,21 @@ test("test 4", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": -1, //use of $path allows this
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": -1, //use of $path allows this
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 5", async () => {
@@ -214,18 +232,22 @@ test("test 5", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": undefined, //<<--intentional
-            "h": -1
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": undefined, //<<--intentional
+                "h": -1
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 6", async () => {
@@ -236,11 +258,15 @@ test("test 6", async () => {
         ]
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": [10]
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": [10]
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 7", async () => {
@@ -250,8 +276,12 @@ test("test 7", async () => {
         "${$$[1] + $[0]}"
     ];
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual([10, 10, 20]);
+    try {
+        await tp.initialize();
+        expect(o).toEqual([10, 10, 20]);
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 8", async () => {
@@ -263,11 +293,16 @@ test("test 8", async () => {
         ]
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": [10, 5]
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": [10, 5]
+        });
+    } finally {
+        tp.close();
+    }
+
 });
 
 test("test 9", async () => {
@@ -2903,3 +2938,8 @@ test("forked homeworlds snapshots", async () => {
         tp.close();
     }
 },30000);
+
+// This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times./
+test("repeatative snapshots stopped in random execution time", async () => {
+
+});

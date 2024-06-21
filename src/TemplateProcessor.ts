@@ -47,7 +47,7 @@ export type Op = "set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
 export type Plan = {
     sortedJsonPtrs:JsonPointerString[],
-    initializationJsonPtrs:JsonPointerString[], //this is dependencies (functions and intervals/timeouts) we need to initialize on restore from a snapshot before we can evaluate the plan
+    restoreJsonPtrs:JsonPointerString[], //this is dependencies (functions and intervals/timeouts) we need to initialize on restore from a snapshot before we can evaluate the plan
     didUpdate: boolean[] //peers with sortedJsonPointers, tells us which of those locations in output actually updated
     data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
     output:object,
@@ -827,7 +827,7 @@ export default class TemplateProcessor {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.executePlan({
             sortedJsonPtrs:evaluationPlan,
-            initializationJsonPtrs: [],
+            restoreJsonPtrs: [],
             data: TemplateProcessor.NOOP,
             output:this.output,
             forkStack:[],
@@ -1089,7 +1089,7 @@ export default class TemplateProcessor {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const plan:Plan = {sortedJsonPtrs: fromPlan, initializationJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
+        const plan:Plan = {sortedJsonPtrs: fromPlan, restoreJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${StatedREPL.stringify(plan)}`);
@@ -1117,7 +1117,7 @@ export default class TemplateProcessor {
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, initializationJsonPtrs: [], didUpdate:[]};
+        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, restoreJsonPtrs: [], didUpdate:[]};
         await this.executePlan(mutationPlan as Plan);
         return fromPlan;
     }
@@ -1157,7 +1157,7 @@ export default class TemplateProcessor {
      */
     public async evaluateIntializationPlan(plan:Plan) {
         try {
-            let {output, forkStack, forkId, didUpdate:updatesArray,initializationJsonPtrs: dependencies} = plan;
+            let {output, forkStack, forkId, didUpdate:updatesArray,restoreJsonPtrs: dependencies} = plan;
             const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
             const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
             for (let i = startIndex; i < dependencies.length; i++) {
@@ -1167,7 +1167,7 @@ export default class TemplateProcessor {
                 output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
             }
         } finally {
-            console.log("evaluated initialization plan", plan.initializationJsonPtrs);
+            console.log("evaluated initialization plan", plan.restoreJsonPtrs);
         }
     }
 
@@ -1175,7 +1175,7 @@ export default class TemplateProcessor {
      * Create an initialization plan from the execution plan
      * @param plan
      */
-    public async createInitializationPlan(plan:Plan) {
+    public async createRestorePlan(plan:Plan) {
         try {
             let intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
             const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
@@ -1189,8 +1189,8 @@ export default class TemplateProcessor {
             for (const expression of functions) {
                 const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
 
-               if (!plan.initializationJsonPtrs.includes(jsonPtrStr)) {
-                   plan.initializationJsonPtrs.push(jsonPtrStr);
+               if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
+                   plan.restoreJsonPtrs.push(jsonPtrStr);
                }
             }
             functions.forEach(metaInfo => {
@@ -1198,8 +1198,8 @@ export default class TemplateProcessor {
             })
             for (const expression of intervals) {
                 const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-                if (!plan.initializationJsonPtrs.includes(jsonPtrStr)) {
-                    plan.initializationJsonPtrs.push(jsonPtrStr);
+                if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
+                    plan.restoreJsonPtrs.push(jsonPtrStr);
                 }
             }
             await this.evaluateIntializationPlan(plan);
