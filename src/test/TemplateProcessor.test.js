@@ -2939,16 +2939,15 @@ test("forked homeworlds snapshots", async () => {
     }
 },30000);
 
-// /**
-//  * This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times.
-//   */
-// test("repeatative snapshots stopped in random execution time", async () => {
-//
-// });
 
 /**
- * This snapshot should start the template processor and snapshot/restore in random places in a loop 10 times.
- */
+ * This test should start this a template processor from a homeworlds template running 5 plans in parallel. It runs it
+ * 10 times in a row, triggering a random snapshot with a 0 to 2000ms delay.
+ *
+ * If a snapshot hasn't converged yet, the test will set a callback to await for all parallel plans to be completed.
+ *
+ * In the end it validates the expected template output.
+ **/
 test("repetitive snapshots stopped in random execution time", async () => {
     const templateString = `
     data: \${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}
@@ -3026,15 +3025,14 @@ test("repetitive snapshots stopped in random execution time", async () => {
                 await Promise.race([timeoutPromise, convergencePromise]);
             } catch (error) {
                 if (error.message === 'Timed out after 10 seconds') {
-                    console.log('Test run timed out, capturing states of tp...');
                     console.log(StatedREPL.stringify(JSON.parse(await restoredTp.snapshot())));
+                    console.log('Test run timed out, see snapshot of TraceProcessor above...');
                     throw error;
                 } else {
                     throw error;
                 }
             }
         }
-
 
         const expectedHomeworlds = [
             "Corellia",
