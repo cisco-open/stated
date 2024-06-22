@@ -2994,24 +2994,47 @@ test("repetitive snapshots stopped in random execution time", async () => {
         expect(Array.isArray(snapshotObject.output.homeworlds)).toBe(true);
         expect(snapshotObject.output.homeworlds.length).toBeLessThanOrEqual(5);
 
+        expect(snapshotObject.output.personDetails).toBe(null);
+        expect(snapshotObject.output.homeworldURL).toBe(null);
+        expect(snapshotObject.output.homeworldDetails).toBe(null);
+        expect(snapshotObject.output.homeworldName).toBe(null);
+
         // Restore from snapshot
         const restoredTp = new TemplateProcessor();
         await restoredTp.initializeFromExecutionStatusString(snapshot);
-        console.debug(`initialized from snapshot=${StatedREPL.stringify(snapshotObject)},\n restoredTp.output=${StatedREPL.stringify(restoredTp.output)}`);
 
         // Wait for restored template to complete
         if (snapshotObject.output.homeworlds.length === 5) {
             console.log("template finished before we could capture the snapshot, not awaiting for /homeworlds to converge");
         } else {
             // if we got less than 5 homeworlds
-            await new Promise(resolve => {
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error('Timed out after 10 seconds'));
+                }, 10000);
+            });
+
+            const convergencePromise = new Promise(resolve => {
                 restoredTp.setDataChangeCallback('/homeworlds', (homeworlds) => {
                     if (homeworlds.length === 5) {
                         resolve();
                     }
                 });
             });
+
+            try {
+                await Promise.race([timeoutPromise, convergencePromise]);
+            } catch (error) {
+                if (error.message === 'Timed out after 10 seconds') {
+                    console.log('Test run timed out, capturing states of tp...');
+                    console.log(StatedREPL.stringify(JSON.parse(await restoredTp.snapshot())));
+                    throw error;
+                } else {
+                    throw error;
+                }
+            }
         }
+
 
         const expectedHomeworlds = [
             "Corellia",

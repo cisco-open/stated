@@ -106,21 +106,18 @@ export class ExecutionStatus {
                 hasRootPlan = true;
             }});
         if (this.statuses?.size === 0 || !hasRootPlan) {
-            // we need to add new root plan, so the functions/timers are reevaluated and can be used
+            // we need to add new root plan to the beginning of the set, so the functions/timers are reevaluated and can be used
             this.statuses = new Set([{
-                    sortedJsonPtrs:[],
-                    restoreJsonPtrs: [],
-                    data: TemplateProcessor.NOOP,
-                    output:tp.output,
-                    forkStack:[],
-                    forkId:"ROOT",
-                    didUpdate:[]
-                }, ...this.statuses]);
-            console.log(`Reset this.statuses to ${StatedREPL.stringify(this.statuses)}`);
-        } else {
-            console.log(`Has root in this.statuses ${StatedREPL.stringify(this.statuses)}`);
+                sortedJsonPtrs: [],
+                restoreJsonPtrs: [],
+                data: TemplateProcessor.NOOP,
+                output: tp.output,
+                forkStack: [],
+                forkId: "ROOT",
+                didUpdate: []
+            }, ...this.statuses]);
         }
-        // by default, we restart all plans.
+        // restart all plans.
         for (const mutationPlan of this.statuses) {
             // we initialize all functions/timeouts for each plan
             await tp.createRestorePlan(mutationPlan);
@@ -171,9 +168,7 @@ export class ExecutionStatus {
         });
 
         // restore the output from root plan in-flight, or set it to the stored obj.output otherwise
-        tp.output = Array.from(executionStatus.statuses)
-            ?.filter(k => k.forkId === "ROOT").map(o => o.output)?.[0]
-            || obj.output;
+        tp.output = obj.output;
         return executionStatus;
     }
 

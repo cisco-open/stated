@@ -1168,8 +1168,7 @@ export default class TemplateProcessor {
             }
         } catch (e) {
             console.error(`failed to initialize restore plan, error=${e}`);
-        }finally {
-            console.log('evaluated restore plan', plan.restoreJsonPtrs);
+            throw e;
         }
     }
 
@@ -1205,7 +1204,6 @@ export default class TemplateProcessor {
                 }
             }
             await this.evaluateRestorePlan(plan);
-            this.output = plan.output;
         } catch (error) {
             this.logger.error("plan functions evaluation failed");
             throw error;
