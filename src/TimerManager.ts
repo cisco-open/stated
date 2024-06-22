@@ -12,16 +12,30 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import TemplateProcessor, {PlanStep} from "./TemplateProcessor.js";
+import {JsonPointerString} from "./MetaInfoProducer.js";
+
 type Timeout = ReturnType<typeof setTimeout>;
 type Interval = ReturnType<typeof setInterval>;
+type wrappedInterval = {
+    interval: Interval,
+    jsonPointerStr: JsonPointerString
+}
+
 
 class TimerManager {
     private timeouts: Set<Timeout>;
     private intervals: Set<Interval>;
+    private tp: TemplateProcessor;
+    private jsonPointerByInterval: Map<Interval, string>;
+    private wrappedIntervals: Set<wrappedInterval>;
 
-    constructor() {
+    constructor(tp:TemplateProcessor) {
         this.timeouts = new Set<Timeout>();
         this.intervals = new Set<Interval>();
+        this.wrappedIntervals = new Set<wrappedInterval>();
+        this.jsonPointerByInterval = new Map<Interval, string>();
+        this.tp = tp;
     }
 
     // Wraps setTimeout to track the timeout
@@ -32,6 +46,28 @@ class TimerManager {
         }, delay);
         this.timeouts.add(timeout);
         return timeout;
+    }
+
+    generateSetInterval(planStep:PlanStep) {
+        return (callback: (...args: any[]) => void, delay: number, ...args: any[]): Interval => {
+            // TODO: wrap the callback to track last run time, run counter, and other stats
+            const interval: Interval = setInterval(callback, delay, ...args);
+            this.intervals.add(interval);
+            this.jsonPointerByInterval.set(interval, planStep.jsonPtr);
+            this.wrappedIntervals.add({interval: interval, jsonPointerStr: planStep.jsonPtr});
+            return interval;
+        }
+    }
+
+    generateClearInterval(planStep:PlanStep) {
+        return async (interval: Interval): Promise<void> => {
+            clearInterval(interval);
+            const jsonPointerStr: string | undefined = this.jsonPointerByInterval.get(interval);
+            if (jsonPointerStr != undefined) {
+                await this.tp.setData(jsonPointerStr, "--cleared-interval", "forceSetInternal");
+            }
+            this.intervals.delete(interval);
+        }
     }
 
     // Wraps setInterval to track the interval

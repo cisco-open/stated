@@ -93,7 +93,6 @@ test("Extend CliCore with restore command", async () => {
     // we call restore on the repl, which will expect it to be defined in CliCore.
     await repl.cli('restore', '-f example/restoreSnapshot.json');
 
-
     console.log(StatedREPL.stringify(repl.cliCore.templateProcessor.output));
     expect(repl.cliCore.templateProcessor.output).toBeDefined();
     expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after restoring from the snapshot

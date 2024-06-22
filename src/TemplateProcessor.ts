@@ -29,11 +29,13 @@ import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
+import * as jsonata from "jsonata";
+import StatedREPL from "./StatedREPL.js";
 
 declare const BUILD_TARGET: string | undefined;
 
-type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
-export type Snapshot = {template:object, options:{}, output: any, prepared?:boolean}
+export type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
+export type Snapshot = {template:object, output: any, options:{}, mvcc: any, metaInfoByJsonPointer: any, plans: any}
 export type StatedError = {
     error: {
         message: string;
@@ -45,6 +47,7 @@ export type Op = "set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
 export type Plan = {
     sortedJsonPtrs:JsonPointerString[],
+    restoreJsonPtrs:JsonPointerString[], //this is dependencies (functions and intervals/timeouts) we need to initialize on restore from a snapshot before we can evaluate the plan
     didUpdate: boolean[] //peers with sortedJsonPointers, tells us which of those locations in output actually updated
     data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
     output:object,
@@ -217,8 +220,6 @@ export default class TemplateProcessor {
      */
     static DEFAULT_FUNCTIONS = {
         fetch:saferFetch,
-        setInterval,
-        clearInterval,
         setTimeout,
         console,
         debounce,
@@ -339,7 +340,7 @@ export default class TemplateProcessor {
     }
 
     constructor(template={}, context = {}, options={}) {
-        this.timerManager = new TimerManager(); //prevent leaks from $setTimeout and $setInterval
+        this.timerManager = new TimerManager(this); //prevent leaks from $setTimeout and $setInterval
         this.uniqueId = Math.random()*1e6;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
@@ -352,7 +353,7 @@ export default class TemplateProcessor {
         this.functionGenerators = new Map();
         this.tagSet = new Set();
         this.onInitialize = new Map();
-        this.executionStatus = new ExecutionStatus();
+        this.executionStatus = new ExecutionStatus(this);
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -385,7 +386,8 @@ export default class TemplateProcessor {
             if (typeof this.context[key] === 'function') {
                 if (key === "setTimeout" || key === "setInterval") {
                     //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
-                    this.context[key] = this.timerManager[key].bind(this.timerManager);
+                    // this.context[key] = this.timerManager[key].bind(this.timerManager);
+                    //TODO: remove it after migrating to generated function
                 } else {
                     this.context[key] = safe(this.context[key]);
                 }
@@ -404,7 +406,7 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", snapshottedOutput: {}|undefined = undefined):Promise<void> {
+    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: {}|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clearAll();
             this.executionStatus.clear();
@@ -415,8 +417,21 @@ export default class TemplateProcessor {
         if (importedSubtemplate !== undefined && jsonPtr === "/") {
             this.resetTemplate(importedSubtemplate)
         }
-        if(snapshottedOutput){
-            this.output = snapshottedOutput; //use by restore to set the restored output state
+        if (executionStatusSnapshot !== undefined) {
+            this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(this, executionStatusSnapshot);
+            // here we restore metaInfoByJsonPointer from the executionStatus
+            this.templateMeta = {};
+
+            // compiles jsonata expressions and recreates templateMeta
+            this.executionStatus.metaInfoByJsonPointer["/"]?.forEach(
+                (metaInfo) => {
+                    if (metaInfo.expr__ !== undefined) {
+                        metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
+                    }
+
+                    jp.set(this.templateMeta, metaInfo.jsonPointer__ === "" ? "/" : metaInfo.jsonPointer__, metaInfo);
+
+                });
         }
 
         if (jsonPtr === "/" && this.isInitializing) {
@@ -444,7 +459,9 @@ export default class TemplateProcessor {
 
             this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
             this.logger.debug(`tags: ${JSON.stringify(Array.from(this.tagSet))}`);
-            this.executionPlans = {}; //clear execution plans
+            if (executionStatusSnapshot === undefined) {
+                this.executionPlans = {}; //clear execution plans
+            }
             let parsedJsonPtr:JsonPointerStructureArray = jp.parse(jsonPtr);
             parsedJsonPtr = parsedJsonPtr.filter(e=>e!=="");//isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
             let compilationTarget;
@@ -453,14 +470,19 @@ export default class TemplateProcessor {
             }else{
                 compilationTarget = importedSubtemplate; //the case where we already initialized once, and now we are initializing an imported sub-template
             }
-            const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
-            this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
-            this.sortMetaInfos(metaInfos);
-            this.populateTemplateMeta(metaInfos);
-            this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
-            this.propagateTags(metaInfos);
-            this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
-            await this.evaluateInitialPlan(jsonPtr);
+            // Recretaing the meta info if execution status is not provided
+            if (executionStatusSnapshot === undefined) {
+                const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
+                this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
+                this.sortMetaInfos(metaInfos);
+                this.populateTemplateMeta(metaInfos);
+                this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
+                this.propagateTags(metaInfos);
+                this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
+                await this.evaluateInitialPlan(jsonPtr);
+            } else {
+                await this.executionStatus.restore(this);
+            }
             await this.postInitialize();
             this.removeTemporaryVariables(this.tempVars, jsonPtr);
             this.logger.verbose("initialization complete...");
@@ -513,12 +535,23 @@ export default class TemplateProcessor {
                 if (result instanceof Promise) {
                     return result.catch(error => {
                         this.logger.error(error.toString());
+
+                        let {
+                            message = 'no message available',
+                            name = 'no name available',
+                            stack = 'no stack available',
+                        } = error;
+                        if (error.cause) {
+                            const {
+                                message: causeMessage = 'no message available',
+                                name: causeName = 'no name available',
+                                stack: causeStack = 'no stack available',
+                            } = error.cause;
+                            if (causeMessage) message = `${message}: ${causeMessage}`;
+                            if (causeName) name = `${name}: ${causeName}`;
+                        }
                         return {
-                            "error": {
-                                message: error.message,
-                                name: error.name,
-                                stack: error.stack,
-                            }
+                            "error": {message, name, stack}
                         };
                     });
                 }
@@ -553,7 +586,7 @@ export default class TemplateProcessor {
         await this.initialize(template, jsonPtrImportPath);
     }
 
-    private static NOOP = Symbol('NOOP');
+    public static NOOP = Symbol('NOOP');
 
     private getImport(metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
@@ -790,10 +823,11 @@ export default class TemplateProcessor {
         });
     }
 
-    private async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
+    public async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
         return await this.executePlan({
             sortedJsonPtrs:evaluationPlan,
+            restoreJsonPtrs: [],
             data: TemplateProcessor.NOOP,
             output:this.output,
             forkStack:[],
@@ -1055,11 +1089,11 @@ export default class TemplateProcessor {
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const plan:Plan = {sortedJsonPtrs: fromPlan, data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
+        const plan:Plan = {sortedJsonPtrs: fromPlan, restoreJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
-            this.logger.debug(`execution plan (uid=${this.uniqueId}): ${JSON.stringify(plan)}`);
-            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${JSON.stringify(this.executionQueue)}`);
+            this.logger.debug(`execution plan (uid=${this.uniqueId}): ${StatedREPL.stringify(plan)}`);
+            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${StatedREPL.stringify(this.executionQueue)}`);
         }
         if(this.executionQueue.length>1){
             return fromPlan; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
@@ -1083,7 +1117,7 @@ export default class TemplateProcessor {
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, didUpdate:[]};
+        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, restoreJsonPtrs: [], didUpdate:[]};
         await this.executePlan(mutationPlan as Plan);
         return fromPlan;
     }
@@ -1093,12 +1127,7 @@ export default class TemplateProcessor {
             try {
                 const plan: Plan | SnapshotPlan = this.executionQueue[0];
                 if (plan.op === "snapshot") {
-                    const snapshot = {
-                        template: this.input,
-                        output: this.output,
-                        options: this.options
-                    };
-                    (plan as SnapshotPlan).generatedSnapshot = stringifyTemplateJSON(snapshot);
+                    (plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();;
                 } else {
                     await this.executePlan(plan);
                 }
@@ -1120,7 +1149,68 @@ export default class TemplateProcessor {
         }
     }
 
-    private async executePlan(plan:Plan){
+    /**
+     * This method is used to compile and evaluate function expressions and their dependencies.
+     *
+     * Based on the metadata, we should identify all functions, and their dependencies
+     * @param plan
+     */
+    public async evaluateRestorePlan(plan:Plan) {
+        try {
+            let {output, forkStack, forkId, didUpdate:updatesArray,restoreJsonPtrs: dependencies} = plan;
+            const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
+            const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
+            for (let i = startIndex; i < dependencies.length; i++) {
+                const jsonPtr = dependencies[i];
+                const planStep:PlanStep = {jsonPtr, output, forkStack, forkId, didUpdate:false}; //pick up the output and forkStack from the prior step
+                planStep.didUpdate = await this.evaluateNode(planStep);
+                output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
+            }
+        } catch (e) {
+            console.error(`failed to initialize restore plan, error=${e}`);
+            throw e;
+        }
+    }
+
+    /**
+     * Create an initialization plan from the execution plan
+     * @param plan
+     */
+    public async createRestorePlan(plan:Plan) {
+        try {
+            let intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
+            const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
+            const functions: MetaInfo[] = this.metaInfoByJsonPointer["/"]
+                ?.filter(metaInfo => metaInfo.expr__ !== undefined)
+                .filter(metaInfo => metaInfo.isFunction__ === true);
+            expressions.forEach(metaInfo => {
+                metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
+            });
+
+            for (const expression of functions) {
+                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
+
+               if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
+                   plan.restoreJsonPtrs.push(jsonPtrStr);
+               }
+            }
+            functions.forEach(metaInfo => {
+                jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
+            })
+            for (const expression of intervals) {
+                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
+                if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
+                    plan.restoreJsonPtrs.push(jsonPtrStr);
+                }
+            }
+            await this.evaluateRestorePlan(plan);
+        } catch (error) {
+            this.logger.error("plan functions evaluation failed");
+            throw error;
+        }
+    }
+
+    public async executePlan(plan:Plan){
         try {
             const {data} = plan;
             let shouldRunDependentExpressions = true;
@@ -1184,7 +1274,7 @@ export default class TemplateProcessor {
 
     private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
         if(plan.lastCompletedStep){
-            return false; //this is a one-step plan, so if it has a completed step, it's already done
+            return plan.lastCompletedStep?plan.sortedJsonPtrs.indexOf(plan.lastCompletedStep.jsonPtr)< plan.sortedJsonPtrs.length:false
         }
         this.executionStatus.begin(plan);
         let theStep:PlanStep|undefined;
@@ -1371,6 +1461,7 @@ export default class TemplateProcessor {
                     throw new Error(msg);
                 }
             }
+
             const context ={...this.context,
             ...{"errorReport": this.generateErrorReportFunction(metaInfo)},
             ...{"defer": safe(this.generateDeferFunction(metaInfo))},
@@ -1378,6 +1469,8 @@ export default class TemplateProcessor {
             ...{"forked": safe(this.generateForked(planStep))},
             ...{"joined": safe(this.generateJoined(planStep))},
             ...{"set": safe(this.generateSet(planStep))},
+            ...{"setInterval": safe(this.timerManager.generateSetInterval(planStep))},
+            ...{"clearInterval": safe(this.timerManager.generateClearInterval(planStep))},
             ...jittedFunctions
             };
             evaluated = await compiledExpr__?.evaluate(
@@ -1595,6 +1688,7 @@ export default class TemplateProcessor {
         }
     }
 
+    // TODO: change it to pass the plan
     private async callDataChangeCallbacks(data: any, jsonPointer: JsonPointerString|JsonPointerString[], removed: boolean = false) {
         let _jsonPointer:JsonPointerString;
         if(Array.isArray(jsonPointer)){
@@ -1731,7 +1825,7 @@ export default class TemplateProcessor {
 
     /**
      * Creates a stringified snapshot of the current state of the TemplateProcessor instance,
-     * including its input, output, and options.
+     * including its execution status, input, output, and options.
      *
      * @returns {string} A JSON string representing the snapshot of the TemplateProcessor's
      *                   current state, including template input, processed output, and options.
@@ -1739,9 +1833,10 @@ export default class TemplateProcessor {
      * @example
      * const tp = new TemplateProcessor(template, context, options);
      * const snapshotString = await tp.snapshot();
-     * // snapshotString contains a JSON string with the template, output, and options of the TemplateProcessor
+     * // snapshotString contains a JSON string with the execution plans, mvcc, template, output, and options of the
+     * TemplateProcessor
      */
-     public async snapshot():Promise<string>  {
+    public async snapshot():Promise<string> {
         const snapshotPlan:SnapshotPlan = {op:"snapshot", generatedSnapshot:"replace me"}; //generatedSnapshot gets filled in
         this.executionQueue.push(snapshotPlan);
         await this.drainExecutionQueue();
@@ -1749,26 +1844,9 @@ export default class TemplateProcessor {
         return generatedSnapshot;
     }
 
-    /**
-     * Constructs and initializes a new TemplateProcessor instance from a given snapshot string.
-     * This method parses the snapshot string, constructs a new TemplateProcessor with the parsed data,
-     * and then initializes it. It is a convenient method for quickly rehydrating and preparing a TemplateProcessor
-     * instance from a saved state.
-     *
-     * @param {string} snapshot - A JSON string snapshot from which to initialize the TemplateProcessor.
-     * @param {object} [context={}] - An optional context object to be used by the TemplateProcessor.
-     * @returns {Promise<TemplateProcessor>} A promise that resolves with the newly initialized TemplateProcessor instance.
-     *
-     * @example
-     * const snapshotString = '{"template":"...","options":{},"output":"..."}';
-     * TemplateProcessor.initializeFromSnapshot(snapshotString, context)
-     *     .then(tp => console.log('TemplateProcessor initialized from snapshot.'));
-     */
-    public static async fromSnapshotString(snapshot: string, context: {} = {}): Promise<TemplateProcessor> {
-        const parsedSnapshot = JSON.parse(snapshot);
-        await TemplateProcessor.prepareSnapshotInPlace(parsedSnapshot);
-        const tp = TemplateProcessor.constructFromSnapshotObject(parsedSnapshot, context);
-        await tp.initialize(undefined, "/", parsedSnapshot.output);
+    public static async fromExecutionStatusString(snapshot: string, context: {} = {}) {
+        const tp = new TemplateProcessor({}, context);
+        await tp.initializeFromExecutionStatusString(snapshot);
         return tp;
     }
 
@@ -1788,87 +1866,13 @@ export default class TemplateProcessor {
      * await tp.initialize();
      */
     public static constructFromSnapshotObject(snapshot: Snapshot, context: {} = {}): TemplateProcessor {
-        if(!snapshot.prepared){
-            throw new Error("Cannot construct TemplateProcessor from unprepared Snapshot")
-        }
         const {template, options} = snapshot;
         return new TemplateProcessor(template, context, options);
     }
 
-    /**
-     * Initializes the current TemplateProcessor instance using the output data from a given snapshot object.
-     * This method is designed for use with an already constructed TemplateProcessor instance, allowing it to be
-     * initialized (or re-initialized) with specific output data from a snapshot. This can be particularly useful
-     * for setting or resetting the processor's state based on dynamic conditions or to rehydrate the processor
-     * from a previously saved state without constructing a new instance.
-     *
-     * @param {object} snapshot - A snapshot object containing only the output data for initializing the TemplateProcessor.
-     * @returns {Promise<void>} A promise that resolves once the TemplateProcessor has been initialized with the output data from the snapshot.
-     *
-     * @example
-     * const snapshot = {"output":{...}, "options":{...}, "template":{...}};
-     * const tp = TemplateProcessor.constructFromSnapshotObject(snapshot);
-     * await tp.initializeFromSnapshotObject(snapshot)
-     *     .then(() => console.log('TemplateProcessor initialized from snapshot output.'));
-     */
-    public async initializeFromSnapshotObject(snapshot:Snapshot){
-        if(!snapshot.prepared){
-            throw new Error("Cannot initialize TemplateProcessor from unprepared Snapshot")
-        }
-        return await this.initialize(undefined, "/", snapshot.output);
-    }
-
-    /**
-     *
-     * @param snapshot
-     * this method mutates the Snapshot's template in place to merge accumulated output data into it. It does this
-     * by
-     *  1. generating local MetaInfo for the template.
-     *  2. making a Map whose key is jsonPointer, and placing into that the MetaInfo for places in the template
-     *     whose subtree has expressions (treeHasExpressions__). This tells us that these are parts of the template
-     *     that cannot be altered, ever, because to alter them would be to remove expressions from the template.
-     *  3. walking the output object recursively. As it walks, it looks up the json pointer in the aformmentioned Map.
-     *     If it does not see the pointer in the Map, then it means the current piece of output is pure data, and is
-     *     transferred ino the template
-     *
-     *  Net effect is that pure data that had been shoved into the output, at runtime gets transfered into the template.
-     *  Now it is safe to initialize from this Snapshot and we will not have a situation where there is pure data in
-     *  the output with no corresponding MetaInfo to mark it as materialized__
-     *
-     * @private
-     */
-    public static async prepareSnapshotInPlace(snapshot:Snapshot):Promise<void>{
-        if(snapshot.prepared){
-            throw new Error("Attempt to prepare an already-prepared snapshot")
-        }
-        const {template, output} = snapshot;
-        const metaInfos:MetaInfo[] = await MetaInfoProducer.getMetaInfos(template);
-        const jsonPointersToMetaInfo:Map<JsonPointerString, MetaInfo> = metaInfos.reduce((acc, metaInf)=>{
-            if(metaInf.treeHasExpressions__){
-                acc.set(jp.compile(metaInf.jsonPointer__ as JsonPointerStructureArray), metaInf);
-            }
-            return acc;
-        }, new Map<JsonPointerString, MetaInfo>());
-
-        //descend callback wil prevent descending further when it reaches a node that is an expression in the template
-        const descend = (value:any, jsonPointer:JsonPointerString)=>{
-            if(jsonPointersToMetaInfo.has(jsonPointer) && jsonPointersToMetaInfo.get(jsonPointer as JsonPointerString)?.expr__ !== undefined){
-                return false; //the location in the output tree corresponds to an expression in the template
-            }
-            const type = Object.prototype.toString.call(value);
-            return type === '[object Object]' || type === '[object Array]';
-        }
-        const transferDataToTemplate = (val:any, jsonPointer:JsonPointerString)=>{
-            if(jsonPointersToMetaInfo.has(jsonPointer) && (jsonPointersToMetaInfo.get(jsonPointer) as MetaInfo).treeHasExpressions__){
-                return; //don't replace any expression or ancestor of expression in the template
-            }
-            //update the template with fields from the output that may not have been present in the template (like they got $set into template at runtime before snapshot)
-            jp.set(template, jsonPointer, val); //this will only get called for 'data', not expressions
-        }
-        jp.walk(output, transferDataToTemplate, descend);
-        //template has now been mutated in place
-        snapshot.prepared = true;
-        return;
+    public async initializeFromExecutionStatusString(exectuionStatusStr: string):Promise<void> {
+        const exectuionStatus = JSON.parse(exectuionStatusStr);
+        return await this.initialize(undefined, "/", exectuionStatus);
     }
 
     /**
