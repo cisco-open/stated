@@ -2199,6 +2199,12 @@ test("interval snapshot", async () => {
                 "bar": "baz"
             }
         },
+        "output": {
+            "counter": "{function:}",
+            "count": 1,
+            "rapidCaller": "--interval/timeout--",
+            "stop": "not done"
+        },
         "mvcc": [
             {
                 "forkId": "ROOT",
@@ -2210,7 +2216,7 @@ test("interval snapshot", async () => {
                 }
             }
         ],
-            "metaInfoByJsonPointer": {
+        "metaInfoByJsonPointer": {
             "/": [
                 {
                     "materialized__": true,
