@@ -165,7 +165,6 @@ export default class CliCore {
         if (!this.templateProcessor && !fromSnapshot) {
             this.templateProcessor = new TemplateProcessor(input, contextData, options);
         } else if (!this.templateProcessor && fromSnapshot) {
-            await TemplateProcessor.prepareSnapshotInPlace(input); // input is a snapshot
             this.templateProcessor = TemplateProcessor.constructFromSnapshotObject(input, contextData);
         } else { // if we are re-initializing, we need to reset the tagSet and options, if provided
             this.templateProcessor.tagSet = new Set();
@@ -190,8 +189,7 @@ export default class CliCore {
                 tailPromise = this.tail(tail);
             }
             if (fromSnapshot) { // restore from a snapshot
-                if (!input.prepared) await TemplateProcessor.prepareSnapshotInPlace(input); // check if already prepared
-                await this.templateProcessor.initialize(input.template,"/", input.output);
+                await this.templateProcessor.initialize(undefined, "/", input);
             } else {
                 await this.templateProcessor.initialize(input);
             }

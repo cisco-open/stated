@@ -14,5 +14,80 @@
       "seconds": 1
     },
     "importPath": "/Users/sesergee/projects/sandbox/workflows/stated-workflow"
+  },
+  "metaInfoByJsonPointer": {
+    "/": [
+      {
+        "materialized__": true,
+        "jsonPointer__": "",
+        "dependees__": [],
+        "dependencies__": [],
+        "absoluteDependencies__": [],
+        "treeHasExpressions__": true,
+        "tags__": [],
+        "parent__": "",
+        "temp__": false,
+        "exprTargetJsonPointer__": ""
+      },
+      {
+        "materialized__": true,
+        "jsonPointer__": "/count",
+        "dependees__": [
+          "/counter",
+          "/stop"
+        ],
+        "dependencies__": [],
+        "absoluteDependencies__": [],
+        "treeHasExpressions__": false,
+        "tags__": [],
+        "parent__": "",
+        "temp__": false,
+        "exprTargetJsonPointer__": ""
+      },
+      {
+        "materialized__": true,
+        "jsonPointer__": "/counter",
+        "dependees__": [
+          "/stop"
+        ],
+        "dependencies__": [
+          "/count"
+        ],
+        "absoluteDependencies__": [
+          "/count"
+        ],
+        "treeHasExpressions__": true,
+        "tags__": [],
+        "parent__": "",
+        "temp__": false,
+        "exprRootPath__": null,
+        "expr__": " $setInterval(function(){$set('/count', count+1)}, 10) ",
+        "exprTargetJsonPointer__": "",
+        "compiledExpr__": "--compiled expression--",
+        "data__": "--interval/timeout--"
+      },
+      {
+        "materialized__": true,
+        "jsonPointer__": "/stop",
+        "dependees__": [],
+        "dependencies__": [
+          "/count",
+          "/counter"
+        ],
+        "absoluteDependencies__": [
+          "/count",
+          "/counter"
+        ],
+        "treeHasExpressions__": true,
+        "tags__": [],
+        "parent__": "",
+        "temp__": false,
+        "exprRootPath__": null,
+        "expr__": " count=10?($clearInterval($$.counter);'done'):'not done'  ",
+        "exprTargetJsonPointer__": "",
+        "compiledExpr__": "--compiled expression--",
+        "data__": "not done"
+      }
+    ]
   }
 }

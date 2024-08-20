@@ -12,12 +12,20 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
+import TemplateProcessor from "../TemplateProcessor.js";
+
+export const UNDEFINED_PLACEHOLDER:string = '__UNDEFINED__';
+export const NOOP_PLACEHOLDER:string = '__NOOP__';
+
 export const circularReplacer = (key: any, value: any) => {
   if (value === undefined) {
     return null;
   }
   if (value?._jsonata_lambda || value?._stated_function__) {
     return "{function:}";
+  }
+  if (value === TemplateProcessor.NOOP) {
+    return NOOP_PLACEHOLDER;
   }
   if (key === 'compiledExpr__') {
     return "--compiled expression--";

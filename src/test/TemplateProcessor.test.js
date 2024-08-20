@@ -22,9 +22,8 @@ import {dirname} from 'path';
 import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
-import StatedREPL from "../../dist/src/StatedREPL.js";
 import {expect} from "@jest/globals";
-
+import StatedREPL from "../../dist/src/StatedREPL.js";
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -34,107 +33,112 @@ test("test 1", async () => {
     });
     let theTempvar = "--";
     tp.postInitialize = async ()=>{ theTempvar = tp.output.removeMe}
-    await tp.initialize();
-    //validate thaat postInitialize call happens before temp var removal
-    expect(theTempvar).toBe('I better get removed because I am temporary variable');
-    const received = [];
-    tp.setDataChangeCallback("/a", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
-    });
-    tp.setDataChangeCallback("/b", (data, jsonPtr) => {
-        received.push({data, jsonPtr})
-    });
-    tp.setDataChangeCallback("/", (data, jsonPtr) => {
-        received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
-    });
-    await tp.setData("/a", 42);
-    //the temporary variable is not seen by root data change callback
-    expect(received).toEqual([
-        {
-            "data": 42,
-            "jsonPtr": "/a"
-        },
-        {
-            "data": 42,
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": 42,
-                "b": 42
+    try {
+        await tp.initialize();
+        //validate thaat postInitialize call happens before temp var removal
+        expect(theTempvar).toBe('I better get removed because I am temporary variable');
+        const received = [];
+        tp.setDataChangeCallback("/a", (data, jsonPtr) => {
+            received.push({data, jsonPtr})
+        });
+        tp.setDataChangeCallback("/b", (data, jsonPtr) => {
+            received.push({data, jsonPtr})
+        });
+        tp.setDataChangeCallback("/", (data, jsonPtr) => {
+            received.push(JSON.parse(JSON.stringify({data, jsonPtr}))); //create immutable snapshot of output
+        });
+        await tp.setData("/a", 42);
+        //the temporary variable is not seen by root data change callback
+        expect(received).toEqual([
+            {
+                "data": 42,
+                "jsonPtr": "/a"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    received.length = 0; //clear
-    //set the same data, expect plan to short circuit and not call callbacks
-    await tp.setData("/a", 42);
-    expect(received).toEqual([]);
-    //now we change data to 2600 we expect callbacks to be called
-    await tp.setData("/a", 2600);
-    expect(received).toEqual([
-        {
-            "data": 2600,
-            "jsonPtr": "/a"
-        },
-        {
-            "data": 2600,
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": 2600,
-                "b": 2600
+            {
+                "data": 42,
+                "jsonPtr": "/b"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    received.length = 0; //clear received
-    //now we change data to empty string we expect callbacks to be called
-    await tp.setData("/a", "");
-    expect(received).toEqual([
-        {
-            "data": "",
-            "jsonPtr": "/a"
-        },
-        {
-            "data": "",
-            "jsonPtr": "/b"
-        },
-        {
-            "data": {
-                "a": "",
-                "b": ""
+            {
+                "data": {
+                    "a": 42,
+                    "b": 42
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        received.length = 0; //clear
+        //set the same data, expect plan to short circuit and not call callbacks
+        await tp.setData("/a", 42);
+        expect(received).toEqual([]);
+        //now we change data to 2600 we expect callbacks to be called
+        await tp.setData("/a", 2600);
+        expect(received).toEqual([
+            {
+                "data": 2600,
+                "jsonPtr": "/a"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
-    //now we test the ability to receive callbacks even when the data has not changed
-    tp.options.receiveNoOpCallbacksOnRoot = true;
-    received.length = 0; //clear received
-    //now we set a to same value, but since we opted to receive NoOp callbacks, we expect the callback anyway
-    await tp.setData("/a", "");
-    expect(received).toEqual([
-        {
-            "data": {
-                "a": "",
-                "b": ""
+            {
+                "data": 2600,
+                "jsonPtr": "/b"
             },
-            "jsonPtr": [
-                "/a",
-                "/b"
-            ]
-        }
-    ]);
+            {
+                "data": {
+                    "a": 2600,
+                    "b": 2600
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        received.length = 0; //clear received
+        //now we change data to empty string we expect callbacks to be called
+        await tp.setData("/a", "");
+        expect(received).toEqual([
+            {
+                "data": "",
+                "jsonPtr": "/a"
+            },
+            {
+                "data": "",
+                "jsonPtr": "/b"
+            },
+            {
+                "data": {
+                    "a": "",
+                    "b": ""
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+        //now we test the ability to receive callbacks even when the data has not changed
+        tp.options.receiveNoOpCallbacksOnRoot = true;
+        received.length = 0; //clear received
+        //now we set a to same value, but since we opted to receive NoOp callbacks, we expect the callback anyway
+        await tp.setData("/a", "");
+        expect(received).toEqual([
+            {
+                "data": {
+                    "a": "",
+                    "b": ""
+                },
+                "jsonPtr": [
+                    "/a",
+                    "/b"
+                ]
+            }
+        ]);
+    } finally {
+        tp.close();
+    }
+
 });
 
 test("test 2", async () => {
@@ -145,10 +149,15 @@ test("test 2", async () => {
         },
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": {"b": 100, "c": 100},
-    });
+
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": {"b": 100, "c": 100},
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 
@@ -164,17 +173,21 @@ test("test 3", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": undefined //because e.f is undefined because e is undefined in this expression. Only f and g are targetable form an expression inside e.
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": undefined //because e.f is undefined because e is undefined in this expression. Only f and g are targetable form an expression inside e.
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 4", async () => {
@@ -189,17 +202,21 @@ test("test 4", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": -1, //use of $path allows this
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": -1, //use of $path allows this
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 5", async () => {
@@ -215,18 +232,22 @@ test("test 5", async () => {
         }
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": 10,
-        "c": 100,
-        "d": 80,
-        "e": {
-            "f": -1,
-            "g": undefined, //<<--intentional
-            "h": -1
-        }
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": 10,
+            "c": 100,
+            "d": 80,
+            "e": {
+                "f": -1,
+                "g": undefined, //<<--intentional
+                "h": -1
+            }
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 6", async () => {
@@ -237,11 +258,15 @@ test("test 6", async () => {
         ]
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": [10]
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": [10]
+        });
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 7", async () => {
@@ -251,8 +276,12 @@ test("test 7", async () => {
         "${$$[1] + $[0]}"
     ];
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual([10, 10, 20]);
+    try {
+        await tp.initialize();
+        expect(o).toEqual([10, 10, 20]);
+    } finally {
+        tp.close();
+    }
 });
 
 test("test 8", async () => {
@@ -264,11 +293,16 @@ test("test 8", async () => {
         ]
     };
     const tp = new TemplateProcessor(o);
-    await tp.initialize();
-    expect(o).toEqual({
-        "a": 10,
-        "b": [10, 5]
-    });
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": 10,
+            "b": [10, 5]
+        });
+    } finally {
+        tp.close();
+    }
+
 });
 
 test("test 9", async () => {
@@ -2090,7 +2124,7 @@ test("functions are immutable and have no 'from'", async () => {
         "/joinResistance",
         "/subscribeParams/to"
     ]);
-    
+
     expect(await tp.getEvaluationPlan()).toEqual([
             "/joinResistance",
             "/subscribeParams/to",
@@ -2109,9 +2143,13 @@ test("don't re-evaluate intervals", async () => {
         "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"
     }
     const tp = new TemplateProcessor(template);
-    await tp.initialize();
-    const from = tp.from("/count");
-    expect(from).toEqual(["/count", "/stop"]);
+    try {
+        await tp.initialize();
+        const from = tp.from("/count");
+        expect(from).toEqual(["/count", "/stop"]);
+    } finally {
+        await tp.close();
+    }
 
 });
 
@@ -2147,67 +2185,369 @@ test("expected function call behavior", async () => {
     expect(answer).toBe('xxx');//jsonata will see '$$.someRootValue' because the reference is absolute
 });
 
+test("interval snapshot", async () => {
+
+    const snapshotObj = {
+        "template": {
+            "counter": "${ function(){( $set('/count', $$.count+1); $$.count)} }",
+            "count": 0,
+            "rapidCaller": "${ $setInterval(counter, 1000)}",
+            "stop": "${ count>=2?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        },
+        "options": {
+            "foo": {
+                "bar": "baz"
+            }
+        },
+        "output": {
+            "counter": "{function:}",
+            "count": 1,
+            "rapidCaller": "--interval/timeout--",
+            "stop": "not done"
+        },
+        "mvcc": [
+            {
+                "forkId": "ROOT",
+                "output": {
+                    "counter": "{function:}",
+                    "count": 1,
+                    "rapidCaller": "--interval/timeout--",
+                    "stop": "not done"
+                }
+            }
+        ],
+        "metaInfoByJsonPointer": {
+            "/": [
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "",
+                    "dependees__": [],
+                    "dependencies__": [],
+                    "absoluteDependencies__": [],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprTargetJsonPointer__": ""
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/count",
+                    "dependees__": [
+                        "/counter",
+                        "/stop"
+                    ],
+                    "dependencies__": [],
+                    "absoluteDependencies__": [],
+                    "treeHasExpressions__": false,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprTargetJsonPointer__": "",
+                    "data__": 1
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/counter",
+                    "dependees__": [
+                        "/rapidCaller"
+                    ],
+                    "dependencies__": [
+                        "/count",
+                        "/count"
+                    ],
+                    "absoluteDependencies__": [
+                        "/count"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " function(){( $set('/count', $$.count+1); $$.count)} ",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "isFunction__": true,
+                    "data__": "{function:}"
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/rapidCaller",
+                    "dependees__": [
+                        "/stop"
+                    ],
+                    "dependencies__": [
+                        "/counter"
+                    ],
+                    "absoluteDependencies__": [
+                        "/counter"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " $setInterval(counter, 1000)",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "--interval/timeout--"
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/stop",
+                    "dependees__": [],
+                    "dependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "absoluteDependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " count>=2?($clearInterval($$.rapidCaller);'done'):'not done' ",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "not done"
+                }
+            ]
+        },
+        "plans": [
+            {
+                "forkId": "ROOT",
+                "forkStack": [],
+                "sortedJsonPtrs": [
+                    "/count",
+                    "/stop"
+                ],
+                "op": "set",
+                "data": 1,
+                "lastCompletedStep": "/count"
+            }
+        ]
+    };
+    const snapshot = JSON.stringify(snapshotObj);
+    let latch;
+    let done;
+    const tp = new TemplateProcessor();
+    tp.logger.leve = 'debug';
+    latch = new Promise(resolve => done = resolve);
+    tp.setDataChangeCallback('/count', (data, ptr, removed) => {
+        if (data === 2) {
+            done()
+        }
+    });
+    try {
+        await tp.initializeFromExecutionStatusString(snapshot);
+        await latch;
+    } finally {
+        await tp.close();
+    }
+})
 
 
-test("snapshot", async () => {
+/**
+ * End to end snapshot/restore test
+ * - Run a simple template with a timeout (setInterval)
+ * - capture a snapshot after template is initialized
+ * - validate and restore from the snapshot
+ * - validate template processor converges to the expected result
+ *
+  */
+
+test("snapshot and restore", async () => {
     let template = {
         "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
         "count": 0,
-        "deferredCount": "${$defer('/count', 100)}",
-        "rapidCaller": "${ $setInterval(counter, 10)}",
+        "rapidCaller": "${ $setInterval(counter, 100)}",
         "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
     };
-    const tp = new TemplateProcessor(template);
+    const options = {"foo": {"bar": "baz"}};
+    const tp = new TemplateProcessor(template, {}, options);
     let done;
     let latch = new Promise(resolve => done = resolve);
-    let deferredCountNumChanges = 0;
-    tp.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
-        deferredCountNumChanges++;
-        if(deferredCountNumChanges === 2){ //will call once for initial value, then again on debounced/defer
+    let callNums = 0;
+    let snapshot;
+    tp.setDataChangeCallback('/count', async (data, jsonPtr)=>{
+        callNums++;
+        if(callNums === 2){ //will call once when count is set to 2
+            snapshot = await tp.snapshot();
+        }
+        if(callNums === 10){ //release latch
             done();
         }
     })
     await tp.initialize();
     await latch;
-    const snapshot = await tp.snapshot();
+
+    expect(tp.output.count).toBe(10);
+
     const snapshotObject = JSON.parse(snapshot);
     expect(snapshotObject).toStrictEqual({
-        "options":{},
-        "output": {
-            "count": 10,
-            "counter": "{function:}",
-            "deferredCount": 10,
-            "rapidCaller": "--interval/timeout--",
-            "stop": "done"
-        },
         "template": {
-            "count": 0,
             "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
-            "deferredCount": "${$defer('/count', 100)}",
-            "rapidCaller": "${ $setInterval(counter, 10)}",
+            "count": 0,
+            "rapidCaller": "${ $setInterval(counter, 100)}",
             "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
-        }
+        },
+        "output": {
+            "count": 2,
+            "counter": "{function:}",
+            "rapidCaller": "--interval/timeout--",
+            "stop": "not done"
+        },
+        "options": {
+            "foo": {
+                "bar": "baz"
+            }
+        },
+        "mvcc": [
+            {
+                "forkId": "ROOT",
+                "output": {
+                    "counter": "{function:}",
+                    "count": 2,
+                    "rapidCaller": "--interval/timeout--",
+                    "stop": "not done"
+                }
+            }
+        ],
+        "metaInfoByJsonPointer": {
+            "/": [
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "",
+                    "dependees__": [],
+                    "dependencies__": [],
+                    "absoluteDependencies__": [],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprTargetJsonPointer__": ""
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/count",
+                    "dependees__": [
+                        "/counter",
+                        "/stop"
+                    ],
+                    "dependencies__": [],
+                    "absoluteDependencies__": [],
+                    "treeHasExpressions__": false,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprTargetJsonPointer__": "",
+                    "data__": 2
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/counter",
+                    "dependees__": [
+                        "/rapidCaller"
+                    ],
+                    "dependencies__": [
+                        "/count",
+                        "/count"
+                    ],
+                    "absoluteDependencies__": [
+                        "/count"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " function(){($set('/count', $$.count+1); $$.count)} ",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "isFunction__": true,
+                    "data__": "{function:}"
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/rapidCaller",
+                    "dependees__": [
+                        "/stop"
+                    ],
+                    "dependencies__": [
+                        "/counter"
+                    ],
+                    "absoluteDependencies__": [
+                        "/counter"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " $setInterval(counter, 100)",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "--interval/timeout--"
+                },
+                {
+                    "materialized__": true,
+                    "jsonPointer__": "/stop",
+                    "dependees__": [],
+                    "dependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "absoluteDependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "treeHasExpressions__": true,
+                    "tags__": [],
+                    "parent__": "",
+                    "temp__": false,
+                    "exprRootPath__": null,
+                    "expr__": " count>=10?($clearInterval($$.rapidCaller);'done'):'not done' ",
+                    "exprTargetJsonPointer__": "",
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "not done"
+                }
+            ]
+        },
+        "plans": [
+            {
+                "forkId": "ROOT",
+                "forkStack": [],
+                "lastCompletedStep": "/count",
+                "sortedJsonPtrs": [
+                    "/count",
+                    "/stop"
+                ],
+                "op": "set",
+                "data": 2
+            }
+        ]
     });
+
+
+    // reset latch promise and callNums
     latch = new Promise(resolve => done = resolve);
-    deferredCountNumChanges = 0;
-    await TemplateProcessor.prepareSnapshotInPlace(snapshotObject);
-    const tp2 = TemplateProcessor.constructFromSnapshotObject(snapshotObject);
-    tp2.setDataChangeCallback('/deferredCount', (data, jsonPtr)=>{
-        deferredCountNumChanges++;
-        if(deferredCountNumChanges === 1){ //will only get called on final value, because when we rehydrate the output, the output already has the value 10, so the initial set of this value is ignored since value does not change
+    callNums = 0;
+    // await TemplateProcessor.prepareSnapshotInPlace(snapshotObject);
+    const tp2 = new TemplateProcessor();
+    tp2.setDataChangeCallback('/count', (data, jsonPtr)=>{
+        callNums++;
+        if(callNums === 8){ //TemplateProcessor restores from count=2 and should continue to count=10
             done();
         }
     })
-    await tp2.initializeFromSnapshotObject(snapshotObject);
-    expect(tp2.output.count).toBe(10);
-    expect(tp2.output.deferredCount).toBe(10);
-
-    for(let i=11;i<=20;i++){
-        await tp2.setData("/count", i)
-    }
+    await tp2.initializeFromExecutionStatusString(snapshot);
     await latch;
-    expect(tp2.output.count).toBe(20);
-    expect(tp2.output.deferredCount).toBe(20);
+
+    // TemplateProcessor restored from snapshot should arrive to the same state as the original
+    expect(tp2.output.count).toBe(10);
 });
 
 
@@ -2304,6 +2644,10 @@ test("dataChangeCallback on delete op", async () => {
     expect(tp.output.foo).toBeUndefined();
 })
 
+/**
+ * validates that a template restored from a snapshot contains injected fields, and that
+ * fields with functions are callable.
+ */
 test("snapshot contains injected fields", async () => {
     const tp = new TemplateProcessor({
         "a": "${function(){'yo'}}",
@@ -2313,87 +2657,12 @@ test("snapshot contains injected fields", async () => {
     await tp.setData("/f","XXX");
     await tp.setData("/b/c/g","YYY");
     const snapshotStr = await tp.snapshot();
-    const tpRestored = await TemplateProcessor.fromSnapshotString(snapshotStr);
+    const tpRestored = await TemplateProcessor.fromExecutionStatusString(snapshotStr);
     expect(await tpRestored.output.a()).toBe('yo');
     expect(tpRestored.output.b.c.d).toBe('hello');
     expect(tpRestored.output.b.e).toBe(42);
     expect(tpRestored.output.f).toBe("XXX");
     expect(tpRestored.output.b.c.g).toBe('YYY');
-})
-
-test("dataChangeCallback on delete op from Snapshot", async () => {
-    const snapshot = {
-        "template": {
-            "step": {
-                "name": "step0"
-            }
-        },
-        "output": {
-            "some": "thing",
-            "step": {
-                "name": "step0",
-                "log": {
-                    "han": {
-                        "start": {
-                            "timestamp": 1709228824377,
-                            "args": "han"
-                        },
-                        "end": {
-                            "timestamp": 1709228825880,
-                            "out": {
-                                "name": "Han Solo",
-                                "height": "180",
-                                "mass": "80",
-                                "hair_color": "brown",
-                                "skin_color": "fair",
-                                "eye_color": "brown",
-                                "birth_year": "29BBY",
-                                "gender": "male",
-                                "homeworld": "https://swapi.tech/api/planets/22/",
-                                "films": [
-                                    "https://swapi.tech/api/films/1/",
-                                    "https://swapi.tech/api/films/2/",
-                                    "https://swapi.tech/api/films/3/"
-                                ],
-                                "species": [],
-                                "vehicles": [],
-                                "starships": [
-                                    "https://swapi.tech/api/starships/10/",
-                                    "https://swapi.tech/api/starships/22/"
-                                ],
-                                "created": "2014-12-10T16:49:14.582000Z",
-                                "edited": "2014-12-20T21:17:50.334000Z",
-                                "url": "https://swapi.tech/api/people/14/"
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        "options": {
-        }
-    }
-    await TemplateProcessor.prepareSnapshotInPlace(snapshot);
-    const tp = TemplateProcessor.constructFromSnapshotObject(snapshot);
-    let done;
-    let latch = new Promise(resolve => done = resolve);
-    tp.setDataChangeCallback('/step/log/han', (data, jsonPtr, removed)=>{
-        if (removed){
-            done();
-        }
-    });
-    try {
-        await tp.initializeFromSnapshotObject(snapshot);
-        await tp.setData("/step/log/han", undefined, "delete");
-        await latch;
-    } catch (error) {
-        console.log(error);
-        jest.fail(error);
-    }
-    expect(tp.output).toStrictEqual({ some: 'thing', step: { name: 'step0', log: {} } });
-    //try to delete the log a second time, just to make sure no double-delete problems
-    await tp.setData("/step/log/han", undefined, "delete");
-
 })
 
 test("forked1", async () => {
@@ -2572,7 +2841,6 @@ test("performance test with 100 data injections", async () => {
 
 test("test that circular reference does not blow up", async () => {
 
-
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const yamlFilePath = path.join(__dirname, '..','..','example','experimental', 'product_workflow.sw.yaml');
@@ -2585,4 +2853,214 @@ test("test that circular reference does not blow up", async () => {
     expect(tp.output.states[2].data.cartMetricType).toBe("foosolution:cart.products.total")
 });
 
+/**
+ * This test restores from execution status snapshot template started from homeworlds-forked.yaml. It expects that the
+ * plans in snapshot will be restored and template converges to the desired result.
+ */
+test("forked homeworlds snapshots", async () => {
 
+    const __filename = fileURLToPath(import.meta.url);
+    const __dirname = dirname(__filename);
+    const filePath = path.join(__dirname, '..', '..', 'example', 'executionStatus.json');
+    let executionStatusStr = fs.readFileSync(filePath, 'utf8');
+
+    let savedState; // save state of the template processor
+    let saveCalls = 0; // number of calls
+
+    let latchSave;
+    const savePromise = new Promise(resolve => {
+        latchSave = resolve
+    });
+    const tp = new TemplateProcessor({},
+        // sets some functions needed for test validation
+        {
+            save: (o) => {
+                saveCalls++;
+                savedState = tp.executionStatus.toJsonObject();
+                // we validate that all 5 forks and one root plan are executed to the save function
+                if (saveCalls === 6 && savedState.mvcc.length === 6) {
+                    latchSave();
+                }
+                return o;
+            },
+            snapshot: async (o) => {
+                return o;
+            }
+        });
+    let latchHomeworlds;
+    const homeworldsPromise = new Promise(resolve => {
+        latchHomeworlds = resolve
+    });
+
+    tp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+        if (homeworlds.length === 5) {
+            latchHomeworlds();
+        }
+    });
+    try {
+        await tp.initializeFromExecutionStatusString(executionStatusStr);
+        await savePromise;
+        const executionStatus = tp.executionStatus.toJsonObject();
+        const expectedExecutionStatus = JSON.parse(executionStatusStr);
+
+        for (let i = 0; i < 6; i++) {
+            expect(executionStatus.mvcc.includes(expectedExecutionStatus.mvcc[i]));
+            // expect(executionStatus.plans[i]).toStrictEqual(expectedExecutionStatus.plans[i]);
+
+        }
+        // expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
+
+        tp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+            if (homeworlds.length === 5) {
+                latchHomeworlds();
+            }
+        })
+
+        await homeworldsPromise;
+        const expectedHomeworlds = [
+            "Corellia",
+            "Tatooine",
+            "Alderaan",
+            "Socorro",
+            "Kashyyyk"
+        ];
+        const homeworlds = tp.output.homeworlds;
+        // Ensure the array contains all the expected elements (we cannot expec them to be in a particular order
+        //due to the async nature of $forked
+        // const expectedHomeworlds = {};
+        expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
+        //
+        // // Ensure the array does not contain any elements not expected
+        expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
+        //
+        // // Ensure the array is exactly the same length as the expected array
+        expect(homeworlds).toHaveLength(expectedHomeworlds.length);
+        if (savedState.mvcc.length !== 6) {
+            throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
+        }
+        expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
+        expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
+    } finally {
+        tp.close();
+    }
+},30000);
+
+
+/**
+ * This test should start this a template processor from a homeworlds template running 5 plans in parallel. It runs it
+ * 10 times in a row, triggering a random snapshot with a 0 to 2000ms delay.
+ *
+ * If a snapshot hasn't converged yet, the test will set a callback to await for all parallel plans to be completed.
+ *
+ * In the end it validates the expected template output.
+ **/
+test("repetitive snapshots stopped in random execution time", async () => {
+    const templateString = `
+    data: \${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}
+    name: null
+    personDetails: \${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}
+    homeworldURL: \${ personDetails!=null?personDetails.properties.homeworld:null }
+    homeworldDetails: \${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}
+    homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
+    homeworlds: []`;
+
+    const runTest = async () => {
+        let savedState;
+        const tp = TemplateProcessor.fromString(templateString, {
+            save: (o) => {
+                savedState = tp.executionStatus.toJsonObject();
+                return o;
+            }
+        });
+
+        // Random delay between 100ms and 2000ms
+        const randomDelay = Math.floor(Math.random() * 1900) + 100;
+
+        const snapshotPromise = new Promise(resolve => {
+            setTimeout(async () => {
+                const snapshot = await tp.snapshot();
+                resolve(snapshot);
+            }, randomDelay);
+        });
+
+        const initializePromise = tp.initialize();
+
+        const [snapshot] = await Promise.all([snapshotPromise, initializePromise]);
+
+        return { snapshot, savedState };
+    };
+
+    for (let i = 0; i < 10; i++) {
+        const {snapshot, savedState} = await runTest();
+        const snapshotObject = JSON.parse(snapshot);
+
+        expect(snapshotObject).toHaveProperty('output');
+        expect(snapshotObject.output).toHaveProperty('homeworlds');
+        expect(Array.isArray(snapshotObject.output.homeworlds)).toBe(true);
+        expect(snapshotObject.output.homeworlds.length).toBeLessThanOrEqual(5);
+
+        expect(snapshotObject.output.personDetails).toBe(null);
+        expect(snapshotObject.output.homeworldURL).toBe(null);
+        expect(snapshotObject.output.homeworldDetails).toBe(null);
+        expect(snapshotObject.output.homeworldName).toBe(null);
+
+        // Restore from snapshot
+        const restoredTp = new TemplateProcessor();
+        await restoredTp.initializeFromExecutionStatusString(snapshot);
+
+        // Wait for restored template to complete
+        if (snapshotObject.output.homeworlds.length === 5) {
+            console.log("template finished before we could capture the snapshot, not awaiting for /homeworlds to converge");
+        } else {
+            // if we got less than 5 homeworlds
+            const timeoutPromise = new Promise((_, reject) => {
+                setTimeout(() => {
+                    reject(new Error('Timed out after 10 seconds'));
+                }, 10000);
+            });
+
+            const convergencePromise = new Promise(resolve => {
+                restoredTp.setDataChangeCallback('/homeworlds', (homeworlds) => {
+                    if (homeworlds.length === 5) {
+                        resolve();
+                    }
+                });
+            });
+
+            try {
+                await Promise.race([timeoutPromise, convergencePromise]);
+            } catch (error) {
+                if (error.message === 'Timed out after 10 seconds') {
+                    console.log(StatedREPL.stringify(JSON.parse(await restoredTp.snapshot())));
+                    console.log('Test run timed out, see snapshot of TraceProcessor above...');
+                    throw error;
+                } else {
+                    throw error;
+                }
+            }
+        }
+
+        const expectedHomeworlds = [
+            "Corellia",
+            "Tatooine",
+            "Alderaan",
+            "Socorro",
+            "Kashyyyk"
+        ];
+        const homeworlds = restoredTp.output.homeworlds;
+
+        // Validate results
+        expect(expectedHomeworlds.every(element => homeworlds.includes(element))).toBe(true);
+        expect(homeworlds.every(element => expectedHomeworlds.includes(element))).toBe(true);
+        expect(homeworlds).toHaveLength(expectedHomeworlds.length);
+
+        // Validate MVCC and plans
+        expect(savedState.mvcc.length).toBeGreaterThan(0);
+        expect(savedState.mvcc.length).toBeLessThanOrEqual(6);
+        expect(savedState.plans.length).toBeGreaterThan(0);
+        // root plan + 5 forks max
+        expect(savedState.plans.length).toBeLessThanOrEqual(6);
+
+        console.log(`Iteration ${i + 1} completed successfully`);
+    }
+}, 30000);
