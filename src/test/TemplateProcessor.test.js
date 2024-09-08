@@ -3064,3 +3064,25 @@ test("repetitive snapshots stopped in random execution time", async () => {
         console.log(`Iteration ${i + 1} completed successfully`);
     }
 }, 30000);
+
+test("test env", async () => {
+    process.env.MY_TEST_VAR = "test_value";
+    const o = {
+        "a":"${$env('MY_TEST_VAR')}",
+        "b":"${$env('MY_TEST_VAR', 'some default that should be ignored')}",
+        "c":"${$env('MY_UNDEFINED_VAR', 'default that should be seen')}",
+        "d":"${$env('MY_UNDEFINED_VAR')}",
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        expect(o).toMatchObject({
+            "a": "test_value",
+            "b": "test_value",
+            "c": "default that should be seen",
+            "d": {"error": {"message": "Environment variable \"MY_UNDEFINED_VAR\" is not defined and no default was provided"}}
+        });
+    } finally {
+        tp.close();
+    }
+});

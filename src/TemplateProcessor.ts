@@ -29,6 +29,7 @@ import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
+import {env} from "./utils/env.js"
 import * as jsonata from "jsonata";
 import StatedREPL from "./StatedREPL.js";
 
@@ -224,7 +225,8 @@ export default class TemplateProcessor {
         console,
         debounce,
         Date,
-        rateLimit
+        rateLimit,
+        env
     }
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
