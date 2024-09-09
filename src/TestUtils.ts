@@ -26,8 +26,8 @@ export type CommandAndResponse = {
   jsonataExpr: string;
 };
 
-export function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, printFunction:(k:any, v:any)=>any = stringifyTemplateJSON){
-  runMarkdownTests(parseMarkdownTests(md, cliCore), cliCore, printFunction);
+export async function parseMarkdownAndTestCodeblocks(md:string, cliCore:CliCore, printFunction:(k:any, v:any)=>any = stringifyTemplateJSON){
+  await runMarkdownTests(parseMarkdownTests(md, cliCore), cliCore, printFunction);
 }
 
 /**
@@ -91,7 +91,7 @@ export function parseMarkdownTests(markdownPath:string, cliInstance:CliCore):Com
  * @param {object} cliCore An instance of the CLI class that has the methods to be tested.
  * @param {function} printFunction The function is used to print response output to compare with expected response.
  */
-function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = stringifyTemplateJSON) {
+async function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, printFunction = stringifyTemplateJSON):Promise<void> {
   try {
     afterAll(async () => {
       if (cliCore) {
@@ -132,6 +132,6 @@ function runMarkdownTests(testData: CommandAndResponse[], cliCore:CliCore, print
       }, 100000); // set timeout to 100 seconds for each test
     });
   }finally {
-    cliCore.close();
+    await cliCore.close();
   }
 }

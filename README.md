@@ -1725,9 +1725,67 @@ All JSONata functions are available in Stated.
 ## Stated functions
 Stated provides many functions not provided out of the box by JSONata. 
 
-### $timeout
+### $env
+`$env` is a function used to read environment variables for Stated templates running in node.js. A default value can 
+be specified. If there is no default provided and no such variable exists in node `process.env` an error is returned.
+```json
+> .init -f example/ex24.json
+{
+  "myVar": "${ $env('MY_VAR', 'default value') }"
+}
+> .out
+{
+  "myVar": "default value"
+}
 
-### $interval
+```
+
+### $setTimeout
+`$setTimeout` is the JavaScript `setTimeout` function. It receives a function and an timeout
+expressed as milliseconds. The function is called after the timeout. Example `ex15.json` demonstrates an 
+intersting use of `$setTimout`. The `counter` variable is updates, which causes `upCount$` to re-evaluate due to
+its reactive dependency on `counter`. In this way, each time `counter` changes, it schedules its next change 1 second
+in the future.:
+```json
+{
+  "counter": 0,
+  "upCount$": "counter<10 ? ($setTimeout(function(){$set('/counter', counter+1)}, 1000);'counting'):'done'"
+}
+```
+
+```json ["data.counter=3"]
+> .init -f example/ex15.json --tail "/ until counter=3"
+Started tailing... Press Ctrl+C to stop.
+{
+  "counter": 3,
+  "upCount$": "counting"
+}
+>
+```
+
+### $setInterval
+`$setInterval` is the JavaScript `setInterval` function. It receives a function and an interval
+expressed as milliseconds. The function is called every inteval. Example `ex14.json` shows how reaction
+to `counter` changing is used to clear the interval when count exceeds 10.:
+```json
+{
+  "incr": "${function(){$set('/counter',counter+1)}}",
+  "counter": 0,
+  "upCount": "${  $setInterval(incr, 1000)  }",
+  "status": "${(counter>10?($clearInterval(upCount);'done'):'counting')}"
+}
+```
+```json ["data.counter=3"]
+> .init -f example/ex14.json --tail "/ until counter=3"
+Started tailing... Press Ctrl+C to stop.
+{
+  "incr": "{function:}",
+  "counter": 3,
+  "upCount": "--interval/timeout--",
+  "status": "counting"
+}
+
+```
 
 ### $fetch
 JSONata provides the standard JS fetch function. You can use it exactly as you would in JS, except that

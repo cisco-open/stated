@@ -28,18 +28,16 @@ class TimerManager {
     private intervals: Set<Interval>;
     private tp: TemplateProcessor;
     private jsonPointerByInterval: Map<Interval, string>;
-    private wrappedIntervals: Set<wrappedInterval>;
 
     constructor(tp:TemplateProcessor) {
         this.timeouts = new Set<Timeout>();
         this.intervals = new Set<Interval>();
-        this.wrappedIntervals = new Set<wrappedInterval>();
         this.jsonPointerByInterval = new Map<Interval, string>();
         this.tp = tp;
     }
 
     // Wraps setTimeout to track the timeout
-    setTimeout(callback: (...args: any[]) => void, delay: number, ...args: any[]): Timeout {
+    public setTimeout = (callback: (...args: any[]) => void, delay: number, ...args: any[]): Timeout => {
         const timeout: Timeout = setTimeout(() => {
             callback(...args);
             this.timeouts.delete(timeout); // Remove the timeout from the set after it's called
@@ -48,49 +46,49 @@ class TimerManager {
         return timeout;
     }
 
-    generateSetInterval(planStep:PlanStep) {
+    public generateSetInterval(planStep:PlanStep) {
         return (callback: (...args: any[]) => void, delay: number, ...args: any[]): Interval => {
             // TODO: wrap the callback to track last run time, run counter, and other stats
             const interval: Interval = setInterval(callback, delay, ...args);
             this.intervals.add(interval);
             this.jsonPointerByInterval.set(interval, planStep.jsonPtr);
-            this.wrappedIntervals.add({interval: interval, jsonPointerStr: planStep.jsonPtr});
             return interval;
         }
     }
 
-    generateClearInterval(planStep:PlanStep) {
+    public generateClearInterval(planStep:PlanStep) {
         return async (interval: Interval): Promise<void> => {
-            clearInterval(interval);
-            const jsonPointerStr: string | undefined = this.jsonPointerByInterval.get(interval);
+            this.clearInterval(interval);
+            const jsonPointerStr: string = this.jsonPointerByInterval.get(interval) as string;
             if (jsonPointerStr != undefined) {
                 await this.tp.setData(jsonPointerStr, "--cleared-interval", "forceSetInternal");
             }
-            this.intervals.delete(interval);
+            this.jsonPointerByInterval.delete(interval);
+
         }
     }
 
     // Wraps setInterval to track the interval
-    setInterval(callback: (...args: any[]) => void, delay: number, ...args: any[]): Interval {
+    setInterval = (callback: (...args: any[]) => void, delay: number, ...args: any[]): Interval => {
         const interval: Interval = setInterval(callback, delay, ...args);
         this.intervals.add(interval);
         return interval;
     }
 
     // Clears a specific timeout
-    clearTimeout(timeout: Timeout): void {
+    public clearTimeout = (timeout: Timeout): void => {
         clearTimeout(timeout);
         this.timeouts.delete(timeout);
     }
 
     // Clears a specific interval
-    clearInterval(interval: Interval): void {
+    public clearInterval = (interval: Interval): void => {
         clearInterval(interval);
         this.intervals.delete(interval);
     }
 
     // Clears all timeouts
-    clearAllTimeouts(): void {
+    private clearAllTimeouts(): void {
         for (const timeout of this.timeouts) {
             clearTimeout(timeout);
         }
@@ -98,15 +96,16 @@ class TimerManager {
     }
 
     // Clears all intervals
-    clearAllIntervals(): void {
+    private clearAllIntervals(): void {
         for (const interval of this.intervals) {
             clearInterval(interval);
         }
         this.intervals.clear();
+        this.jsonPointerByInterval.clear();
     }
 
     // Clears all timeouts and intervals
-    clearAll(): void {
+    public clearAll(): void {
         this.clearAllTimeouts();
         this.clearAllIntervals();
     }

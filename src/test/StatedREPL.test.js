@@ -56,8 +56,8 @@ test("test onInit", async () => {
     await repl2.cliCore.init('-f "example/ex01.yaml"');
     expect(beenCalled2).toBe(true);
   }finally {
-    repl1.close();
-    repl2.close();
+    await repl1.close();
+    await repl2.close();
   }
 });
 
@@ -106,6 +106,6 @@ test("Extend CliCore with restore command", async () => {
     expect(repl.cliCore.templateProcessor.output.count).toBe(10);
   } finally {
     process.argv = originalCmdLineArgsStr;
-    if (repl !== undefined) repl.close();
+    if (repl !== undefined) await repl.close();
   }
 });

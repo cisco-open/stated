@@ -111,7 +111,7 @@ test("tail", async () => {
     "__tailed": true,
     "data": 5
   });
-  cliCore.close();
+  await cliCore.close();
 });
 
 test("xf", async () => {
@@ -121,7 +121,7 @@ test("xf", async () => {
     "name": "Dr. Stephen Falken",
     "address": "Goose Island, OR, USA"
   });
-  cliCore.close();
+  await cliCore.close();
 });
 
 test("import JS", async () => {
@@ -131,7 +131,7 @@ test("import JS", async () => {
     "messageFromInitFunction": "__init sidecar succeeded",
     "res": "bar: foo"
   });
-  cliCore.close();
+  await cliCore.close();
 });
 
 test("import and run __init function", async () => {
@@ -159,7 +159,7 @@ test("import and run __init function", async () => {
   try {
     await promise;
   }finally {
-    cliCore.close();
+    await cliCore.close();
    clearInterval(x);
   }
 });
