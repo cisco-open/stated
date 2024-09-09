@@ -29,6 +29,7 @@ import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
+import {env} from "./utils/env.js"
 import * as jsonata from "jsonata";
 import StatedREPL from "./StatedREPL.js";
 
@@ -212,19 +213,23 @@ export default class TemplateProcessor {
      * @static
      * @type {{
      *   fetch: typeof fetch,
-     *   setInterval: typeof setInterval,
      *   clearInterval: typeof clearInterval,
      *   setTimeout: typeof setTimeout,
-     *   console: Console
+     *   setInterval: typeof setInterval,
+     *   console: Console,
+     *   debounce: typeof debounce
+     *   Date: Date
+     *   rateLimit: typeof rateLimit
+     *   env: typeof env
      * }}
      */
     static DEFAULT_FUNCTIONS = {
         fetch:saferFetch,
-        setTimeout,
         console,
         debounce,
         Date,
-        rateLimit
+        rateLimit,
+        env
     }
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
@@ -308,7 +313,7 @@ export default class TemplateProcessor {
 
     public executionStatus: ExecutionStatus;
 
-
+    private isClosed = false;
 
 
 
@@ -358,6 +363,7 @@ export default class TemplateProcessor {
 
     // resetting template means that we are resetting all data holders and set up new template
     private resetTemplate(template:object) {
+        this.executionQueue.length = 0; //empty the execution queue - it can contain lingering plans that mustn't infect this template
         this.input = JSON.parse(JSON.stringify(template));
         this.output = template; //initial output is input template
         this.templateMeta = JSON.parse(JSON.stringify(template));// Copy the given template to `initialize the templateMeta
@@ -373,24 +379,29 @@ export default class TemplateProcessor {
             TemplateProcessor.DEFAULT_FUNCTIONS,
             {"save": (output:object)=>{ //default implementation of save just logs the execution status
                     if (this.isEnabled("debug")){
-                        console.debug(this.executionStatus.toJsonString());
+                        this.logger.debug(this.executionStatus.toJsonString());
                     }
                     return output;
             }}, //note that save is before context, by design, so context can override save as needed
             context,
             {"set": this.setData},
-            {"sleep": new Sleep(this.timerManager).sleep}
+            {"sleep": new Sleep(this.timerManager).sleep},
+            {"setTimeout": this.timerManager.setTimeout},
+            {"clearTimeout": this.timerManager.clearTimeout},
+
         );
         const safe = this.withErrorHandling.bind(this);
         for (const key in this.context) {
             if (typeof this.context[key] === 'function') {
+                /*
                 if (key === "setTimeout" || key === "setInterval") {
                     //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
-                    // this.context[key] = this.timerManager[key].bind(this.timerManager);
+                    this.context[key] = this.timerManager[key].bind(this.timerManager);
                     //TODO: remove it after migrating to generated function
-                } else {
+                    //TODO: ^^^^ sergey please explain this comment
+                } else { */
                     this.context[key] = safe(this.context[key]);
-                }
+                //}
             }
         }
     }
@@ -435,7 +446,7 @@ export default class TemplateProcessor {
         }
 
         if (jsonPtr === "/" && this.isInitializing) {
-            console.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
+            this.logger.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
         }
 
@@ -470,7 +481,7 @@ export default class TemplateProcessor {
             }else{
                 compilationTarget = importedSubtemplate; //the case where we already initialized once, and now we are initializing an imported sub-template
             }
-            // Recretaing the meta info if execution status is not provided
+            // Recreating the meta info if execution status is not provided
             if (executionStatusSnapshot === undefined) {
                 const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
                 this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
@@ -479,8 +490,10 @@ export default class TemplateProcessor {
                 this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
                 this.propagateTags(metaInfos);
                 this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
+                this.isClosed = false; //open the execution queue for processing
                 await this.evaluateInitialPlan(jsonPtr);
             } else {
+                this.isClosed = false;
                 await this.executionStatus.restore(this);
             }
             await this.postInitialize();
@@ -492,7 +505,10 @@ export default class TemplateProcessor {
         }
     }
 
-    close():void{
+    async close():Promise<void>{
+        this.isClosed = true;
+        this.executionQueue.length = 0; //nuke execution queue
+        await this.drainExecutionQueue();
         this.timerManager.clearAll();
         this.changeCallbacks.clear();
         this.executionStatus.clear();
@@ -1086,6 +1102,9 @@ export default class TemplateProcessor {
      * @returns {Promise<<JsonPointerString[]>} A promise with the list of json pointers touched by the plan
      */
     async setData(jsonPtr:JsonPointerString, data:any=null, op:Op="set"):Promise<JsonPointerString[]> {
+        if(this.isClosed){
+            throw new Error("Attempt to setData on a closed TemplateProcessor.")
+        }
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
@@ -1114,6 +1133,9 @@ export default class TemplateProcessor {
      * @param planStep
      */
     public async setDataForked(planStep:PlanStep):Promise<JsonPointerString[]>{
+        if(this.isClosed){
+            throw new Error("Attempt to setData on a closed TemplateProcessor.")
+        }
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
@@ -1123,7 +1145,7 @@ export default class TemplateProcessor {
     }
 
     private async drainExecutionQueue(){
-        while (this.executionQueue.length > 0) {
+        while (this.executionQueue.length > 0 && !this.isClosed) {
             try {
                 const plan: Plan | SnapshotPlan = this.executionQueue[0];
                 if (plan.op === "snapshot") {
@@ -1167,7 +1189,7 @@ export default class TemplateProcessor {
                 output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
             }
         } catch (e) {
-            console.error(`failed to initialize restore plan, error=${e}`);
+            this.logger.error(`failed to initialize restore plan, error=${e}`);
             throw e;
         }
     }

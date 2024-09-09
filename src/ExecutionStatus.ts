@@ -29,7 +29,7 @@ export class ExecutionStatus {
         return stringifyTemplateJSON(this.toJsonObject());
     }
 
-    public toJsonObject():object{
+    public getForkMap():Map<string,Fork>{
         const outputsByForkId = new  Map<string, Fork>();
         Array.from(this.statuses).forEach((mutationPlan:Plan)=>{
             const {forkId, output, forkStack}= mutationPlan;
@@ -39,11 +39,16 @@ export class ExecutionStatus {
             });
 
         });
+        return outputsByForkId;
+    }
+
+    public toJsonObject():object{
+
         const snapshot = {
             template: this.tp.input,
             output: this.tp.output,
             options: this.tp.options,
-            mvcc:Array.from(outputsByForkId.values()),
+            mvcc:Array.from(this.getForkMap().values()),
             metaInfoByJsonPointer: this.metaInfosToJSON(this.metaInfoByJsonPointer),
             plans: Array.from(this.statuses).map(this.mutationPlanToJSON)
         };
@@ -121,8 +126,14 @@ export class ExecutionStatus {
         for (const mutationPlan of this.statuses) {
             // we initialize all functions/timeouts for each plan
             await tp.createRestorePlan(mutationPlan);
-            tp.executePlan(mutationPlan); // restart the restored plan asynchronously
-        };
+            //we don't await here. In fact, it is critical NOT to await here because the presence of multiple mutationPlan
+            //means that there was concurrent ($forked) execution and we don't want to serialize what was intended to
+            //run concurrently
+            tp.executePlan(mutationPlan).catch(error => {
+                console.error(`Error executing plan for mutation: ${this.mutationPlanToJSON(mutationPlan)}`, error);
+            }); // restart the restored plan asynchronously
+
+        }
     }
 
     /**

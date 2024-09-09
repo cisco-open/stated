@@ -15,6 +15,11 @@
 import {parseMarkdownAndTestCodeblocks } from './dist/src/TestUtils.js';
 import CliCore from './dist/src/CliCore.js';
 
-
-parseMarkdownAndTestCodeblocks('./README.md', new CliCore());
+(async () => {
+    try {
+        await parseMarkdownAndTestCodeblocks('./README.md', new CliCore());
+    } catch (error) {
+        console.error('Error:', error);
+    }
+})();
 

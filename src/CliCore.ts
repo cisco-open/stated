@@ -44,9 +44,9 @@ export default class CliCore {
         this.currentDirectory = process.cwd();
         this.onInit = ()=>{};
     }
-    public close(){
+    public async close(){
         if(this.templateProcessor){
-            this.templateProcessor.close();
+            await this.templateProcessor.close();
         }
         if(this.server){
             this.server.close();
@@ -421,7 +421,7 @@ export default class CliCore {
                 countDown--;
             }
 
-            if(countDown === 0 || await compiledExpr.evaluate(data)===true){
+            if(countDown === 0 || await compiledExpr.evaluate(data)===true){ //check if the expression in the 'until' argument (the stop tailing condition) has evaluated to true
                 done = true;
                 unplug();
                 resolve(); //resolve the latch promise

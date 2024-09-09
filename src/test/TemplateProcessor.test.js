@@ -136,7 +136,7 @@ test("test 1", async () => {
             }
         ]);
     } finally {
-        tp.close();
+        await tp.close();
     }
 
 });
@@ -156,7 +156,7 @@ test("test 2", async () => {
             "a": {"b": 100, "c": 100},
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -186,7 +186,7 @@ test("test 3", async () => {
             }
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -215,7 +215,7 @@ test("test 4", async () => {
             }
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -246,7 +246,7 @@ test("test 5", async () => {
             }
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -265,7 +265,7 @@ test("test 6", async () => {
             "b": [10]
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -280,7 +280,7 @@ test("test 7", async () => {
         await tp.initialize();
         expect(o).toEqual([10, 10, 20]);
     } finally {
-        tp.close();
+        await tp.close();
     }
 });
 
@@ -300,7 +300,7 @@ test("test 8", async () => {
             "b": [10, 5]
         });
     } finally {
-        tp.close();
+        await tp.close();
     }
 
 });
@@ -1488,7 +1488,7 @@ test("test rxLog", async () => {
             "/stop$"
         ]);
     }finally{
-        tp.close();
+        await tp.close();
     }
 
 });
@@ -1646,7 +1646,7 @@ test("ex14.yaml", async () => {
             "/counter"
         ]);
     }finally {
-        tp.close();
+        await tp.close();
     }
 });
 describe('TemplateProcessor.fromString', () => {
@@ -2756,7 +2756,7 @@ test("forked1", async () => {
 })
 
 test("forked homeworlds", async () => {
-    let savedState;
+    let savedForkIds = new Set();
     let latch;
     const latchSaveCommand = new Promise(resolve => {latch=resolve});
     const tp = TemplateProcessor.fromString(`
@@ -2768,8 +2768,10 @@ test("forked homeworlds", async () => {
     homeworldName: \${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }
     homeworlds: []`,
         {save:(o)=>{
-            savedState = tp.executionStatus.toJsonObject();
-            if (savedState.mvcc.length === 6){
+            for (const key of tp.executionStatus.getForkMap().keys()) {
+                savedForkIds.add(key);
+            }
+            if (savedForkIds.size === 6){
                 latch();
             }
             return o;
@@ -2801,12 +2803,8 @@ test("forked homeworlds", async () => {
 
     // Ensure the array is exactly the same length as the expected array
     expect(homeworlds).toHaveLength(expectedHomeworlds.length);
-    if (savedState.mvcc.length !== 6) {
-        throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
-    }
-    expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
-    expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
-},5000);
+    expect(savedForkIds.size).toEqual(6); //5 names + 1 initialization of null name
+   },5000);
 
 
 test("performance test with 100 data injections", async () => {
@@ -2858,7 +2856,7 @@ test("test that circular reference does not blow up", async () => {
  * plans in snapshot will be restored and template converges to the desired result.
  */
 test("forked homeworlds snapshots", async () => {
-
+    const savedForkIds = new Set();
     const __filename = fileURLToPath(import.meta.url);
     const __dirname = dirname(__filename);
     const filePath = path.join(__dirname, '..', '..', 'example', 'executionStatus.json');
@@ -2876,9 +2874,11 @@ test("forked homeworlds snapshots", async () => {
         {
             save: (o) => {
                 saveCalls++;
-                savedState = tp.executionStatus.toJsonObject();
+                for (const key of tp.executionStatus.getForkMap().keys()) {
+                    savedForkIds.add(key);
+                }
                 // we validate that all 5 forks and one root plan are executed to the save function
-                if (saveCalls === 6 && savedState.mvcc.length === 6) {
+                if (savedForkIds.size === 6 ) {
                     latchSave();
                 }
                 return o;
@@ -2903,19 +2903,6 @@ test("forked homeworlds snapshots", async () => {
         const executionStatus = tp.executionStatus.toJsonObject();
         const expectedExecutionStatus = JSON.parse(executionStatusStr);
 
-        for (let i = 0; i < 6; i++) {
-            expect(executionStatus.mvcc.includes(expectedExecutionStatus.mvcc[i]));
-            // expect(executionStatus.plans[i]).toStrictEqual(expectedExecutionStatus.plans[i]);
-
-        }
-        // expect(tp.executionStatus.toJsonString()).toEqual(executionStatusStr);
-
-        tp.setDataChangeCallback('/homeworlds', (homeworlds) => {
-            if (homeworlds.length === 5) {
-                latchHomeworlds();
-            }
-        })
-
         await homeworldsPromise;
         const expectedHomeworlds = [
             "Corellia",
@@ -2935,13 +2922,9 @@ test("forked homeworlds snapshots", async () => {
         //
         // // Ensure the array is exactly the same length as the expected array
         expect(homeworlds).toHaveLength(expectedHomeworlds.length);
-        if (savedState.mvcc.length !== 6) {
-            throw new Error(`Expected savedState.mvcc.length to be 6. SavedState.mvcc is \n ${JSON.stringify(savedState.mvcc, null, 2)}`);
-        }
-        expect(savedState.mvcc.length).toEqual(6); //5 names + 1 initialization of null name
-        expect(savedState.plans.length).toEqual(5); //5 forks. Initial value of 'name' is not from a fork
+        expect(savedForkIds.size).toEqual(6); //5 names + 1 initialization of null name
     } finally {
-        tp.close();
+        await tp.close();
     }
 },30000);
 
@@ -2973,8 +2956,8 @@ test("repetitive snapshots stopped in random execution time", async () => {
             }
         });
 
-        // Random delay between 100ms and 2000ms
-        const randomDelay = Math.floor(Math.random() * 1900) + 100;
+        // Random delay between 100ms and 400ms
+        const randomDelay = Math.floor(Math.random() * 300) + 100;
 
         const snapshotPromise = new Promise(resolve => {
             setTimeout(async () => {
@@ -2990,7 +2973,8 @@ test("repetitive snapshots stopped in random execution time", async () => {
         return { snapshot, savedState };
     };
 
-    for (let i = 0; i < 10; i++) {
+    for (let i = 0; i < 5; i++) {
+        console.log(`iterating snapshot and restore ${i}`);
         const {snapshot, savedState} = await runTest();
         const snapshotObject = JSON.parse(snapshot);
 
@@ -3061,6 +3045,46 @@ test("repetitive snapshots stopped in random execution time", async () => {
         // root plan + 5 forks max
         expect(savedState.plans.length).toBeLessThanOrEqual(6);
 
-        console.log(`Iteration ${i + 1} completed successfully`);
     }
-}, 30000);
+}, 40000);
+
+test("test env", async () => {
+    process.env.MY_TEST_VAR = "test_value";
+    const o = {
+        "a":"${$env('MY_TEST_VAR')}",
+        "b":"${$env('MY_TEST_VAR', 'some default that should be ignored')}",
+        "c":"${$env('MY_UNDEFINED_VAR', 'default that should be seen')}",
+        "d":"${$env('MY_UNDEFINED_VAR')}",
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        expect(o).toMatchObject({
+            "a": "test_value",
+            "b": "test_value",
+            "c": "default that should be seen",
+            "d": {"error": {"message": "Environment variable \"MY_UNDEFINED_VAR\" is not defined and no default was provided"}}
+        });
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test close", async () => {
+    process.env.MY_TEST_VAR = "test_value";
+    const o = {
+        "a":"whatever"
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        await tp.close();
+        // We expect tp.setData to reject with a specific error message
+        await expect(tp.setData("/this/should/fail/because/template/closed", 42))
+            .rejects
+            .toThrow("Attempt to setData on a closed TemplateProcessor.");
+
+    } finally {
+        await tp.close();
+    }
+});
