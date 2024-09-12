@@ -1,5 +1,5 @@
 import MetaInfoProducer from '../../dist/src/MetaInfoProducer.js';
-import StatedREPL from '../../dist/src/StatedREPL.js';
+import {stringifyTemplateJSON as stringify} from '../../dist/src/utils/stringify.js';
 
 
 test("tt1", async () => {
@@ -9,7 +9,7 @@ test("tt1", async () => {
         "c": "${'the answer is: '& b}"
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],
@@ -81,7 +81,7 @@ test("t2", async () => {
         }
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],
@@ -237,7 +237,7 @@ test("t3", async () => {
         "l": "${j}"
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],
@@ -647,7 +647,7 @@ test("temp vars 1", async () => {
         "a":"!${42}",
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],
@@ -698,7 +698,7 @@ test("temp vars 2", async () => {
         "c": "${b4}" //non-existant node reference
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],
@@ -973,7 +973,7 @@ test("temp vars 3", async () => {
         }
     };
     const metaInfos = await MetaInfoProducer.getMetaInfos(template);
-    expect(JSON.parse(JSON.stringify(metaInfos, StatedREPL.printFunc, 2))).toEqual([
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
         {
             "absoluteDependencies__": [],
             "dependees__": [],

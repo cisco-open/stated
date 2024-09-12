@@ -15,7 +15,7 @@ import repl from 'repl';
 import CliCore from './CliCore.js';
 import colorizeJson from "json-colorizer";
 import chalk from 'chalk';
-import { circularReplacer, stringifyTemplateJSON } from './utils/stringify.js';
+import { stringifyTemplateJSON as stringify } from './utils/stringify.js';
 import TemplateProcessor from "./TemplateProcessor.js";
 
 
@@ -63,7 +63,7 @@ export default class StatedREPL {
         const {oneshot} = CliCore.parseInitArgs(cmdLineArgsStr)
         const resp = await this.cliCore.init(cmdLineArgsStr)
         if(oneshot){
-            console.log(StatedREPL.stringify(resp));
+            console.log(stringify(resp));
             return; //do not start REPL. We produced oneshot output, now bail
         }
         //crank up the interactive REPL
@@ -128,26 +128,16 @@ export default class StatedREPL {
             const method = (this.cliCore as any)[cliCoreMethodName].bind(this.cliCore);
             result = await method(args);
             if(!this.tookOverIO(cliCoreMethodName, result)){
-                let stringify = StatedREPL.stringify(result);
-                if(this.isColorized === true){
-                    stringify = StatedREPL.colorize(stringify);
+                let s = stringify(result);
+                if(this.isColorized){
+                    s = StatedREPL.colorize(s);
                 }
-                console.log(stringify);
+                console.log(s);
             }
         } catch (e:any) {
-            const stringify = StatedREPL.stringify(e.message);
-            console.error(stringify);
-            result = "";
+            console.error(stringify(e.message));
         }
         this.r.displayPrompt();
-    }
-
-    static printFunc(key:string, value:any) {
-        return circularReplacer(key, value);
-    }
-
-    static stringify(o: any, printFunction?: (k: any, v: any) => any) {
-        return stringifyTemplateJSON(o, printFunction)
     }
 
     static colorize(s:string):string{

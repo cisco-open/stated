@@ -1,7 +1,6 @@
 import {MetaInfo} from "./MetaInfoProducer.js";
 import TemplateProcessor, {Fork, MetaInfoMap, Plan, PlanStep} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
-import StatedREPL from "./StatedREPL.js";
 
 export class ExecutionStatus {
     public statuses: Set<Plan>;
