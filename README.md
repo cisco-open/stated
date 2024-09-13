@@ -1726,7 +1726,7 @@ All JSONata functions are available in Stated.
 Stated provides many functions not provided out of the box by JSONata. 
 
 ### $env
-`$env` is a function used to read environment variables for Stated templates running in node.js. A default value can 
+`$env` is a function used to read environment variables for Stated templates running in Node.js environment. A default value can 
 be specified. If there is no default provided and no such variable exists in node `process.env` an error is returned.
 ```json
 > .init -f example/ex24.json

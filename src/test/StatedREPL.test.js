@@ -14,9 +14,10 @@
 
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import TemplateProcessor from "../../dist/src/TemplateProcessor.js";
+import {stringifyTemplateJSON as stringify} from "../../dist/src/utils/stringify.js"
 
 test("test stringify", async () => {
-  expect(StatedREPL.stringify({a: 1, b: 2})).toBe(
+  expect(stringify({a: 1, b: 2})).toBe(
     `{
   "a": 1,
   "b": 2
@@ -25,7 +26,7 @@ test("test stringify", async () => {
 
 test("test stringify custom print function", async () => {
   const customPrintFunc = (k,v) => {return k === "a" ? null : v}
-  expect(StatedREPL.stringify({ a: 1, b: 2 }, customPrintFunc)).toBe(
+  expect(stringify({ a: 1, b: 2 }, customPrintFunc)).toBe(
     `{
   "a": null,
   "b": 2
@@ -93,7 +94,7 @@ test("Extend CliCore with restore command", async () => {
     // we call restore on the repl, which will expect it to be defined in CliCore.
     await repl.cli('restore', '-f example/restoreSnapshot.json');
 
-    console.log(StatedREPL.stringify(repl.cliCore.templateProcessor.output));
+    console.log(stringify(repl.cliCore.templateProcessor.output));
     expect(repl.cliCore.templateProcessor.output).toBeDefined();
     expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after restoring from the snapshot
     expect(repl.cliCore.templateProcessor.output.count).toBeLessThan(10); // ... but less than 10

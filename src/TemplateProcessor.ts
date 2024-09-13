@@ -23,7 +23,7 @@ import fs from 'fs';
 import ConsoleLogger, {Levels, LOG_LEVELS, StatedLogger} from "./ConsoleLogger.js";
 import FancyLogger from "./FancyLogger.js";
 import {TimerManager} from "./TimerManager.js";
-import {stringifyTemplateJSON} from './utils/stringify.js';
+import {stringifyTemplateJSON as stringify} from './utils/stringify.js';
 import {debounce} from "./utils/debounce.js"
 import {rateLimit} from "./utils/rateLimit.js"
 import {ExecutionStatus} from "./ExecutionStatus.js";
@@ -31,7 +31,7 @@ import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
 import {env} from "./utils/env.js"
 import * as jsonata from "jsonata";
-import StatedREPL from "./StatedREPL.js";
+
 
 declare const BUILD_TARGET: string | undefined;
 
@@ -1111,8 +1111,8 @@ export default class TemplateProcessor {
         const plan:Plan = {sortedJsonPtrs: fromPlan, restoreJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
-            this.logger.debug(`execution plan (uid=${this.uniqueId}): ${StatedREPL.stringify(plan)}`);
-            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${StatedREPL.stringify(this.executionQueue)}`);
+            this.logger.debug(`execution plan (uid=${this.uniqueId}): ${stringify(plan)}`);
+            this.logger.debug(`execution plan queue (uid=${this.uniqueId}): ${stringify(this.executionQueue)}`);
         }
         if(this.executionQueue.length>1){
             return fromPlan; //if there is a plan in front of ours in the executionQueue it will be handled by the already-awaited drainQueue
@@ -1167,7 +1167,7 @@ export default class TemplateProcessor {
     private logOutput(output:any) {
         if (this.isEnabled("debug")) {
             this.logger.debug(`----------------TEMPLATE OUTPUT (${this.uniqueId})-----------------`)
-            this.logger.debug(stringifyTemplateJSON(output));
+            this.logger.debug(stringify(output));
         }
     }
 
@@ -1507,9 +1507,9 @@ export default class TemplateProcessor {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
-            this.logger.debug(`Target: ${stringifyTemplateJSON(target)}`);
-            this.logger.debug(`Target: ${stringifyTemplateJSON(target)}`);
-            this.logger.debug(`Result: ${stringifyTemplateJSON(evaluated)}`);
+            this.logger.debug(`Target: ${stringify(target)}`);
+            this.logger.debug(`Target: ${stringify(target)}`);
+            this.logger.debug(`Result: ${stringify(evaluated)}`);
             const _error = new Error(error.message);
             _error.name = "JSONata evaluation exception";
             throw _error;
