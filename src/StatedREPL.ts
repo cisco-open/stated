@@ -158,7 +158,7 @@ export default class StatedREPL {
     }
 
     private tookOverIO(methodName:string, result:any) {
-        return methodName === 'open' || result.__tailed
+        return methodName === 'open' || result?.__tailed
     }
 }
 
