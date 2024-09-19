@@ -16,6 +16,9 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v2
 
+      - name: Set up Apache Pulsar
+        uses: reugn/github-action-pulsar@v1
+
       - name: Use Node.js
         uses: actions/setup-node@v2
         with:
