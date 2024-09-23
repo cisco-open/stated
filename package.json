@@ -8,7 +8,8 @@
   "exports": {
     ".": {
       "import": "./dist/bundle.mjs",
-      "require": "./dist/bundle-common-js.cjs"
+      "require": "./dist/bundle-common-js.cjs",
+      "types": "./dist/index.d.ts"
     },
     "./dist/src/TemplateProcessor.js": "./dist/src/TemplateProcessor.js",
     "./dist/src/CliCore.js": "./dist/src/CliCore.js",
