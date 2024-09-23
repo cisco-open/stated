@@ -1,6 +1,6 @@
 {
   "name": "stated-js",
-  "version": "0.1.28",
+  "version": "0.1.29",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
   "main": "./dist/src/TemplateProcessor.js",
@@ -8,7 +8,8 @@
   "exports": {
     ".": {
       "import": "./dist/bundle.mjs",
-      "require": "./dist/bundle-common-js.cjs"
+      "require": "./dist/bundle-common-js.cjs",
+      "types": "./dist/index.d.ts"
     },
     "./dist/src/TemplateProcessor.js": "./dist/src/TemplateProcessor.js",
     "./dist/src/CliCore.js": "./dist/src/CliCore.js",
