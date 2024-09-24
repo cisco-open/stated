@@ -294,8 +294,8 @@ export default class TemplateProcessor {
     /** Flag indicating if the template processor is currently initializing. */
     private isInitializing: boolean;
 
-    /** A unique identifier for the template processor instance. */
-    private readonly uniqueId;
+    /** A unique string identifier for the template processor instance like '3b12f1df-5232-4e1f-9c1b-3c6fc5ac7d3f'. */
+    public uniqueId:string;
 
     private tempVars:JsonPointerString[]=[];
 
@@ -346,7 +346,7 @@ export default class TemplateProcessor {
 
     constructor(template={}, context = {}, options={}) {
         this.timerManager = new TimerManager(this); //prevent leaks from $setTimeout and $setInterval
-        this.uniqueId = Math.random()*1e6;
+        this.uniqueId = crypto.randomUUID();;
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
