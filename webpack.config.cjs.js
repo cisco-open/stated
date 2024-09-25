@@ -12,7 +12,7 @@ export default {
 
     devtool: 'source-map',
     entry: {
-        main: './dist/src/TemplateProcessor.js'
+        main: './dist/src/index.js'
     },
     output: {
         path: `${__dirname}/dist`, // Use __dirname here

@@ -13,7 +13,7 @@ export default {
     devtool: 'source-map', //generate sourcemaps so other projects can debug into stated
     mode: 'production',
     entry: {
-        main: './dist/src/TemplateProcessor.js'
+        main: './dist/src/index.js'
     },
     output: {
         path: `${__dirname}/dist`, // Use __dirname here
