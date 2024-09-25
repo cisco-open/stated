@@ -3,8 +3,8 @@
   "version": "0.1.32",
   "license": "Apache-2.0",
   "description": "JSONata embedded in JSON",
-  "main": "./dist/src/TemplateProcessor.js",
-  "module": "./dist/src/TemplateProcessor.js",
+  "main": "./dist/src/index.js",
+  "module": "./dist/src/index.js",
   "exports": {
     ".": {
       "import": "./dist/bundle.mjs",
@@ -17,6 +17,7 @@
     "./dist/src/TestUtils.js": "./dist/src/TestUtils.js",
     "./dist/src/DependencyFinder.js": "./dist/src/DependencyFinder.js",
     "./dist/src/JsonPointer.js": "./dist/src/JsonPointer.js",
+    "./dist/src/utils/stringify.js": "./dist/src/utils/stringify.js",
     "./dist/src/utils/debounce.js": "./dist/src/utils/debounce.js",
     "./dist/src/utils/rateLimit.js": "./dist/src/utils/rateLimit.js"
   },
