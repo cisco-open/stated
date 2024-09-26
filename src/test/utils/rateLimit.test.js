@@ -13,54 +13,64 @@
 // limitations under the License.
 
 import { rateLimit } from "../../../dist/src/utils/rateLimit.js";
-import {expect, jest} from '@jest/globals'
+import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/globals';
 
-describe('rateLimit function', () => {
-  jest.useFakeTimers();
-  /**
-   * Below test validates the following scenario
-   * rateLimitedFunction('First call'); // called at 0ms and Executed immediately
-   * rateLimitedFunction('Second call');  // called at 500ms, deferred till execution at 1000ms
-   * rateLimitedFunction('Third call');  // called at 700ms, deferred till execution at 1000ms, and replaces the Second call
-   * // at 1000ms 'Third call' gets executed.
-   * rateLimitedFunction('Forth call'); //  called at 1100ms and gets executed in 2000ms
-   **/
-  it('should rate limit function calls as specified', () => {
-    const mockFunction = jest.fn();
-    const maxWait = 1000;
-    const rateLimitedFunction = rateLimit(mockFunction, maxWait);
+if(typeof Bun === 'undefined'){ //advanceTimersByTime is not available in Bun
+  describe('rateLimit function', () => {
+    beforeEach(() => {
+      // Enable fake timers before each test
+      jest.useFakeTimers('modern');
+    });
 
-    // First call - executed immediately
-    rateLimitedFunction('First call');
-    expect(mockFunction).toHaveBeenCalledTimes(1);
-    expect(mockFunction).toHaveBeenCalledWith('First call');
+    afterEach(() => {
+      // Restore real timers after each test
+      jest.useRealTimers();
+    });
 
-    // Second call - deferred
-    jest.advanceTimersByTime(500);
-    rateLimitedFunction('Second call');
-    expect(mockFunction).toHaveBeenCalledTimes(1);
+    /**
+     * Below test validates the following scenario
+     * rateLimitedFunction('First call'); // called at 0ms and Executed immediately
+     * rateLimitedFunction('Second call');  // called at 500ms, deferred till execution at 1000ms
+     * rateLimitedFunction('Third call');  // called at 700ms, deferred till execution at 1000ms, and replaces the Second call
+     * // at 1000ms 'Third call' gets executed.
+     * rateLimitedFunction('Forth call'); //  called at 1100ms and gets executed in 2000ms
+     **/
+    test('should rate limit function calls as specified', () => {
+      const mockFunction = jest.fn();
+      const maxWait = 1000;
+      const rateLimitedFunction = rateLimit(mockFunction, maxWait);
 
-    // Third call - replaces second, also deferred
-    jest.advanceTimersByTime(200);
-    rateLimitedFunction('Third call');
-    expect(mockFunction).toHaveBeenCalledTimes(1);
+      // First call - executed immediately
+      rateLimitedFunction('First call');
+      expect(mockFunction).toHaveBeenCalledTimes(1);
+      expect(mockFunction).toHaveBeenCalledWith('First call');
 
-    // Executing the deferred 'Third call'
-    jest.advanceTimersByTime(350);
-    expect(mockFunction).toHaveBeenCalledTimes(2);
-    expect(mockFunction).toHaveBeenCalledWith('Third call');
+      // Second call - deferred
+      jest.advanceTimersByTime(500);
+      rateLimitedFunction('Second call');
+      expect(mockFunction).toHaveBeenCalledTimes(1);
 
-    // Fourth call - at 1100ms from start gets defferred till 2000ms
-    jest.advanceTimersByTime(100);
-    rateLimitedFunction('Forth call');
-    jest.advanceTimersByTime(900);
-    expect(mockFunction).toHaveBeenCalledTimes(3);
-    expect(mockFunction).toHaveBeenCalledWith('Forth call');
+      // Third call - replaces second, also deferred
+      jest.advanceTimersByTime(200);
+      rateLimitedFunction('Third call');
+      expect(mockFunction).toHaveBeenCalledTimes(1);
 
-    // no more calls expected
-    jest.advanceTimersByTime(1000);
-    expect(mockFunction).toHaveBeenCalledTimes(3);
+      // Executing the deferred 'Third call'
+      jest.advanceTimersByTime(350);
+      expect(mockFunction).toHaveBeenCalledTimes(2);
+      expect(mockFunction).toHaveBeenCalledWith('Third call');
+
+      // Fourth call - at 1100ms from start gets defferred till 2000ms
+      jest.advanceTimersByTime(100);
+      rateLimitedFunction('Forth call');
+      jest.advanceTimersByTime(900);
+      expect(mockFunction).toHaveBeenCalledTimes(3);
+      expect(mockFunction).toHaveBeenCalledWith('Forth call');
+
+      // no more calls expected
+      jest.advanceTimersByTime(1000);
+      expect(mockFunction).toHaveBeenCalledTimes(3);
+    });
   });
-});
-
+}
 

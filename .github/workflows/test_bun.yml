@@ -1,0 +1,42 @@
+name: Run Jest Tests on Bun.js
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  test-bun:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Set up Apache Pulsar
+        uses: reugn/github-action-pulsar@v1
+
+      - name: Install Bun
+        run: |
+          curl https://bun.sh/install | bash
+          echo "$HOME/.bun/bin" >> $GITHUB_PATH
+
+      - name: Verify Bun Installation
+        run: bun --version
+
+      - name: Install dependencies with Bun
+        run: bun install
+
+      - name: Run Bun tests
+        run: bun run test:bun
+
+      - name: Upload Bun test logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v3
+        with:
+          name: bun-test-logs
+          path: ./bun-test-logs/*
+

@@ -33,34 +33,69 @@ test("test stringify custom print function", async () => {
 }`);
 });
 
-/** Test that the onInit function is called when the .init command is called */
-test("test onInit", async () => {
-  const repl1 = new StatedREPL();
-  await repl1.initialize();
+if(typeof Bun === "undefined") { //run on node, not bun
+  /** Test that the onInit function is called when the .init command is called */
+  test("test onInitxx", async () => {
+    const repl1 = new StatedREPL();
+    await repl1.initialize();
 
-  const repl2 = new StatedREPL();
-  await repl2.initialize();
+    const repl2 = new StatedREPL();
+    await repl2.initialize();
 
-  try {
-    let beenCalled1 = false;
-    repl1.cliCore.onInit = () => {
-      beenCalled1 = true;
+    try {
+      let beenCalled1 = false;
+      repl1.cliCore.onInit = () => {
+        beenCalled1 = true;
+      }
+      let beenCalled2 = false;
+      repl2.cliCore.onInit = () => {
+        beenCalled2 = true;
+      }
+      await repl1.cliCore.init('-f "example/ex01.yaml"');
+      expect(beenCalled1).toBe(true);
+      expect(beenCalled2).toBe(false);
+
+      await repl2.cliCore.init('-f "example/ex01.yaml"');
+      expect(beenCalled2).toBe(true);
+    } finally {
+      await repl1.close();
+      await repl2.close();
     }
-    let beenCalled2 = false;
-    repl2.cliCore.onInit = () => {
-      beenCalled2 = true;
-    }
-    await repl1.cliCore.init('-f "example/ex01.yaml"');
-    expect(beenCalled1).toBe(true);
-    expect(beenCalled2).toBe(false);
+  });
+  // Validates restore command
+  test("Extend CliCore with restore command", async () => {
 
-    await repl2.cliCore.init('-f "example/ex01.yaml"');
-    expect(beenCalled2).toBe(true);
-  }finally {
-    await repl1.close();
-    await repl2.close();
-  }
-});
+    // ensure jest argv does not interfere with the test
+    const originalCmdLineArgsStr = process.argv;
+    process.argv = ["node", "dist/stated.js"]; // this is an argv when running stated.js repl.
+
+    // extend CliCore with restore command
+    const repl = new StatedREPL();
+
+    try {
+      await repl.initialize();
+
+      // we call restore on the repl, which will expect it to be defined in CliCore.
+      await repl.cli('restore', '-f example/restoreSnapshot.json');
+
+      console.log(stringify(repl.cliCore.templateProcessor.output));
+      expect(repl.cliCore.templateProcessor.output).toBeDefined();
+      expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after restoring from the snapshot
+      expect(repl.cliCore.templateProcessor.output.count).toBeLessThan(10); // ... but less than 10
+
+
+      while (repl.cliCore.templateProcessor.output.count < 10) { // validates that templateProcessor picks up where it was left in the snapshot.
+        console.log("waiting for output.count to reach 10")
+        await new Promise(resolve => setTimeout(resolve, 50));
+      }
+      expect(repl.cliCore.templateProcessor.output.count).toBe(10);
+    } finally {
+      process.argv = originalCmdLineArgsStr;
+      if (repl !== undefined) await repl.close();
+    }
+  });
+
+}
 
 // This test validates a bug when running an init command in StatedREPL overwrites context of provided TemplateProcessor
 test("TemplateProcessor keeps context on init", async () => {
@@ -78,35 +113,3 @@ test("TemplateProcessor keeps context on init", async () => {
   );
 });
 
-// Validates restore command
-test("Extend CliCore with restore command", async () => {
-
-  // ensure jest argv does not interfere with the test
-  const originalCmdLineArgsStr = process.argv;
-  process.argv = ["node", "dist/stated.js"]; // this is an argv when running stated.js repl.
-
-  // extend CliCore with restore command
-  const repl = new StatedREPL();
-
-  try {
-    await repl.initialize();
-
-    // we call restore on the repl, which will expect it to be defined in CliCore.
-    await repl.cli('restore', '-f example/restoreSnapshot.json');
-
-    console.log(stringify(repl.cliCore.templateProcessor.output));
-    expect(repl.cliCore.templateProcessor.output).toBeDefined();
-    expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after restoring from the snapshot
-    expect(repl.cliCore.templateProcessor.output.count).toBeLessThan(10); // ... but less than 10
-
-
-    while (repl.cliCore.templateProcessor.output.count < 10) { // validates that templateProcessor picks up where it was left in the snapshot.
-      console.log("waiting for output.count to reach 10")
-      await new Promise(resolve => setTimeout(resolve, 50));
-    }
-    expect(repl.cliCore.templateProcessor.output.count).toBe(10);
-  } finally {
-    process.argv = originalCmdLineArgsStr;
-    if (repl !== undefined) await repl.close();
-  }
-});

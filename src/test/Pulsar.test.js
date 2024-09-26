@@ -1,47 +1,100 @@
-// pulsar.test.js
-import Pulsar from 'pulsar-client';
+import pulsar from 'pulsar-flex';
+import {jest, describe, beforeAll, afterAll, test, expect} from "@jest/globals";
 
-describe('Pulsar Standalone Mode', () => {
-    let client;
+describe('pulsar-flex Integration Test', () => {
     let producer;
     let consumer;
 
+    const topic = "persistent://public/default/xxx";
+    const subscription = "test-subscription";
+
+    const messagesToSend = [
+        { properties: { pulsar: "flex" }, payload: 'Ayeo' },
+        { properties: { pulsar: "flex" }, payload: 'Ayeo' }
+    ];
+
+    let receivedMessages = [];
+
+    // Increase Jest's default timeout since Pulsar operations might take longer
+    jest.setTimeout(20000); // 20 seconds
+
     beforeAll(async () => {
-        // Create a Pulsar client connected to the local standalone broker
-        client = new Pulsar.Client({
-            serviceUrl: 'pulsar://localhost:6650',
+        // Initialize Producer
+        producer = new pulsar.Producer({
+            topic: topic,
+            discoveryServers: ['localhost:6650'],
+            // If your Pulsar setup requires JWT, ensure it's set in the environment variables
+            jwt: process.env.JWT_TOKEN,
+            producerAccessMode: pulsar.Producer.ACCESS_MODES.SHARED,
+            logLevel: pulsar.logLevel.INFO
+            // Optionally, provide a logCreator function for custom logging
         });
 
-        // Create a producer on a test topic
-        producer = await client.createProducer({
-            topic: 'persistent://public/default/test-topic',
+        // Initialize Consumer
+        consumer = new pulsar.Consumer({
+            topic: topic,
+            subscription: subscription,
+            discoveryServers: ['localhost:6650'],
+            jwt: process.env.JWT_TOKEN,
+            subType: pulsar.Consumer.SUB_TYPES.EXCLUSIVE,
+            consumerName: 'Test Consumer',
+            receiveQueueSize: 1000,
+            logLevel: pulsar.logLevel.INFO,
+            // Optionally, provide a logCreator function for custom logging
         });
 
-        // Create a consumer to verify message delivery
-        consumer = await client.subscribe({
-            topic: 'persistent://public/default/test-topic',
-            subscription: 'test-subscription',
-            subscriptionType: 'Exclusive',
+        // Create Producer
+        await producer.create();
+
+        // Subscribe Consumer
+        await consumer.subscribe();
+
+        // Optional: Listen to Consumer state changes
+        consumer.onStateChange(({ previousState, newState }) => {
+            console.log(`Consumer state changed from ${previousState} to ${newState}.`);
+        });
+
+        // Run Consumer
+        await consumer.run({
+            onMessage: async ({ ack, message, properties, redeliveryCount }) => {
+                await ack(); // Acknowledge the message
+                receivedMessages.push({
+                    message: message, // Contains the payload
+                    properties: properties, // Message properties
+                    redeliveryCount: redeliveryCount, // Number of times the message was redelivered
+                });
+            },
+            autoAck: false, // Manual acknowledgment
         });
     });
 
     afterAll(async () => {
-        // Clean up: close the producer, consumer, and client
+        // Close Producer and Consumer
         await producer.close();
-        await consumer.close();
-        await client.close();
+        await consumer.unsubscribe();
     });
 
-    test('should produce and consume a message', async () => {
-        // Send a test message
-        const message = Buffer.from('Hello, Pulsar!');
-        await producer.send({ data: message });
+    test('should produce and consume messages successfully', async () => {
+        // Send a batch of messages
+        await producer.sendBatch({ messages: messagesToSend });
 
-        // Receive the message
-        const msg = await consumer.receive();
-        expect(msg.getData().toString()).toBe('Hello, Pulsar!');
+        // Wait for messages to be received
+        const maxWaitTime = 10000; // 10 seconds
+        const pollInterval = 100; // 100ms
+        let waited = 0;
 
-        // Acknowledge the message
-        consumer.acknowledge(msg);
+        while (receivedMessages.length < messagesToSend.length && waited < maxWaitTime) {
+            await new Promise(resolve => setTimeout(resolve, pollInterval));
+            waited += pollInterval;
+        }
+
+        // Assertions
+        expect(receivedMessages.length).toBe(messagesToSend.length);
+
+        receivedMessages.forEach((received, index) => {
+            expect(received.message.toString()).toBe(messagesToSend[index].payload);
+            expect(received.properties).toEqual(messagesToSend[index].properties);
+            expect(received.redeliveryCount).toBe(0); // Assuming no redeliveries
+        });
     });
 });

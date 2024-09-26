@@ -31,10 +31,12 @@ export const circularReplacer = (key: any, value: any) => {
     return "--compiled expression--";
   }
   if (null !== value) {
+    const tag = Object.prototype.toString.call(value);
     const { _idleTimeout, _onTimeout } = value;
-    if (_idleTimeout !== undefined && _onTimeout !== undefined) {
+    if (tag === '[object Timeout]'|| (_idleTimeout !== undefined && _onTimeout !== undefined)) { //Node.js
       return "--interval/timeout--";
     }
+
     if (value instanceof Set) {
       return Array.from(value);
     }

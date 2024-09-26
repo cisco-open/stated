@@ -1,4 +1,4 @@
-name: Run Jest Tests
+name: Run Jest Tests on Node.js
 
 on:
   push:
