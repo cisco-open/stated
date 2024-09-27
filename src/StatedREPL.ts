@@ -22,7 +22,7 @@ import TemplateProcessor from "./TemplateProcessor.js";
 export default class StatedREPL {
     private readonly cliCore: CliCore;
     //@ts-ignore
-    r: repl.REPLServer;
+    replServer: repl.REPLServer;
     private isColorized:boolean=false;
     constructor(templateProcessor: TemplateProcessor) {
         this.cliCore = new CliCore(templateProcessor);
@@ -67,31 +67,33 @@ export default class StatedREPL {
             return; //do not start REPL. We produced oneshot output, now bail
         }
         //crank up the interactive REPL
-        this.r = repl.start({
+        this.replServer = repl.start({
             prompt: '> ',
             useColors:true,
             useGlobal:true
         });
-        this.cliCore.replServer = this.r;
+        //make variable called 'template' accessible in REPL
+        this.replServer.context.template = this.cliCore.getTemplateProcessor();
+        this.cliCore.replServer = this.replServer;
         this.registerCommands();
     }
 
     close(){
         this.cliCore.close();
-        this.r.close();
+        this.replServer.close();
     }
 
     registerCommands() {
         StatedREPL.CLICORE_COMMANDS.map(c=>{
             const [cmdName, helpMsg] = c;
-            this.r.defineCommand(cmdName, {
+            this.replServer.defineCommand(cmdName, {
                 help: helpMsg,
                 action: async (args) => {
                     await this.cli(cmdName, args);
                 },
             });
         });
-        this.r.defineCommand("color", {
+        this.replServer.defineCommand("color", {
             help: "[on|off] colorize JSON",
             action: async (args) => {
                 if(args.trim()==="on"){
@@ -99,25 +101,25 @@ export default class StatedREPL {
                 }else if(args.trim()==="off"){
                     this.isColorized = false;
                 }
-                this.r.displayPrompt();
+                this.replServer.displayPrompt();
             },
         });
 
         //these other commands are REPL-only commands and are not part of the CLiCore that does
         //template processing
-        this.r.defineCommand('help', {
+        this.replServer.defineCommand('help', {
             help: 'Display available commands and their descriptions',
             action: () => {
                 try {
                     console.log('Available commands:');
-                    Object.entries(this.r.commands).forEach(([name, command]) => {
+                    Object.entries(this.replServer.commands).forEach(([name, command]) => {
                         //@ts-ignore
                         console.log(`  .${name} - ${command.help}`);
                     });
                 } catch (e) {
                     console.error(e);
                 }
-                this.r.displayPrompt();
+                this.replServer.displayPrompt();
             },
         });
     }
@@ -137,7 +139,7 @@ export default class StatedREPL {
         } catch (e:any) {
             console.error(stringify(e.message));
         }
-        this.r.displayPrompt();
+        this.replServer.displayPrompt();
     }
 
     static colorize(s:string):string{
