@@ -17,6 +17,7 @@ import * as repl from 'repl';
 import {stringifyTemplateJSON} from "./utils/stringify.js";
 import jsonata from "jsonata";
 import {CliCoreBase} from "./CliCoreBase.js";
+import fs from 'fs';
 
 
 export default class CliCore extends CliCoreBase{
@@ -25,6 +26,67 @@ export default class CliCore extends CliCoreBase{
 
     constructor(templateProcessor: TemplateProcessor) {
         super(templateProcessor);
+    }
+
+    public async open(directory: string = this.currentDirectory) {
+        if(directory === ""){
+            directory = this.currentDirectory;
+        }
+
+        let files: string[]|undefined = undefined;
+        try {
+            // Read all files from the directory
+            files = await fs.promises.readdir(directory);
+        } catch (error) {
+            console.log(`Error reading directory ${directory}: ${error}`);
+            console.log('Changed directory with .cd or .open an/existing/directory');
+            this.replServer.displayPrompt();
+            return {error: `Error reading directory ${directory}: ${error}`};
+        }
+        // Filter out only .json and .yaml files
+        const templateFiles: string[] = files.filter(file => file.endsWith('.json') || file.endsWith('.yaml'));
+
+        // Display the list of files to the user
+        templateFiles.forEach((file, index) => {
+            console.log(`${index + 1}: ${file}`);
+        });
+
+        // Create an instance of AbortController
+        const ac = new AbortController();
+        const {signal} = ac; // Get the AbortSignal from the controller
+
+        // Ask the user to choose a file
+        this.replServer.question('Enter the number of the file to open (or type "abort" to cancel): ', {signal}, async (answer) => {
+            // Check if the operation was aborted
+            if (signal.aborted) {
+                console.log('File open operation was aborted.');
+                this.replServer.displayPrompt();
+                return;
+            }
+
+            const fileIndex = parseInt(answer, 10) - 1; // Convert to zero-based index
+            if (fileIndex >= 0 && fileIndex < templateFiles.length) {
+                // User has entered a valid file number; initialize with this file
+                const filepath = templateFiles[fileIndex];
+                try {
+                    const result = await this.init(`-f "${filepath}"`); // Adjust this call as per your init method's expected format
+                    console.log(stringifyTemplateJSON(result));
+                    console.log("...try '.out' or 'template.output' to see evaluated template")
+                } catch (error) {
+                    console.log('Error loading file:', error);
+                }
+            } else {
+                console.log('Invalid file number.');
+            }
+            this.replServer.displayPrompt();
+        });
+
+        // Allow the user to type "abort" to cancel the file open operation
+        this.replServer.once('SIGINT', () => {
+            ac.abort();
+        });
+
+        return "open... (type 'abort' to cancel)";
     }
 
 

@@ -95,6 +95,25 @@ if(typeof Bun === "undefined") { //run on node, not bun
     }
   });
 
+  test("open", async () => {
+    const originalCmdLineArgsStr = process.argv;
+    process.argv = ["node", "dist/stated.js"]; // this is an argv when running stated.js repl.
+    // extend CliCore with restore command
+    const repl = new StatedREPL();
+
+      try {
+        await repl.initialize();
+
+        // we call restore on the repl, which will expect it to be defined in CliCore.
+        const msg = await repl.cli('open');
+
+        expect(msg).toBe(true);
+      } finally {
+        process.argv = originalCmdLineArgsStr;
+        if (repl !== undefined) await repl.close();
+      }
+  });
+
 }
 
 // This test validates a bug when running an init command in StatedREPL overwrites context of provided TemplateProcessor
@@ -112,4 +131,6 @@ test("TemplateProcessor keeps context on init", async () => {
     }
   );
 });
+
+
 

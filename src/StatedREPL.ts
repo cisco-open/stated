@@ -140,6 +140,7 @@ export default class StatedREPL {
             console.error(stringify(e.message));
         }
         this.replServer.displayPrompt();
+        return true;
     }
 
     static colorize(s:string):string{
