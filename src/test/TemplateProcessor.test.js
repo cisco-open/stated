@@ -1352,6 +1352,19 @@ test("local import with non-absolute --importPath", async () => {
     });
 });
 
+test("local import textfile with non-absolute --importPath", async () => {
+    const template = {
+        "foo": "bar",
+        "baz": "${ $import('importme.txt') }"
+    };
+    const tp = new TemplateProcessor(template, {}, {importPath: 'example'});
+    await tp.initialize();
+    expect(tp.output).toEqual({
+        "baz": "Hello - I am an imported text file\nthis is my second line",
+        "foo": "bar"
+    });
+});
+
 test("deep view", async () => {
     const template = {
         "closureExpression": "/${ ($names := $distinct(data.pD.data.name);  {'yAxis': [ {'categories': $names} ]}) }",
