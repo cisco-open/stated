@@ -93,7 +93,9 @@ export class CliCoreBase {
 
         if (fileExtension === 'yaml' || fileExtension === 'yml') {
             return yaml.load(fileContent);
-        } else {
+        }else if (fileExtension === 'text' || fileExtension === 'txt') {
+            return fileContent;
+        }else {
             return JSON.parse(fileContent);
         }
     }
