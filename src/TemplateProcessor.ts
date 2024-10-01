@@ -661,6 +661,8 @@ export default class TemplateProcessor {
                     format = 'json';
                 } else if (contentType.includes("text/yaml")) {
                     format = 'yaml';
+                }else if (contentType.includes("text/plain")) {
+                    format = 'yaml';
                 }
             } //we can still encounter incorrect conetnt-type like text/plain for json or yaml on various hosting sites like github raw
             if(!format){
@@ -670,12 +672,16 @@ export default class TemplateProcessor {
                     format = 'json';
                 } else if (fileExtension === 'yaml' || fileExtension === 'yml') {
                     format = 'yaml';
+                } else if (fileExtension === 'text' || fileExtension === 'txt') {
+                    format = 'text';
                 }
             }
 
             switch (format) {
                 case 'json':
                     return await resp.json();
+                case 'text':
+                    return await resp.text();
                 case 'yaml':
                     const text = await resp.text();
                     return yaml.load(text);
@@ -1778,6 +1784,8 @@ export default class TemplateProcessor {
                 return JSON.parse(content);
             }else if (fileExtension === '.yaml' || fileExtension === '.yml') {
                 return yaml.load(content);
+            }else if (fileExtension === '.text' || fileExtension === '.txt') {
+                return content;
             }else if (fileExtension === '.js' || fileExtension === '.mjs') {
                 throw new Error('js and mjs imports not implemented yet');
              }else{
@@ -1785,8 +1793,8 @@ export default class TemplateProcessor {
             }
         } catch(e) {
             this.logger.debug('import was not a local file');
+            throw e;
         }
-        return content;
     }
 
     private wrapInOrdinaryFunction(jsonataLambda:any) {
