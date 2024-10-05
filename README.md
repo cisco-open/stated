@@ -1739,6 +1739,75 @@ be specified. If there is no default provided and no such variable exists in nod
 }
 
 ```
+### $generate
+[Generator functions](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator)
+can be used to cause a stated field to receive a series of values. Any field that is set to an AsyncGenerator will receive
+the sequence of values from the iterator. You can use generators written in pure JS, like this from `example/myGenerator.mjs`:
+```javascript
+export async function* myGenerator() {
+    for (let i = 1; i <= 10; i++) {
+        yield i;
+    }
+}
+```
+You can call `myGenerator` from your stated template, as demonstrated in `example/myGenerator.mjs`.
+As you can see the final value of 10 is what remains when we execute the `.out` command. However,
+keep in mind that all the values were sequentially pushed into the `generated` field, and we see only the final value.
+```json
+> .init -f example/myGenerator.json --xf example/myGenerator.mjs
+{
+  "generated": "${$myGenerator()}"
+}
+> .out
+{
+  "generated": 10
+}
+```
+A slight variation on the example accumulates every value yielded by the generator:
+```json
+> .init -f example/myGenerator2.json --xf example/myGenerator.mjs
+{
+   "generated": "${$myGenerator()}",
+   "onGenerated": "${$set('/accumulator/-', $$.generated)}",
+   "accumulator": []
+}
+```
+```json ["data=[1,2,3,4,5,6,7,8,9,10]"]
+> .init -f example/myGenerator2.json --xf example/myGenerator.mjs --tail "/accumulator until $=[1,2,3,4,5,6,7,8,9,10]"
+Started tailing... Press Ctrl+C to stop.
+[
+1,
+2,
+3,
+4,
+5,
+6,
+7,
+8,
+9,
+10
+]
+
+```
+Or, you can use the built in `$generate` method, which takes an optional delay in ms, and turns the array
+into an AsyncGenerator. In the example below the values 1 to 10 are pumped into the `generated` field
+with 10 ms temporal separation.
+```json
+> .init -f example/generate.json
+{
+  "delayMs": 10,
+  "generated":"${[1..10]~>$generate(delayMs)}"
+}
+```
+```json ["data.generated=10"]
+> .init -f example/generate.json --tail "/ until generated=10"
+Started tailing... Press Ctrl+C to stop.
+{
+"delayMs": 10,
+"generated": 10
+}
+
+```
 
 ### $setTimeout
 `$setTimeout` is the JavaScript `setTimeout` function. It receives a function and an timeout

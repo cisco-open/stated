@@ -1,0 +1,4 @@
+{
+  "delayMs": 10,
+  "generated":"${[1..10]~>$generate(delayMs)}"
+}
