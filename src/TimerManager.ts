@@ -105,7 +105,7 @@ class TimerManager {
     }
 
     // Clears all timeouts and intervals
-    public clearAll(): void {
+    public clear(): void {
         this.clearAllTimeouts();
         this.clearAllIntervals();
     }

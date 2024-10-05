@@ -22,8 +22,13 @@ import {dirname} from 'path';
 import DependencyFinder from "../../dist/src/DependencyFinder.js";
 import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
-//import {expect} from "@jest/globals";
 import StatedREPL from "../../dist/src/StatedREPL.js";
+import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/globals';
+
+if (typeof Bun !== 'undefined') {
+    // Dynamically import Jest's globals if in Bun.js environment
+    const {jest} = await import('@jest/globals');
+}
 
 test("test 1", async () => {
     const tp = new TemplateProcessor({
@@ -32,7 +37,9 @@ test("test 1", async () => {
         "removeMe":"!${'I better get removed because I am temporary variable'}"
     });
     let theTempvar = "--";
-    tp.postInitialize = async ()=>{ theTempvar = tp.output.removeMe}
+    tp.postInitialize = async ()=>{
+        theTempvar = tp.output.removeMe
+    }
     try {
         await tp.initialize();
         //validate thaat postInitialize call happens before temp var removal
@@ -1221,7 +1228,7 @@ test("remove temp vars 1", async () => {
     };
     const tp = new TemplateProcessor(template, {});
     await tp.initialize()
-    expect(tp.output).toEqual({
+    expect(tp.output).toStrictEqual({
         "a": 42,
         "b": {
             "b1": 10
@@ -1664,7 +1671,7 @@ test("ex14.yaml", async () => {
 });
 describe('TemplateProcessor.fromString', () => {
 
-    it('should correctly identify and parse JSON string', async () => {
+    test('should correctly identify and parse JSON string', async () => {
         const jsonString = '{"key": "value"}';
         const instance = TemplateProcessor.fromString(jsonString);
         await instance.initialize();
@@ -1672,7 +1679,7 @@ describe('TemplateProcessor.fromString', () => {
         expect(instance.output).toEqual({ key: "value" });  // Assuming parsedObject is publicly accessible
     });
 
-    it('should correctly identify and parse YAML string using ---', async () => {
+    test('should correctly identify and parse YAML string using ---', async () => {
         const yamlString = `---
 key: value`;
         const instance = TemplateProcessor.fromString(yamlString);
@@ -1681,7 +1688,7 @@ key: value`;
         expect(instance.output).toEqual({ key: "value" });
     });
 
-    it('should correctly identify and parse YAML string using colon', async () => {
+    test('should correctly identify and parse YAML string using colon', async () => {
         const yamlString = `key: value`;
         const instance = TemplateProcessor.fromString(yamlString);
         await instance.initialize();
@@ -1689,12 +1696,12 @@ key: value`;
         expect(instance.output).toEqual({ key: "value" });
     });
 
-    it('should throw an error for unknown formats', async () => {
+    test('should throw an error for unknown formats', async () => {
         const unknownString = `Hello World`;
         expect(() => TemplateProcessor.fromString(unknownString)).toThrow("Unknown format");
     });
 
-    it('should not misinterpret colon in JSON string', async () => {
+    test('should not misinterpret colon in JSON string', async () => {
         const jsonString = '{"greeting": "Hello: World"}';
         const instance = TemplateProcessor.fromString(jsonString);
         expect(instance).toBeInstanceOf(TemplateProcessor);
@@ -3097,6 +3104,37 @@ test("test close", async () => {
             .rejects
             .toThrow("Attempt to setData on a closed TemplateProcessor.");
 
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate", async () => {
+    const o = {
+        "delayMs": 10,
+        "a":"${[1..10]~>$generate(delayMs)}",
+        "b": "${a}"
+    };
+
+    const callCount = 10;
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        if (changeHandler.mock.calls.length === 10) {
+            resolvePromise(); // Resolve the promise when callCount is reached
+        }
+    });
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(10);
+        expect(tp.output.b).toBe(10);
     } finally {
         await tp.close();
     }

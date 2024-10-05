@@ -31,6 +31,7 @@ import {Sleep} from "./utils/Sleep.js";
 import {saferFetch} from "./utils/FetchWrapper.js";
 import {env} from "./utils/env.js"
 import * as jsonata from "jsonata";
+import {GeneratorManager} from "./utils/GeneratorManager.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -299,7 +300,9 @@ export default class TemplateProcessor {
 
     private tempVars:JsonPointerString[]=[];
 
-    private timerManager:TimerManager;
+    timerManager:TimerManager;
+
+    private generatorManager:GeneratorManager;
 
     /** Allows caller to set a callback to propagate initialization into their framework */
     public readonly onInitialize: Map<string,() => Promise<void>|void>;
@@ -313,9 +316,7 @@ export default class TemplateProcessor {
 
     public executionStatus: ExecutionStatus;
 
-    private isClosed = false;
-
-
+    public isClosed = false;
 
     public static fromString(template:string, context = {}, options={} ):TemplateProcessor{
             let inferredType: "JSON" | "YAML" | "UNKNOWN" = "UNKNOWN";
@@ -346,7 +347,8 @@ export default class TemplateProcessor {
 
     constructor(template={}, context = {}, options={}) {
         this.timerManager = new TimerManager(this); //prevent leaks from $setTimeout and $setInterval
-        this.uniqueId = crypto.randomUUID();;
+        this.generatorManager = new GeneratorManager(this);
+        this.uniqueId = crypto.randomUUID();
         this.setData = this.setData.bind(this); // Bind template-accessible functions like setData and import
         this.import = this.import.bind(this); // allows clients to directly call import on this TemplateProcessor
         this.logger = new ConsoleLogger("info");
@@ -388,20 +390,14 @@ export default class TemplateProcessor {
             {"sleep": new Sleep(this.timerManager).sleep},
             {"setTimeout": this.timerManager.setTimeout},
             {"clearTimeout": this.timerManager.clearTimeout},
+            {"generate": this.generatorManager.generate},
 
         );
         const safe = this.withErrorHandling.bind(this);
         for (const key in this.context) {
             if (typeof this.context[key] === 'function') {
-                /*
-                if (key === "setTimeout" || key === "setInterval") {
-                    //replace with wrappers that allow us to ensure we kill all prior timers when template re-inits
-                    this.context[key] = this.timerManager[key].bind(this.timerManager);
-                    //TODO: remove it after migrating to generated function
-                    //TODO: ^^^^ sergey please explain this comment
-                } else { */
-                    this.context[key] = safe(this.context[key]);
-                //}
+                this.context[key] = safe(this.context[key]);
+
             }
         }
     }
@@ -419,10 +415,9 @@ export default class TemplateProcessor {
      */
     public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: {}|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
-            this.timerManager.clearAll();
+            this.timerManager.clear();
             this.executionStatus.clear();
         }
-
         // if initialize is called with a importedSubtemplate and root json pointer (which is "/" b default)
         // we need to reset the importedSubtemplate. Otherwise, we rely on the one provided in the constructor
         if (importedSubtemplate !== undefined && jsonPtr === "/") {
@@ -468,7 +463,7 @@ export default class TemplateProcessor {
                 this.logger.level = _level;
             }
 
-            this.logger.verbose(`initializing (uid=${this.uniqueId})...`);
+            this.logger.debug(`initializing (uid=${this.uniqueId})...`);
             this.logger.debug(`tags: ${JSON.stringify(Array.from(this.tagSet))}`);
             if (executionStatusSnapshot === undefined) {
                 this.executionPlans = {}; //clear execution plans
@@ -509,7 +504,7 @@ export default class TemplateProcessor {
         this.isClosed = true;
         this.executionQueue.length = 0; //nuke execution queue
         await this.drainExecutionQueue();
-        this.timerManager.clearAll();
+        this.timerManager.clear();
         this.changeCallbacks.clear();
         this.executionStatus.clear();
     }
@@ -845,9 +840,9 @@ export default class TemplateProcessor {
         });
     }
 
-    public async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]) {
+    public async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]):Promise<void> {
         const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        return await this.executePlan({
+        const plan = {
             sortedJsonPtrs:evaluationPlan,
             restoreJsonPtrs: [],
             data: TemplateProcessor.NOOP,
@@ -855,7 +850,9 @@ export default class TemplateProcessor {
             forkStack:[],
             forkId:"ROOT",
             didUpdate:[]
-        });
+        };
+        this.executionQueue.push(plan);
+        await this.drainExecutionQueue(false);
     }
 
     private makeDepsAbsolute(parentJsonPtr:JsonPointerStructureArray, localJsonPtrs:JsonPointerStructureArray[]) {
@@ -1150,7 +1147,7 @@ export default class TemplateProcessor {
         return fromPlan;
     }
 
-    private async drainExecutionQueue(){
+    private async drainExecutionQueue(removeTmpVars:boolean=true){
         while (this.executionQueue.length > 0 && !this.isClosed) {
             try {
                 const plan: Plan | SnapshotPlan = this.executionQueue[0];
@@ -1159,7 +1156,7 @@ export default class TemplateProcessor {
                 } else {
                     await this.executePlan(plan);
                 }
-                this.removeTemporaryVariables(this.tempVars, "/");
+                removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
             }finally {
                 this.executionQueue.shift();
             }
@@ -1463,16 +1460,16 @@ export default class TemplateProcessor {
 
     private async _evaluateExprNode(planStep: PlanStep) {
         const {jsonPtr, output} = planStep;
-        let evaluated;
+        let evaluated: AsyncGenerator<unknown, any, unknown> | any;
         const metaInfo = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
         const {compiledExpr__, exprTargetJsonPointer__, expr__} = metaInfo;
         let target;
         try {
             target = jp.get(output, exprTargetJsonPointer__ as JsonPointerString); //an expression is always relative to a target
-            const safe =  this.withErrorHandling.bind(this);
+            const safe = this.withErrorHandling.bind(this);
             const jittedFunctions: { [key: string]: (arg: any) => Promise<any> } = {};
             for (const k of this.functionGenerators.keys()) {
-                const generator: FunctionGenerator|undefined = this.functionGenerators.get(k);
+                const generator: FunctionGenerator | undefined = this.functionGenerators.get(k);
                 if (generator) { // Check if generator is not undefined
                     try {
                         jittedFunctions[k] = await safe(await generator(metaInfo, this));
@@ -1505,11 +1502,11 @@ export default class TemplateProcessor {
                 target,
                 context
             );
-            if(evaluated?._jsonata_lambda){
+            if (evaluated?._jsonata_lambda) {
                 evaluated = this.wrapInOrdinaryFunction(evaluated);
                 metaInfo.isFunction__ = true;
             }
-        } catch (error:any) {
+        } catch (error: any) {
             this.logger.error(`Error evaluating expression at ${jsonPtr}`);
             this.logger.error(error);
             this.logger.debug(`Expression: ${expr__}`);
@@ -1520,7 +1517,12 @@ export default class TemplateProcessor {
             _error.name = "JSONata evaluation exception";
             throw _error;
         }
-        return evaluated;
+        if (GeneratorManager.isGenerator(evaluated)) {
+            //returns the first item, and begins pumping remaining items into execution queue
+            evaluated = this.generatorManager.pumpItems(evaluated as AsyncGenerator, metaInfo, this);
+        }
+        return evaluated
+
     }
 
     private allTagsPresent(tagSetOnTheExpression:Set<string>) {
@@ -1546,6 +1548,10 @@ export default class TemplateProcessor {
         }
         let existingData;
         if (jp.has(output, jsonPtr)) {
+            //note get(output, 'foo/-') SHOULD and does return undefined. Don't be tempted into thinking it should
+            //return the last element of the array. 'foo/-' syntax only has meaning for update operations. IF we returned
+            //the last element of the array, the !isEqual logic below would fail because it would compare the to-be-appended
+            //item to what is already there, which is nonsensical.
             existingData = jp.get(output, jsonPtr);
         }
         if (!isEqual(existingData, data)) {
