@@ -1795,7 +1795,7 @@ with 10 ms temporal separation.
 ```json
 > .init -f example/generate.json
 {
-  "delayMs": 10,
+  "delayMs": 250,
   "generated":"${[1..10]~>$generate(delayMs)}"
 }
 ```
