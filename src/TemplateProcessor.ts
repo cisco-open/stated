@@ -32,6 +32,8 @@ import {saferFetch} from "./utils/FetchWrapper.js";
 import {env} from "./utils/env.js"
 import * as jsonata from "jsonata";
 import {GeneratorManager} from "./utils/GeneratorManager.js";
+import {LifecycleOwner, LifecycleState} from "./Lifecycle.js";
+import {LifecycleManager} from "./LifecycleManager.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -304,15 +306,18 @@ export default class TemplateProcessor {
 
     private generatorManager:GeneratorManager;
 
-    /** Allows caller to set a callback to propagate initialization into their framework */
+    /** Allows caller to set a callback to propagate initialization into their framework
+     * @deprecated use lifecycleManager instead
+     * */
     public readonly onInitialize: Map<string,() => Promise<void>|void>;
 
     /**
      * Allows a caller to receive a callback after the template is evaluated, but before any temporary variables are
      * removed. This function is slated to be replaced with a map of functions like onInitialize
-     * @deprecated
+     * @deprecated use lifecycleManager instead
      */
     public postInitialize: ()=> Promise<void> = async () =>{};
+    public readonly lifecycleManager:LifecycleOwner = new LifecycleManager(this);
 
     public executionStatus: ExecutionStatus;
 
@@ -452,6 +457,7 @@ export default class TemplateProcessor {
             this.logger.debug(`Running onInitialize plugin '${name}'...`);
             await task();
         }
+        await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.StartInitialize);
         try {
             if (jsonPtr === "/") {
                 this.errorReport = {}; //clear the error report when we initialize a root importedSubtemplate
@@ -492,9 +498,11 @@ export default class TemplateProcessor {
                 await this.executionStatus.restore(this);
             }
             await this.postInitialize();
+            await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.PreTmpVarRemoval);
             this.removeTemporaryVariables(this.tempVars, jsonPtr);
             this.logger.verbose("initialization complete...");
             this.logOutput(this.output);
+            await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.Initialized);
         }finally {
             this.isInitializing = false;
         }
@@ -502,11 +510,14 @@ export default class TemplateProcessor {
 
     async close():Promise<void>{
         this.isClosed = true;
+        await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.StartClose);
         this.executionQueue.length = 0; //nuke execution queue
         await this.drainExecutionQueue();
         this.timerManager.clear();
         this.changeCallbacks.clear();
         this.executionStatus.clear();
+        await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.Closed);
+        (this.lifecycleManager as LifecycleManager).clear();
     }
 
     private async evaluateInitialPlan(jsonPtr:JsonPointerString) {

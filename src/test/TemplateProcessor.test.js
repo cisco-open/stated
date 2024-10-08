@@ -24,6 +24,7 @@ import jsonata from "jsonata";
 import { default as jp } from "../../dist/src/JsonPointer.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/globals';
+import {LifecycleState} from "../../dist/src/Lifecycle.js";
 
 if (typeof Bun !== 'undefined') {
     // Dynamically import Jest's globals if in Bun.js environment
@@ -3135,6 +3136,86 @@ test("test generate", async () => {
         await allCallsMade;
         expect(changeHandler).toHaveBeenCalledTimes(10);
         expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+
+test("test lifecycle manager", async () => {
+    const o = {
+        "a": "hello",
+        "tmp": "!${'remove me'}"
+    };
+
+    const callCount = 10;
+
+
+
+    const tp = new TemplateProcessor(o);
+
+    let resolve0;
+    const promise0 = new Promise((resolve) => {
+        resolve0 = resolve;
+    })
+    tp.lifecycleManager.setLifecycleCallback(LifecycleState.StartInitialize, async (state, tp)=>{
+        expect(state).toEqual(LifecycleState.StartInitialize);
+        expect(tp.output).toEqual({
+            "a": "hello",
+            "tmp": "!${'remove me'}"
+        });
+        resolve0();
+    });
+    let resolve1;
+    const promise1 = new Promise((resolve) => {
+        resolve1 = resolve;
+    })
+    tp.lifecycleManager.setLifecycleCallback(LifecycleState.PreTmpVarRemoval, async (state)=>{
+        expect(state).toEqual(LifecycleState.PreTmpVarRemoval);
+        expect(tp.output).toEqual({
+            "a": "hello",
+            "tmp": "remove me"
+        });
+        resolve1();
+    });
+    let resolve2;
+    const promise2 = new Promise((resolve) => {
+        resolve2 = resolve;
+    })
+    tp.lifecycleManager.setLifecycleCallback(LifecycleState.Initialized, async (state)=>{
+        expect(state).toEqual(LifecycleState.Initialized);
+        expect(tp.output).toEqual({
+            "a": "hello",
+        });
+        resolve2();
+    });
+    let resolve3;
+    const promise3 = new Promise((resolve) => {
+        resolve3 = resolve;
+    })
+    tp.lifecycleManager.setLifecycleCallback(LifecycleState.StartClose, async (state)=>{
+        expect(state).toEqual(LifecycleState.StartClose);
+        expect(tp.output).toEqual({
+            "a": "hello",
+        });
+        resolve3();
+    });
+    let resolve4;
+    const promise4 = new Promise((resolve) => {
+        resolve4 = resolve;
+    })
+    tp.lifecycleManager.setLifecycleCallback(LifecycleState.Closed, async (state)=>{
+        expect(state).toEqual(LifecycleState.Closed);
+        expect(tp.output).toEqual({
+            "a": "hello",
+        });
+        resolve4();
+    });
+    try {
+        await tp.initialize();
+        await Promise.all([promise0, promise1]);
+        tp.close();
+        await Promise.all([promise2, promise3, promise4]);
     } finally {
         await tp.close();
     }
