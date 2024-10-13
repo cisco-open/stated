@@ -3220,3 +3220,33 @@ test("test lifecycle manager", async () => {
         await tp.close();
     }
 });
+
+test("test transaction", async () => {
+    const o = {
+        "a": 1,
+        "b": "replace me",
+        "c": "remove me",
+        "d": "${41+1}"
+    };
+    const transaction = {
+        op: "transaction",
+        mutations:[
+            {op: "set", jsonPtr: "/b", value: 42},
+            {op: "delete", jsonPtr: "/c", value: undefined},
+            {op: "set", jsonPtr: "/d", value: 42}
+        ]
+    }
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        let receivedTransaction;
+        tp.setTransactionCallback((transaction)=>{
+            receivedTransaction = transaction;
+        });
+        await tp.applyTransaction(transaction);
+        await expect(tp.output).toStrictEqual({a:1, b:42, d:42})
+        expect(receivedTransaction).toStrictEqual(transaction);
+    } finally {
+        await tp.close();
+    }
+});

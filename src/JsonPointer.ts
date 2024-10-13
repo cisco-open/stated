@@ -71,7 +71,11 @@ export default class JsonPointer {
      */
     static get(obj:object, pointer:JsonPointerString|JsonPointerStructureArray) {
         const refTokens = Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer as JsonPointerString);
-
+        //technically the json pointer for the root object is "". However I find this ridiculous and we adopt our
+        //more sensible convention that "/" is the root pointer. So the if block below is there to treat "" as "/"
+        if(refTokens[0] === "" && refTokens.length === 1){
+            return obj;
+        }
         for (let i = 0; i < refTokens.length; ++i) {
             const tok = refTokens[i];
             if (!(typeof obj === 'object' && tok in obj)) {
