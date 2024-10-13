@@ -1244,7 +1244,7 @@ export default class TemplateProcessor {
      * changes can be 'bundled' into a single Transaction for the purpose of capturing a single set of changes that
      * if atomically applied, has the exact same effect as the DAG propagation. Therefore, a Transaction can be a
      * less chatty way to capture and apply changes from one template instance A to template instance B without
-     * incurring the cost of for B to compute the change DAG.  
+     * incurring the cost of for B to compute the change DAG.
      *
      * @param cb - A callback function that handles a `Transaction` object. The callback is expected
      * to return a `Promise<void>`.
