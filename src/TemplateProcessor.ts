@@ -72,7 +72,7 @@ export type PlanStep = {
     forkId:string,
     didUpdate:boolean
 }
-export type Mutation =  {jsonPtr:JsonPointerString, op:Op, value:any};
+export type Mutation =  {jsonPtr:JsonPointerString, op:Op, data:any};
 
 //A Transaction is a set of changes applied atomically.
 export type Transaction ={
@@ -1223,16 +1223,16 @@ export default class TemplateProcessor {
      */
     private async applyTransaction(transaction: Transaction) {
         const ptrs: JsonPointerString[] = [];
-        for (const { jsonPtr, value, op } of transaction.mutations) {
+        for (const { jsonPtr, data, op } of transaction.mutations) {
             ptrs.push(jsonPtr);
             if (op === 'set') {
-                jp.set(this.output, jsonPtr, value);
+                jp.set(this.output, jsonPtr, data);
             } else if (op === 'delete') {
                 jp.remove(this.output, jsonPtr);
             } else {
                 throw new Error(`Transaction cannot include Op type ${op}`);
             }
-            await this.callDataChangeCallbacks(value, jsonPtr, op === 'delete', op);
+            await this.callDataChangeCallbacks(data, jsonPtr, op === 'delete', op);
         }
         await this.callDataChangeCallbacks(this.output, ptrs);
     }
@@ -1254,16 +1254,16 @@ export default class TemplateProcessor {
      * @public
      */
     public setTransactionCallback(cb: (transaction: Transaction) => Promise<void>) {
-        const dataChangeCallback = async (value: any, jsonPtrs: JsonPointerString | JsonPointerString[], removed?: boolean, op?: Op) => {
+        const dataChangeCallback = async (root: any, jsonPtrs: JsonPointerString | JsonPointerString[], removed?: boolean, op?: Op) => {
             if (!Array.isArray(jsonPtrs)) {  // This is the case where the update is for the root document
                 throw new Error(`DataChangeHandler for transaction bundling was illegally registered on ${jsonPtrs} (it can only be registered on '/'`);
             }
             const mutations: Mutation[] = jsonPtrs.map(jsonPtr => {
-                const value = jp.has(this.output, jsonPtr) ? jp.get(this.output, jsonPtr) : undefined;
+                const data = jp.has(this.output, jsonPtr) ? jp.get(this.output, jsonPtr) : undefined;
                 return {
-                    value,
+                    data,
                     jsonPtr,
-                    op: value === undefined ? "delete" : "set",
+                    op: data === undefined ? "delete" : "set",
                 };
             });
             const transaction: Transaction = {
