@@ -3231,9 +3231,9 @@ test("test transaction", async () => {
     const transaction = {
         op: "transaction",
         mutations:[
-            {op: "set", jsonPtr: "/b", value: 42},
-            {op: "delete", jsonPtr: "/c", value: undefined},
-            {op: "set", jsonPtr: "/d", value: 42}
+            {op: "set", jsonPtr: "/b", data: 42},
+            {op: "delete", jsonPtr: "/c", data: undefined},
+            {op: "set", jsonPtr: "/d", data: 42}
         ]
     }
     const tp = new TemplateProcessor(o);
