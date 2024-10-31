@@ -3174,7 +3174,7 @@ test("test generate function result", async () => {
         "a":"${$generate(function(){10})}",
         "b": "${a}"
     };
-    
+
     let resolvePromise;
     const allCallsMade = new Promise((resolve) => {
         resolvePromise = resolve;
