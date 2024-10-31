@@ -3110,14 +3110,14 @@ test("test close", async () => {
     }
 });
 
-test("test generate", async () => {
+test("test generate array", async () => {
     const o = {
         "delayMs": 10,
         "a":"${[1..10]~>$generate(delayMs)}",
         "b": "${a}"
     };
 
-    const callCount = 10;
+    const callCount = 0;
     let resolvePromise;
     const allCallsMade = new Promise((resolve) => {
         resolvePromise = resolve;
@@ -3135,6 +3135,62 @@ test("test generate", async () => {
         await tp.initialize();
         await allCallsMade;
         expect(changeHandler).toHaveBeenCalledTimes(10);
+        expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate single item", async () => {
+    const o = {
+        "a":"${$generate(10)}",
+        "b": "${a}"
+    };
+
+    const callCount = 0;
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
+        expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate function result", async () => {
+    const o = {
+        "a":"${$generate(function(){10})}",
+        "b": "${a}"
+    };
+    
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
         expect(tp.output.b).toBe(10);
     } finally {
         await tp.close();

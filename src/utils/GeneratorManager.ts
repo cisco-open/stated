@@ -9,28 +9,40 @@ export class GeneratorManager{
     }
 
     /**
-     * Generates an asynchronous generator that yields items from the provided array,
+     * Generates an asynchronous generator that yields items from the provided generateMe,
      * separated by the specified timeout, and automatically registers the generator.
      *
-     * @param array The array of items to yield.
+     * @param generateMe The item or array of items to yield. If generate me is a function, the function is called to
+     * get a result, and recursively passed to generate()
      * @param timeout The delay in milliseconds between yields. Defaults to 0.
      * @returns The registered asynchronous generator.
      */
-    public generate = (array: any[], timeout: number = 0): AsyncGenerator<any, void, unknown> => {
+    public generate = (generateMe: any[]|any| (() => any), timeout: number = 0): AsyncGenerator<any, void, unknown> => {
         if (this.templateProcessor.isClosed) {
             throw new Error("generate() cannot be called on a closed TemplateProcessor");
         }
         const timerManager = this.templateProcessor.timerManager;
-
-        const generator = async function* () {
-            for (let i = 0; i < array.length; i++) {
-                yield array[i];
-                if (timeout > 0 && i < array.length - 1) {
-                    await new Promise<void>((resolve) => timerManager.setTimeout(resolve, timeout));
+        //yield array items separated by timeout
+        if(Array.isArray(generateMe)) {
+            return async function* () {
+                for (let i = 0; i < generateMe.length; i++) {
+                    yield generateMe[i];
+                    if (timeout > 0 && i < generateMe.length - 1) {
+                        await new Promise<void>((resolve) => timerManager.setTimeout(resolve, timeout));
+                    }
                 }
-            }
+            }();
+        }
+        //call function and return result
+        if(typeof generateMe === 'function'){
+            return async function*(){
+                yield (generateMe as ()=>any)();
+            }();
+        }
+        //yield individual item
+        return async function*(){
+            yield generateMe;
         }();
-        return generator;
     };
 
 
