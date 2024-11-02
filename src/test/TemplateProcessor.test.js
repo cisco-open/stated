@@ -3112,8 +3112,8 @@ test("test close", async () => {
 
 test("test generate array", async () => {
     const o = {
-        "delayMs": 10,
-        "a":"${[1..10]~>$generate(delayMs)}",
+        "options": {"interval":10, "valueOnly":true},
+        "a":"${[1..10]~>$generate(options)}",
         "b": "${a}"
     };
 
@@ -3192,6 +3192,35 @@ test("test generate function result", async () => {
         await allCallsMade;
         expect(changeHandler).toHaveBeenCalledTimes(1);
         expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate verbose function result", async () => {
+    const o = {
+        "a":"${$generate(function(){10}, {'valueOnly':false})}",
+        "b": "${a}"
+    };
+
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
+        expect(tp.output.b).toMatchObject({value:10, done:true});
+        expect(tp.output.b.return).toBeDefined(); //make sure 'return' function is provided
     } finally {
         await tp.close();
     }

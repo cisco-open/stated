@@ -1,0 +1,8 @@
+generated: ${$generate($random, {'interval':10, 'valueOnly':false})}
+onGenerated: |
+  ${
+    $count(accumulator)<3
+      ? $set('/accumulator/-', $$.generated.value)
+      : generated.return() /* shut off the generator when the accumulator has 10 items */
+  }
+accumulator: []

@@ -1763,14 +1763,35 @@ keep in mind that all the values were sequentially pushed into the `generated` f
   "generated": 10
 }
 ```
+If you are familiar with generators in JS, you know that generated values take a verbose form in which 
+a `{value, done}` object is [returned](https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/AsyncGenerator/next#return_value).
+If you wish to use the more verbose JS style of yielded/returned object, you can pass your generator 
+to `$generate` and disable `valuesOnly`, as follows. Notice how the yielded values now contain the JS style 
+`{value, done}`
+```json
+> .init -f example/myGeneratorVerbose.json --xf example/myGenerator.mjs
+{
+  "generated": "${$myGenerator()~>$generate({'valueOnly':false})}"
+}
+> .out
+{
+  "generated": {
+    "value": 10,
+    "done": true,
+    "return": "{function:}"
+  }
+}
+```
+
 A slight variation on the example accumulates every value yielded by the generator:
 ```json
-> .init -f example/myGenerator2.json --xf example/myGenerator.mjs
+>  .init -f example/myGenerator2.json --xf example/myGenerator.mjs
 {
-   "generated": "${$myGenerator()}",
-   "onGenerated": "${$set('/accumulator/-', $$.generated)}",
-   "accumulator": []
+  "generated": "${$myGenerator()}",
+  "onGenerated": "${$set('/accumulator/-', $$.generated)}",
+  "accumulator": []
 }
+
 ```
 ```json ["data=[1,2,3,4,5,6,7,8,9,10]"]
 > .init -f example/myGenerator2.json --xf example/myGenerator.mjs --tail "/accumulator until $=[1,2,3,4,5,6,7,8,9,10]"
@@ -1789,14 +1810,15 @@ Started tailing... Press Ctrl+C to stop.
 ]
 
 ```
-Or, you can use the built in `$generate` method, which takes an optional delay in ms, and turns the array
-into an AsyncGenerator. In the example below the values 1 to 10 are pumped into the `generated` field
-with 10 ms temporal separation.
+You already saw hoe the built-in `$generate` function can accept a JS AsyncGeneraotr, and options. But $generate 
+can also be used to convert ordinary arrays or functions into async generators. When provided, the `interval` option, 
+causes the provided array to yield its elements periodically. When a function is provided, as opposed to an array, the
+function is called periodically.
 ```json
 > .init -f example/generate.json
 {
   "delayMs": 250,
-  "generated":"${[1..10]~>$generate(delayMs)}"
+  "generated":"${[1..10]~>$generate({'interval':delayMs})}"
 }
 ```
 ```json ["data.generated=10"]
@@ -1808,6 +1830,63 @@ Started tailing... Press Ctrl+C to stop.
 }
 
 ```
+This `example/myGenerator3.yaml` shows how you can call `return` and stop a generator.
+```yaml
+generated: ${$generate($random, {'interval':10, 'valueOnly':false})}
+onGenerated: |
+  ${
+    $count(accumulator)<3
+      ? $set('/accumulator/-', $$.generated.value)
+      : generated.return() /* shut off the generator when the accumulator has 10 items */
+  }
+accumulator: []
+```
+```json ["$count(data.accumulator)=3"]
+> .init -f example/myGenerator3.yaml --tail "/ until $count(accumulator)=3"
+Started tailing... Press Ctrl+C to stop.
+{
+  "generated": {
+    "value": 0.23433826655570145,
+    "done": false,
+    "return": "{function:}"
+  },
+  "onGenerated": {
+    "value": null,
+    "done": true
+  },
+  "accumulator": [
+    0.23433826655570145,
+    0.23433826655570145,
+    0.23433826655570145
+  ]
+}
+
+
+```
+The `maxYield` parameter can also be used to stop a generator:
+```json ["$count(data.accumulator)=0", "$count(data.accumulator)=5"]
+> .init -f example/myGenerator4.yaml
+{
+  "generated": "${$generate($random, {'interval':10, 'maxYield':5})}",
+  "onGenerated": "${$set('/accumulator/-', $$.generated)}",
+  "accumulator": []
+}
+> .init -f example/myGenerator4.yaml --tail "/ until $count(accumulator)=5"
+{
+  "generated": 0.5289126250886866,
+  "onGenerated": [
+    "/accumulator/-"
+  ],
+  "accumulator": [
+    0.3260049204634301,
+    0.4477190160739559,
+    0.9414436597923774,
+    0.8593436891141426,
+    0.5289126250886866
+  ]
+}
+```
+
 
 ### $setTimeout
 `$setTimeout` is the JavaScript `setTimeout` function. It receives a function and an timeout

@@ -1633,7 +1633,7 @@ export default class TemplateProcessor {
                 context
             );
             if (evaluated?._jsonata_lambda) {
-                evaluated = this.wrapInOrdinaryFunction(evaluated);
+                evaluated = TemplateProcessor.wrapInOrdinaryFunction(evaluated);
                 metaInfo.isFunction__ = true;
             }
         } catch (error: any) {
@@ -1647,9 +1647,9 @@ export default class TemplateProcessor {
             _error.name = "JSONata evaluation exception";
             throw _error;
         }
-        if (GeneratorManager.isGenerator(evaluated)) {
-            //returns the first item, and begins pumping remaining items into execution queue
-            evaluated = this.generatorManager.pumpItems(evaluated as AsyncGenerator, metaInfo, this);
+        if (GeneratorManager.isAsyncGenerator(evaluated)) {
+            //awaits and returns the first item. And pumpItems begins pumping remaining items into execution queue asynchronously
+            evaluated = await this.generatorManager.pumpItems(evaluated as AsyncGenerator, metaInfo, this);
         }
         return evaluated
 
@@ -1869,7 +1869,6 @@ export default class TemplateProcessor {
         if (callbacks) {
             const promises = Array.from(callbacks).map(cbFn =>
                 Promise.resolve().then(() => {
-                    //to do ... return here so asyn functions are actually awaited by Promise.all
                     cbFn(data, jsonPointer as JsonPointerString, removed, op);
                 }) //works with cbFn that is either sync or async by wrapping in promise
             );
@@ -1934,7 +1933,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private wrapInOrdinaryFunction(jsonataLambda:any) {
+    public static wrapInOrdinaryFunction(jsonataLambda:any) {
         const wrappedFunction = (...args:any[])=> {
             // Call the 'apply' method of jsonataLambda with the captured arguments
             return jsonataLambda.apply(jsonataLambda, args);
@@ -2062,7 +2061,7 @@ export default class TemplateProcessor {
                 forkId: TemplateProcessor.simpleUniqueId()
             };
             //do not await setData...$forked runs async
-            this.setDataForked (mvccSnapshotPlanStep);
+            void this.setDataForked (mvccSnapshotPlanStep);
         }
     }
 

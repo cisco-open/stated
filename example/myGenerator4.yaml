@@ -1,0 +1,3 @@
+generated: ${$generate($random, {'interval':10, 'maxYield':5})}
+onGenerated:  ${$set('/accumulator/-', $$.generated)}
+accumulator: []
