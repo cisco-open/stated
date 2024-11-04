@@ -45,6 +45,7 @@ export default class DependencyFinder {
     private readonly currentSteps: StepRecord[][]; //logically, [[a,b,c],[d,e,f]]
     private nodeStack: GeneratedExprNode[];
     private readonly dependencies: string[][]; //during tree walking we collect these dependencies like [["a", "b", "c"], ["foo", "bar"]] which means the dependencies are a.b.c and foo.bar
+    public readonly variables: Set<string> = new Set<string>();
     /**
      * program can be either a string to be compiled, or an already-compiled AST
      * @param program
@@ -102,6 +103,7 @@ export default class DependencyFinder {
             const {
                 type,
             } = node;
+            this.captureBuiltInFunctionNames(node);
             this.capturePathExpressions(node);
             this.captureArrayIndexes(node);
             this.nodeStack.push(node);
@@ -141,6 +143,21 @@ export default class DependencyFinder {
             this.markScopeWhenFunctionReturnsValue(scopeWeExited as GeneratedExprNode);
         }
         return this.dependencies;
+    }
+
+    /**
+     * Function calls like $count(...) are recorded in this.variables so that the MetaInf can have a record
+     * of what context variables (in this case functions) were accessed by the expression.
+     * @param node
+     * @private
+     */
+    private captureBuiltInFunctionNames(node:GeneratedExprNode) {
+        if(node.type === 'function'){
+            const name = node.procedure?.value;
+            if(name !== undefined){
+                this.variables.add(name);
+            }
+        }
     }
 
     private markScopeWhenFunctionReturnsValue(scopeWeExited:GeneratedExprNode) {
@@ -238,6 +255,7 @@ export default class DependencyFinder {
         if (type === "variable") {
             //if we are here then the variable must be an ordinary locally named variable since it is neither $$ or $.
             //variables local to a closure cannot cause/imply a dependency for this expression
+            this.variables.add(value);
             if (!this.hasParent("function")) { //the function name is actually a variable, we want to skip such variables
                 //@ts-ignore
                 last(this.currentSteps).push({type, value, "emit": false});

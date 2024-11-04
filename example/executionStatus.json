@@ -120,7 +120,8 @@
         "expr__": "['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
-        "data__": null
+        "data__": null,
+        "variables__": ["forked"]
       },
       {
         "materialized__": true,
@@ -156,7 +157,8 @@
             "treeHasExpressions__": false,
             "parent__": "/homeworldDetails/properties"
           }
-        }
+        },
+        "variables__": ["fetch"]
       },
       {
         "materialized__": true,
@@ -177,7 +179,8 @@
         "exprRootPath__": null,
         "expr__": " homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ",
         "exprTargetJsonPointer__": "",
-        "compiledExpr__": "--compiled expression--"
+        "compiledExpr__": "--compiled expression--",
+        "variables__": ["joined"]
       },
       {
         "materialized__": true,
@@ -263,7 +266,8 @@
             "treeHasExpressions__": false,
             "parent__": "/personDetails/properties"
           }
-        }
+        },
+        "variables__": ["fetch", "save"]
       },
       {
         "materialized__": false,

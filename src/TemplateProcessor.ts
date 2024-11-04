@@ -84,7 +84,8 @@ export type Transaction ={
  * a FunctionGenerator is used to generate functions that need the context of which expression they were called from
  * which is made available to them in the MetaInf
  */
-export type FunctionGenerator = (metaInfo: MetaInfo, templateProcessor: TemplateProcessor) => (Promise<(arg: any) => Promise<any>>);
+export type FunctionGenerator<T> = (context: T, templateProcessor?: TemplateProcessor) => Promise<(...args: any[]) => Promise<any>> | ((...args: any[]) => any);
+
 
 
 
@@ -310,10 +311,11 @@ export default class TemplateProcessor {
      *  it generates are asynchronous functions (ie they return a promise).
      *  $import is an example of this kind of behavior.
      *  When $import('http://mytemplate.com/foo.json') is called, the import function
-     *  is actually genrated on the fly, using knowledge of the json path that it was
+     *  is actually generated on the fly, using knowledge of the json path that it was
      *  called at, to replace the content of the template at that path with the downloaded
      *  content.*/
-    functionGenerators: Map<string, FunctionGenerator>;
+    functionGenerators: Map<string, FunctionGenerator<MetaInfo>> = new Map();
+    planStepFunctionGenerators:  Map<string, FunctionGenerator<PlanStep>> = new Map();
 
     /** for every json pointer, we have multiple callbacks that are stored in a Set
      * @private
@@ -388,7 +390,7 @@ export default class TemplateProcessor {
         this.options = options;
         this.isInitializing = false;
         this.changeCallbacks = new Map();
-        this.functionGenerators = new Map();
+        //this.functionGenerators = new Map();
         this.tagSet = new Set();
         this.onInitialize = new Map();
         this.executionStatus = new ExecutionStatus(this);
@@ -431,6 +433,7 @@ export default class TemplateProcessor {
 
             }
         }
+        this.setupFunctionGenerators();
     }
 
 
@@ -636,7 +639,7 @@ export default class TemplateProcessor {
 
     public static NOOP = Symbol('NOOP');
 
-    private getImport(metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> { //we provide the JSON Pointer that targets where the imported content will go
+    private getImport = (metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> => { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr
         return async (importMe) => {
             let resp;
@@ -789,6 +792,7 @@ export default class TemplateProcessor {
                     metaInfo.compiledExpr__ = depFinder.compiledExpression;
                     //we have to filter out "" from the dependencies as these are akin to 'no-op' path steps
                     metaInfo.dependencies__ = depFinder.findDependencies().map(depArray => depArray.filter(pathPart => pathPart !== ""));
+                    metaInfo.variables__ = Array.from(depFinder.variables);
                     acc.push(metaInfo);
                 } catch (e) {
                     this.logger.error(JSON.stringify(e));
@@ -1191,7 +1195,7 @@ export default class TemplateProcessor {
                 if (plan.op === "snapshot") {
                     (plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();;
                 } else if(plan.op === "transaction" ){
-                    this.applyTransaction(plan as Transaction);
+                    this.applyTransaction(plan as Transaction); //should this await?
                 }else{
                     await this.executePlan(plan as Plan);
                 }
@@ -1592,42 +1596,12 @@ export default class TemplateProcessor {
         const {jsonPtr, output} = planStep;
         let evaluated: AsyncGenerator<unknown, any, unknown> | any;
         const metaInfo = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
-        const {compiledExpr__, exprTargetJsonPointer__, expr__} = metaInfo;
+        const {compiledExpr__, exprTargetJsonPointer__, expr__, variables__=[]} = metaInfo;
         let target;
         try {
+            const context = {...this.context};
+            await this.populateContextWithGeneratedFunctions(context, variables__, metaInfo, planStep);
             target = jp.get(output, exprTargetJsonPointer__ as JsonPointerString); //an expression is always relative to a target
-            const safe = this.withErrorHandling.bind(this);
-            const jittedFunctions: { [key: string]: (arg: any) => Promise<any> } = {};
-            for (const k of this.functionGenerators.keys()) {
-                const generator: FunctionGenerator | undefined = this.functionGenerators.get(k);
-                if (generator) { // Check if generator is not undefined
-                    try {
-                        jittedFunctions[k] = await safe(await generator(metaInfo, this));
-                    } catch (error) {
-                        const errorMessage = error instanceof Error ? error.message : "Unknown error";
-                        const msg = `Function generator '${k}' failed to generate a function and erred with:"${errorMessage}"`;
-                        this.logger.error(msg);
-                        throw new Error(msg);
-                    }
-                } else {
-                    // Optionally handle the case where generator is undefined
-                    const msg = `Function generator for key '${k}' is undefined.`;
-                    this.logger.error(msg);
-                    throw new Error(msg);
-                }
-            }
-
-            const context ={...this.context,
-            ...{"errorReport": this.generateErrorReportFunction(metaInfo)},
-            ...{"defer": safe(this.generateDeferFunction(metaInfo))},
-            ...{"import": safe(this.getImport(metaInfo))},
-            ...{"forked": safe(this.generateForked(planStep))},
-            ...{"joined": safe(this.generateJoined(planStep))},
-            ...{"set": safe(this.generateSet(planStep))},
-            ...{"setInterval": safe(this.timerManager.generateSetInterval(planStep))},
-            ...{"clearInterval": safe(this.timerManager.generateClearInterval(planStep))},
-            ...jittedFunctions
-            };
             evaluated = await compiledExpr__?.evaluate(
                 target,
                 context
@@ -1653,6 +1627,52 @@ export default class TemplateProcessor {
         }
         return evaluated
 
+    }
+
+    private setupFunctionGenerators(){
+        this.functionGenerators.set("errorReport", this.generateErrorReportFunction);
+        this.functionGenerators.set("defer", this.generateDeferFunction);
+        this.functionGenerators.set("import", this.getImport);
+        this.planStepFunctionGenerators.set("forked", this.generateForked);
+        this.planStepFunctionGenerators.set("joined", this.generateJoined);
+        this.planStepFunctionGenerators.set("set", this.generateSet);
+        this.planStepFunctionGenerators.set("setInterval", this.timerManager.generateSetInterval);
+        this.planStepFunctionGenerators.set("clearInterval", this.timerManager.generateClearInterval);
+    }
+
+    /**
+     * Certain functions callable in a JSONata expression must be dynamically generated. They cannot be static
+     * generated because the function instance needs to hold a reference to some kind of runtime state, either
+     * a MetaInfo or a PlanStep (see FunctionGenerator type). This method, for a given list of function names,
+     * generates the function by finding and calling the corresponding FunctionGenerator.
+     * @param context
+     * @param functionNames
+     * @param metaInf
+     * @param planStep
+     * @private
+     */
+    private async populateContextWithGeneratedFunctions( context:any, functionNames:string[], metaInf:MetaInfo, planStep:PlanStep):Promise<void>{
+        const safe = this.withErrorHandling.bind(this);
+        for (const name of functionNames) {
+            try {
+                let generator:any = this.functionGenerators.get(name);
+                if (generator) {
+                    const generated:any = await generator(metaInf, this);
+                    context[name] = safe(generated);
+                } else {
+                    generator = this.planStepFunctionGenerators.get(name);
+                    if (generator) {
+                        const generated = await generator(planStep);
+                        context[name] = safe(generated);
+                    }
+                }
+            } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : "Unknown error";
+                const msg = `Function generator '${name}' failed to generate a function and erred with:"${errorMessage}"`;
+                this.logger.error(msg);
+                throw new Error(msg);
+            }
+        }
     }
 
     private allTagsPresent(tagSetOnTheExpression:Set<string>) {
@@ -1948,7 +1968,7 @@ export default class TemplateProcessor {
         return wrappedFunction;
     }
 
-    private async generateErrorReportFunction(metaInfo: MetaInfo){
+    private generateErrorReportFunction = async (metaInfo: MetaInfo) => {
         return async (message:string, name?:string, stack?:any):Promise<StatedError>=>{
             const error:StatedError =  {
                 error: {
@@ -1974,19 +1994,18 @@ export default class TemplateProcessor {
 
 
 
-    private generateDeferFunction(metaInfo: any) {
-        const deferFunc =  (jsonPointer:JsonPointerString, timeoutMs:number)=>{
+    private generateDeferFunction = (metaInfo: MetaInfo) => {
+        return (jsonPointer: JsonPointerString, timeoutMs: number) => {
 
-            if(jp.has(this.output, jsonPointer)){
-                const dataChangeCallback =  debounce(async (data)=>{
-                    this.setData(metaInfo.jsonPointer__, data, "forceSetInternal"); //sets the value into the location in the template where the $defer() call is made
+            if (jp.has(this.output, jsonPointer)) {
+                const dataChangeCallback = debounce(async (data) => {
+                    this.setData(metaInfo.jsonPointer__ as JsonPointerString, data, "forceSetInternal"); //sets the value into the location in the template where the $defer() call is made
                 }, timeoutMs);
                 this.setDataChangeCallback(jsonPointer, dataChangeCallback);
                 return jp.get(this.output, jsonPointer); //returns the current value of the location $defer is called on
             }
             throw new Error(`$defer called on non-existant field: ${jsonPointer}`);
-        }
-        return deferFunc;
+        };
     }
 
     /**
@@ -2047,7 +2066,7 @@ export default class TemplateProcessor {
      * @private
      * @param planStep
      */
-    public generateForked(planStep: PlanStep) {
+    public generateForked = (planStep: PlanStep) => {
         return async (jsonPtr:JsonPointerString, data:any, op:Op='set')=>{
             const {output=this.output, forkStack, forkId} = planStep; //defaulting output to this.output is important for when this call is used by ExecutionStatus to restore
             const mvccSnapshot = TemplateProcessor.deepCopy(output); //every call to $forked creates a new planStep with its own output copy
@@ -2076,7 +2095,7 @@ export default class TemplateProcessor {
      * @param planStep
      * @private
      */
-    private generateSet(planStep: PlanStep) {
+    private generateSet = (planStep: PlanStep) => {
         const isInsideFork = planStep.forkStack.length > 0;
         if(!isInsideFork){
             return this.setData
@@ -2092,7 +2111,7 @@ export default class TemplateProcessor {
      * @param planStep
      * @private
      */
-    private generateJoined(planStep: PlanStep) {
+    private generateJoined = (planStep: PlanStep) => {
         return async (jsonPtr:JsonPointerString, data:any, op:Op='set')=>{
             const {output, forkId} = planStep.forkStack.pop() || {output:this.output, forkId:"ROOT"};
             if(forkId === "ROOT"){

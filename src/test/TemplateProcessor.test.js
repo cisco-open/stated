@@ -2289,7 +2289,8 @@ test("interval snapshot", async () => {
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
                     "isFunction__": true,
-                    "data__": "{function:}"
+                    "data__": "{function:}",
+                    "variables__": ["set"]
                 },
                 {
                     "materialized__": true,
@@ -2311,7 +2312,8 @@ test("interval snapshot", async () => {
                     "expr__": " $setInterval(counter, 1000)",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "--interval/timeout--"
+                    "data__": "--interval/timeout--",
+                    "variables__": ["setInterval"]
                 },
                 {
                     "materialized__": true,
@@ -2333,7 +2335,8 @@ test("interval snapshot", async () => {
                     "expr__": " count>=2?($clearInterval($$.rapidCaller);'done'):'not done' ",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "not done"
+                    "data__": "not done",
+                    "variables__": ["clearInterval"]
                 }
             ]
         },
@@ -2489,7 +2492,8 @@ test("snapshot and restore", async () => {
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
                     "isFunction__": true,
-                    "data__": "{function:}"
+                    "data__": "{function:}",
+                    "variables__": ["set"]
                 },
                 {
                     "materialized__": true,
@@ -2511,7 +2515,8 @@ test("snapshot and restore", async () => {
                     "expr__": " $setInterval(counter, 100)",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "--interval/timeout--"
+                    "data__": "--interval/timeout--",
+                    "variables__": ["setInterval"]
                 },
                 {
                     "materialized__": true,
@@ -2533,7 +2538,8 @@ test("snapshot and restore", async () => {
                     "expr__": " count>=10?($clearInterval($$.rapidCaller);'done'):'not done' ",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "not done"
+                    "data__": "not done",
+                    "variables__": ["clearInterval"]
                 }
             ]
         },
@@ -3197,7 +3203,7 @@ test("test generate function result", async () => {
     }
 });
 
-test("test generate verbose function result", async () => {
+test("test_generate_verbose_function_result", async () => {
     const o = {
         "a":"${$generate(function(){10}, {'valueOnly':false})}",
         "b": "${a}"

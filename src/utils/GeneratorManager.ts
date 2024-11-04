@@ -55,7 +55,7 @@ export class GeneratorManager{
         else if(typeof input === 'function'){
             g = async function*(){
                 if(interval < 0){ //no interval so call function once
-                    return (input as ()=>any)();//return not yield, for done:true
+                    return await (input as ()=>any)();//return not yield, for done:true
                 }else{ //an interval is specified so we sit in a loop calling the function
                     let count = 0;
                     while(maxYield < 0 || count++ < maxYield-1){
