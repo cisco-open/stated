@@ -2289,7 +2289,8 @@ test("interval snapshot", async () => {
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
                     "isFunction__": true,
-                    "data__": "{function:}"
+                    "data__": "{function:}",
+                    "variables__": ["set"]
                 },
                 {
                     "materialized__": true,
@@ -2311,7 +2312,8 @@ test("interval snapshot", async () => {
                     "expr__": " $setInterval(counter, 1000)",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "--interval/timeout--"
+                    "data__": "--interval/timeout--",
+                    "variables__": ["setInterval"]
                 },
                 {
                     "materialized__": true,
@@ -2333,7 +2335,8 @@ test("interval snapshot", async () => {
                     "expr__": " count>=2?($clearInterval($$.rapidCaller);'done'):'not done' ",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "not done"
+                    "data__": "not done",
+                    "variables__": ["clearInterval"]
                 }
             ]
         },
@@ -2489,7 +2492,8 @@ test("snapshot and restore", async () => {
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
                     "isFunction__": true,
-                    "data__": "{function:}"
+                    "data__": "{function:}",
+                    "variables__": ["set"]
                 },
                 {
                     "materialized__": true,
@@ -2511,7 +2515,8 @@ test("snapshot and restore", async () => {
                     "expr__": " $setInterval(counter, 100)",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "--interval/timeout--"
+                    "data__": "--interval/timeout--",
+                    "variables__": ["setInterval"]
                 },
                 {
                     "materialized__": true,
@@ -2533,7 +2538,8 @@ test("snapshot and restore", async () => {
                     "expr__": " count>=10?($clearInterval($$.rapidCaller);'done'):'not done' ",
                     "exprTargetJsonPointer__": "",
                     "compiledExpr__": "--compiled expression--",
-                    "data__": "not done"
+                    "data__": "not done",
+                    "variables__": ["clearInterval"]
                 }
             ]
         },
@@ -3110,14 +3116,14 @@ test("test close", async () => {
     }
 });
 
-test("test generate", async () => {
+test("test generate array", async () => {
     const o = {
-        "delayMs": 10,
-        "a":"${[1..10]~>$generate(delayMs)}",
+        "options": {"interval":10, "valueOnly":true},
+        "a":"${[1..10]~>$generate(options)}",
         "b": "${a}"
     };
 
-    const callCount = 10;
+    const callCount = 0;
     let resolvePromise;
     const allCallsMade = new Promise((resolve) => {
         resolvePromise = resolve;
@@ -3136,6 +3142,91 @@ test("test generate", async () => {
         await allCallsMade;
         expect(changeHandler).toHaveBeenCalledTimes(10);
         expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate single item", async () => {
+    const o = {
+        "a":"${$generate(10)}",
+        "b": "${a}"
+    };
+
+    const callCount = 0;
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
+        expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate function result", async () => {
+    const o = {
+        "a":"${$generate(function(){10})}",
+        "b": "${a}"
+    };
+
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
+        expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test_generate_verbose_function_result", async () => {
+    const o = {
+        "a":"${$generate(function(){10}, {'valueOnly':false})}",
+        "b": "${a}"
+    };
+
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        resolvePromise(); // Resolve the promise when callCount is reached
+    });
+
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(1);
+        expect(tp.output.b).toMatchObject({value:10, done:true});
+        expect(tp.output.b.return).toBeDefined(); //make sure 'return' function is provided
     } finally {
         await tp.close();
     }

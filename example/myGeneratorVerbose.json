@@ -1,0 +1,3 @@
+{
+  "generated": "${$myGenerator()~>$generate({'valueOnly':false})}"
+}

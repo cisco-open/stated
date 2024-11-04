@@ -64,7 +64,8 @@
         "expr__": " $setInterval(function(){$set('/count', count+1)}, 10) ",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
-        "data__": "--interval/timeout--"
+        "data__": "--interval/timeout--",
+        "variables__": ["setInterval","set"]
       },
       {
         "materialized__": true,
@@ -86,7 +87,8 @@
         "expr__": " count=10?($clearInterval($$.counter);'done'):'not done'  ",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
-        "data__": "not done"
+        "data__": "not done",
+        "variables__": ["clearInterval"]
       }
     ]
   }

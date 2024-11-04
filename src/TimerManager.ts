@@ -46,7 +46,7 @@ class TimerManager {
         return timeout;
     }
 
-    public generateSetInterval(planStep:PlanStep) {
+    public generateSetInterval = (planStep:PlanStep) => {
         return (callback: (...args: any[]) => void, delay: number, ...args: any[]): Interval => {
             // TODO: wrap the callback to track last run time, run counter, and other stats
             const interval: Interval = setInterval(callback, delay, ...args);
@@ -56,7 +56,7 @@ class TimerManager {
         }
     }
 
-    public generateClearInterval(planStep:PlanStep) {
+    public generateClearInterval = (planStep:PlanStep) => {
         return async (interval: Interval): Promise<void> => {
             this.clearInterval(interval);
             const jsonPointerStr: string = this.jsonPointerByInterval.get(interval) as string;

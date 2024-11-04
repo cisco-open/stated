@@ -9,48 +9,76 @@ export class GeneratorManager{
     }
 
     /**
-     * Generates an asynchronous generator that yields items from the provided array,
+     * Generates an asynchronous generator that yields items from the provided input,
      * separated by the specified timeout, and automatically registers the generator.
      *
-     * @param array The array of items to yield.
-     * @param timeout The delay in milliseconds between yields. Defaults to 0.
+     * @param input The item or array of items to yield. If generate me is a function, the function is called to
+     * get a result, and recursively passed to generate()
+     * @param options {valueOnly:boolean, interval?:number}={valueOnly:true, interval:-1} by default the generator will
+     * yield/return only the value and not the verbose {value, done} object that is yielded from a JS AsyncGenerator.
+     * The interval parameter is used to temporally space the yielding of array values when input is an array. When input
+     * is a function .or simple value, the interval is used to repeatedly call the function or yield the value
      * @returns The registered asynchronous generator.
      */
-    public generate = (array: any[], timeout: number = 0): AsyncGenerator<any, void, unknown> => {
+    public generate = (input: AsyncGenerator|any[]|any| (() => any),  options:{valueOnly:boolean, interval?:number, maxYield?:number}={valueOnly:true, interval:-1, maxYield:-1}): AsyncGenerator<any, any, unknown> => {
         if (this.templateProcessor.isClosed) {
             throw new Error("generate() cannot be called on a closed TemplateProcessor");
         }
-        const timerManager = this.templateProcessor.timerManager;
-
-        const generator = async function* () {
-            for (let i = 0; i < array.length; i++) {
-                yield array[i];
-                if (timeout > 0 && i < array.length - 1) {
-                    await new Promise<void>((resolve) => timerManager.setTimeout(resolve, timeout));
-                }
-            }
-        }();
-        return generator;
-    };
-
-
-
-    /**
-     * Extracts the first item from a generator, whether it is synchronous or asynchronous.
-     * Automatically registers the generator.
-     *
-     * @param gen The generator (sync or async) to extract the first item from.
-     * @returns A promise that resolves to the first item or `undefined` if empty.
-     */
-    public async firstItem(gen: AsyncGenerator | Generator): Promise<any> {
-        if (!GeneratorManager.isGenerator(gen)) {
-            throw new Error('The provided generator is not an AsynchronousGenerator, it is a `{typeof generator}`}.');
+        const {interval=-1, valueOnly=true, maxYield=-1} = options;
+        if(maxYield === 0){
+            throw new Error('maxYield must be greater than zero');
         }
-
-        const asyncGen = gen as AsyncGenerator;
-        const result = await asyncGen.next();
-        return result.done ? undefined : result.value;
-    }
+        if(GeneratorManager.isAsyncGenerator(input)){ //wrapping an existing async generator
+            input["valueOnly"] = options.valueOnly;   //in effect, annotate the generator with the options, so that down the pike we can determine if we should pump just the value, or the entire shebang
+            return input
+        }
+        const timerManager = this.templateProcessor.timerManager;
+        let g;
+        //yield array items separated by timeout
+        if(Array.isArray(input)) {
+            g = async function* () {
+                let max = input.length;
+                if(maxYield > 0){
+                    max = Math.min(max, maxYield);
+                }
+                let i;
+                for (i=0; i < max-1; i++) {
+                    yield input[i];
+                    if (interval >= 0) {
+                        await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
+                    }
+                }
+                return input[i]; //last item is returned, not yielded, so don't is true with last item
+            }();
+        }
+        //call function and return result
+        else if(typeof input === 'function'){
+            g = async function*(){
+                if(interval < 0){ //no interval so call function once
+                    return await (input as ()=>any)();//return not yield, for done:true
+                }else{ //an interval is specified so we sit in a loop calling the function
+                    let count = 0;
+                    while(maxYield < 0 || count++ < maxYield-1){
+                        yield await (input as ()=>any)();
+                        await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
+                    }
+                    return await (input as ()=>any)();
+                }
+            }();
+        }else {
+            //yield individual item
+            g = async function* () {
+                if(interval < 0){ //no interval
+                    return input; //return not yield, for done:true
+                }else{
+                    //interval is not supported for ordinary value as this will pump a duplicate same value over and over which will be deduped and ignored anyway
+                    throw new Error("$generate cannot be used to repeat the same value on an 'interval' since Stated would simply dedup/ignore the repeated values.");
+                }
+            }();
+        }
+        (g as any)["valueOnly"] = valueOnly;
+        return g;
+    };
 
     /**
      * Checks if the provided object is a generator (synchronous or asynchronous).
@@ -58,7 +86,7 @@ export class GeneratorManager{
      * @param obj The object to check.
      * @returns `true` if the object is a generator; otherwise `false`.
      */
-    public static isGenerator(obj: any): boolean {
+    public static isAsyncGenerator(obj: any): boolean {
         if (obj == null) return false;
         if (typeof obj.next === 'function' && typeof obj[Symbol.asyncIterator] === 'function') {
             return true;
@@ -66,46 +94,66 @@ export class GeneratorManager{
         return false;
     }
 
+
     /**
-     * Pumps the remaining items from the generator into the TemplateProcessor.
-     * Automatically registers the generator and returns the first item.
+     * Pumps the remaining items (after the first item) from the generator into the TemplateProcessor.
+     * Automatically returns the first item.
      *
      * @param generator The generator to pump items from.
      * @param metaInfo The meta info for processing.
      * @param templateProcessor The TemplateProcessor to set data in.
-     * @returns The first generated item.
+     * @returns The first generated item wrapped as {value, done, return}
      */
     public async pumpItems(
-        generator: AsyncGenerator | Generator,
+        generator: AsyncGenerator,
         metaInfo: any,
         templateProcessor: any
     ): Promise<any> {
-        const first = await this.firstItem(generator);  // Get the first item from the generator
-        // Check if the generator is asynchronous
-        if (this.isAsyncGenerator(generator)) {
-            // Handle asynchronous generator. Do not await, because we want items to be pumped into the template async
-            void this.handleAsyncGenerator(generator, metaInfo, templateProcessor);
-        } else {
-            // Handle synchronous generator
-            throw new Error('The provided generator is not an AsynchronousGenerator, it is a `{typeof generator}`}.');
+        const {valueOnly=true} = generator as any;
+        const first = await generator.next(); // Get the first item from the generator
+        const {done} = first;
+        if(!done) {
+            if (GeneratorManager.isAsyncGenerator(generator)) {
+                // Handle asynchronous generator. Do not await, because we want items to be pumped into the template async.
+                // Also, fear not, pumpItems can only queue items which will queue the remaining items which won't be
+                //drained out of the queue until the item returned by this method has been processed
+                void this.pumpRemaining(generator, metaInfo, templateProcessor);
+            } else {
+                // Handle synchronous generator
+                throw new Error('The provided generator is not an AsynchronousGenerator, it is a `{typeof generator}`}.');
+            }
         }
-
-        return first;
+        return valueOnly?first.value: {...first,  return: TemplateProcessor.wrapInOrdinaryFunction(generator.return.bind(generator))};
     }
 
     /**
-     * Handles asynchronous generators, pumping values into the template processor.
+     * Handles asynchronous generators, pumping remaining values into the template processor.
      */
-    private async handleAsyncGenerator(
+    private async pumpRemaining(
         generator: AsyncGenerator<any, void, unknown>,
         metaInfo: any,
         templateProcessor: any
     ): Promise<void> {
-        for await (const item of generator) {
+        while (true) {
             try {
+                const result = await generator.next();
+                const {valueOnly=true} = generator as any;
+                const { value, done } = result;
+
+                // Create an object that includes value, done, and the return function
+                const item = valueOnly?value:{
+                    value,
+                    done,
+                    return: TemplateProcessor.wrapInOrdinaryFunction(generator.return.bind(generator))
+                };
+
+                // Pass the entire item object to setData
                 await templateProcessor.setData(metaInfo.jsonPointer__ as string, item, "forceSetInternal");
-            }catch(error:any){
-                if(error.message === "Attempt to setData on a closed TemplateProcessor."){
+
+                // Break the loop if the generator is done
+                if (done) break;
+            } catch (error: any) {
+                if (error.message === "Attempt to setData on a closed TemplateProcessor.") {
                     await generator.return();
                     break;
                 }
@@ -113,14 +161,5 @@ export class GeneratorManager{
             }
         }
     }
-
-
-    /**
-     * Determines if a generator is asynchronous.
-     */
-    private isAsyncGenerator(generator: any): generator is AsyncGenerator {
-        return typeof generator[Symbol.asyncIterator] === 'function';
-    }
-
 
 }

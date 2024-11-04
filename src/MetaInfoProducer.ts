@@ -31,6 +31,7 @@ export interface MetaInfo{
     exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString //the pointer to the object that this expression executes on
     data__?:any
     isFunction__?:boolean
+    variables__?:string[]
 }
 
 export type JsonPointerStructureArray = (string|number)[];

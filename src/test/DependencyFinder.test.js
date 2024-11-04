@@ -45,6 +45,7 @@ test('$$.aaa', () => {
 test('$merge($.a.b, $i)', () => {
     const df = new DependencyFinder('$merge($.a.b, $i)');
     expect(df.findDependencies()).toEqual([["", 'a', 'b']]);
+    expect(Array.from(df.variables)).toEqual(["merge", "i"])
 });
 
 test(`'$reduce(function($acc, $i){(x.y.z)})`, () => {
@@ -52,6 +53,7 @@ test(`'$reduce(function($acc, $i){(x.y.z)})`, () => {
         '                            x.y.z\n' +
         '                       )})');
     expect(df.findDependencies()).toEqual([["x", "y", "z"]]);
+    expect(Array.from(df.variables)).toEqual(["reduce", "acc", "i"])
 });
 test('reduce 2', () => {
     const df = new DependencyFinder('$reduce(function($acc, $i){(\n' +
@@ -59,6 +61,7 @@ test('reduce 2', () => {
         '                            x.y.z\n' +
         '                       )})');
     expect(df.findDependencies()).toEqual([["", 'a', 'b'], ["x", "y", "z"]]);
+    expect(Array.from(df.variables)).toEqual(["reduce", "acc", "i", "merge"])
 });
 test("transform - pattern should be ignored", () => {
     const program = `k.z~>|$|{'foo':nozzle~>|bingus|{"dingus":klunk}|, 'zap':$$.aaaa}|`
@@ -245,6 +248,19 @@ test("complex program 1", () => {
             "z"
         ]
     ]);
+    expect(Array.from(df.variables)).toEqual([
+        "gorp",
+        "dink",
+        "loop",
+        "map",
+        "i",
+        "a",
+        "b",
+        "gimp",
+        "reduce",
+        "acc",
+        "merge"
+    ])
 });
 
 test("subtract", () => {
@@ -399,6 +415,7 @@ test("products.$sum(quantity * price)", () => {
             "products"
         ]
     ]);
+    expect(Array.from(df.variables)).toEqual(["sum"]);
 });
 
 test("$sum(quantity * price)", () => {
@@ -412,6 +429,7 @@ test("$sum(quantity * price)", () => {
             "price"
         ]
     ]);
+    expect(Array.from(df.variables)).toEqual(["sum"]);
 });
 
 test("count.{'cloud.provider': $$.providerName}", () => {
@@ -540,6 +558,7 @@ test("chained function", () => {
                 "handleRes"
             ]
         ]);
+    expect(Array.from(df.variables)).toEqual(["urlArray", "fetch", "join"]);
 });
 
 test("function/procedure name should chain to path dependency", () => {
@@ -676,6 +695,7 @@ test("matrix3", () => {
             "chars"
         ]
     ]);
+    expect(Array.from(df.variables)).toEqual(["set", "count"]);
 });
 
 test("matrix4", () => {
@@ -724,6 +744,18 @@ test("big test expression", () => {
         [
             "compare"
         ]
+    ]);
+    expect(Array.from(df.variables)).toEqual([
+        "actual",
+        "expected",
+        "path",
+        "type",
+        "count",
+        "map",
+        "item",
+        "i",
+        "reduce",
+        "append"
     ]);
 });
 
@@ -793,6 +825,22 @@ test("acc^($.val)", () => {
         ]
     ]);
 });
+
+test("viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import", () => {
+    const program = "viz ~> |props|{'x':'../../../../${$$.replacementProp}'}| ~> $import";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(Array.from(df.variables)).toEqual(["import"]);
+});
+
+test("$setInterval(counter, 1000)", () => {
+    const program = "$setInterval(counter, 1000)";
+    const df = new DependencyFinder(program);
+    const deps = df.findDependencies();
+    expect(Array.from(df.variables)).toEqual(["setInterval"]);
+});
+
+
 
 
 

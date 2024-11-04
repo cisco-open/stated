@@ -1,4 +1,4 @@
 {
   "delayMs": 250,
-  "generated":"${[1..10]~>$generate(delayMs)}"
+  "generated":"${[1..10]~>$generate({'interval':delayMs})}"
 }
