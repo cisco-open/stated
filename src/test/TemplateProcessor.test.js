@@ -2412,11 +2412,133 @@ test("snapshot and restore", async () => {
 
     const snapshotObject = JSON.parse(snapshot);
     expect(snapshotObject).toStrictEqual({
-        "template": {
-            "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
-            "count": 0,
-            "rapidCaller": "${ $setInterval(counter, 100)}",
-            "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        "metaInfoByJsonPointer": {
+            "/": [
+                {
+                    "absoluteDependencies__": [],
+                    "dependees__": [],
+                    "dependencies__": [],
+                    "exprTargetJsonPointer__": "",
+                    "jsonPointer__": "",
+                    "materialized__": true,
+                    "parent__": "",
+                    "tags__": [],
+                    "temp__": false,
+                    "treeHasExpressions__": true
+                },
+                {
+                    "absoluteDependencies__": [],
+                    "data__": 2,
+                    "dependees__": [
+                        "/counter",
+                        "/stop"
+                    ],
+                    "dependencies__": [],
+                    "exprTargetJsonPointer__": "",
+                    "jsonPointer__": "/count",
+                    "materialized__": true,
+                    "parent__": "",
+                    "tags__": [],
+                    "temp__": false,
+                    "treeHasExpressions__": false
+                },
+                {
+                    "absoluteDependencies__": [
+                        "/count"
+                    ],
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "{function:}",
+                    "dependees__": [
+                        "/rapidCaller"
+                    ],
+                    "dependencies__": [
+                        "/count",
+                        "/count"
+                    ],
+                    "exprRootPath__": null,
+                    "exprTargetJsonPointer__": "",
+                    "expr__": " function(){($set('/count', $$.count+1); $$.count)} ",
+                    "isFunction__": true,
+                    "isInitialized__": true,
+                    "jsonPointer__": "/counter",
+                    "materialized__": true,
+                    "parent__": "",
+                    "tags__": [],
+                    "temp__": false,
+                    "treeHasExpressions__": true,
+                    "variables__": [
+                        "set"
+                    ]
+                },
+                {
+                    "absoluteDependencies__": [
+                        "/counter"
+                    ],
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "--interval/timeout--",
+                    "dependees__": [
+                        "/stop"
+                    ],
+                    "dependencies__": [
+                        "/counter"
+                    ],
+                    "exprRootPath__": null,
+                    "exprTargetJsonPointer__": "",
+                    "expr__": " $setInterval(counter, 100)",
+                    "isInitialized__": true,
+                    "jsonPointer__": "/rapidCaller",
+                    "materialized__": true,
+                    "parent__": "",
+                    "tags__": [],
+                    "temp__": false,
+                    "treeHasExpressions__": true,
+                    "variables__": [
+                        "setInterval"
+                    ]
+                },
+                {
+                    "absoluteDependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "compiledExpr__": "--compiled expression--",
+                    "data__": "not done",
+                    "dependees__": [],
+                    "dependencies__": [
+                        "/count",
+                        "/rapidCaller"
+                    ],
+                    "exprRootPath__": null,
+                    "exprTargetJsonPointer__": "",
+                    "expr__": " count>=10?($clearInterval($$.rapidCaller);'done'):'not done' ",
+                    "isInitialized__": true,
+                    "jsonPointer__": "/stop",
+                    "materialized__": true,
+                    "parent__": "",
+                    "tags__": [],
+                    "temp__": false,
+                    "treeHasExpressions__": true,
+                    "variables__": [
+                        "clearInterval"
+                    ]
+                }
+            ]
+        },
+        "mvcc": [
+            {
+                "forkId": "ROOT",
+                "output": {
+                    "count": 2,
+                    "counter": "{function:}",
+                    "rapidCaller": "--interval/timeout--",
+                    "stop": "not done"
+                }
+            }
+        ],
+        "options": {
+            "foo": {
+                "bar": "baz"
+            }
         },
         "output": {
             "count": 2,
@@ -2424,138 +2546,25 @@ test("snapshot and restore", async () => {
             "rapidCaller": "--interval/timeout--",
             "stop": "not done"
         },
-        "options": {
-            "foo": {
-                "bar": "baz"
-            }
-        },
-        "mvcc": [
-            {
-                "forkId": "ROOT",
-                "output": {
-                    "counter": "{function:}",
-                    "count": 2,
-                    "rapidCaller": "--interval/timeout--",
-                    "stop": "not done"
-                }
-            }
-        ],
-        "metaInfoByJsonPointer": {
-            "/": [
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "",
-                    "dependees__": [],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprTargetJsonPointer__": ""
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/count",
-                    "dependees__": [
-                        "/counter",
-                        "/stop"
-                    ],
-                    "dependencies__": [],
-                    "absoluteDependencies__": [],
-                    "treeHasExpressions__": false,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprTargetJsonPointer__": "",
-                    "data__": 2
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/counter",
-                    "dependees__": [
-                        "/rapidCaller"
-                    ],
-                    "dependencies__": [
-                        "/count",
-                        "/count"
-                    ],
-                    "absoluteDependencies__": [
-                        "/count"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " function(){($set('/count', $$.count+1); $$.count)} ",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "isFunction__": true,
-                    "data__": "{function:}",
-                    "variables__": ["set"]
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/rapidCaller",
-                    "dependees__": [
-                        "/stop"
-                    ],
-                    "dependencies__": [
-                        "/counter"
-                    ],
-                    "absoluteDependencies__": [
-                        "/counter"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " $setInterval(counter, 100)",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "data__": "--interval/timeout--",
-                    "variables__": ["setInterval"]
-                },
-                {
-                    "materialized__": true,
-                    "jsonPointer__": "/stop",
-                    "dependees__": [],
-                    "dependencies__": [
-                        "/count",
-                        "/rapidCaller"
-                    ],
-                    "absoluteDependencies__": [
-                        "/count",
-                        "/rapidCaller"
-                    ],
-                    "treeHasExpressions__": true,
-                    "tags__": [],
-                    "parent__": "",
-                    "temp__": false,
-                    "exprRootPath__": null,
-                    "expr__": " count>=10?($clearInterval($$.rapidCaller);'done'):'not done' ",
-                    "exprTargetJsonPointer__": "",
-                    "compiledExpr__": "--compiled expression--",
-                    "data__": "not done",
-                    "variables__": ["clearInterval"]
-                }
-            ]
-        },
         "plans": [
             {
+                "data": 2,
                 "forkId": "ROOT",
                 "forkStack": [],
                 "lastCompletedStep": "/count",
+                "op": "set",
                 "sortedJsonPtrs": [
                     "/count",
                     "/stop"
-                ],
-                "op": "set",
-                "data": 2
+                ]
             }
-        ]
+        ],
+        "template": {
+            "count": 0,
+            "counter": "${ function(){($set('/count', $$.count+1); $$.count)} }",
+            "rapidCaller": "${ $setInterval(counter, 100)}",
+            "stop": "${ count>=10?($clearInterval($$.rapidCaller);'done'):'not done' }"
+        }
     });
 
 
@@ -3142,6 +3151,37 @@ test("test generate array", async () => {
         await allCallsMade;
         expect(changeHandler).toHaveBeenCalledTimes(10);
         expect(tp.output.b).toBe(10);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test generate array and accumulate it", async () => {
+    const o = {
+        "options": {"interval":10},
+        "a":"${[1..10]~>$generate(options)}",
+        "b": "${$default($self, []) ~> $accumulate(a)}"
+    };
+
+    const callCount = 0;
+    let resolvePromise;
+    const allCallsMade = new Promise((resolve) => {
+        resolvePromise = resolve;
+    });
+
+    const changeHandler = jest.fn((data, ptr) => {
+        expect(ptr).toBe("/b"); // Ensure correct pointer
+        if (changeHandler.mock.calls.length === 10) {
+            resolvePromise(); // Resolve the promise when callCount is reached
+        }
+    });
+    const tp = new TemplateProcessor(o);
+    tp.setDataChangeCallback('/b', changeHandler);
+    try {
+        await tp.initialize();
+        await allCallsMade;
+        expect(changeHandler).toHaveBeenCalledTimes(10);
+        expect(tp.output.b).toStrictEqual([1,2,3,4,5,6,7,8,9,10]);
     } finally {
         await tp.close();
     }

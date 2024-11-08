@@ -17,7 +17,7 @@ import { default as jp } from './JsonPointer.js';
 
 export interface MetaInfo{
     materialized__:boolean,
-    jsonPointer__: JsonPointerStructureArray|JsonPointerString;
+    jsonPointer__: JsonPointerStructureArray|JsonPointerString; // $self
     parent__:JsonPointerStructureArray|JsonPointerString;
     dependees__:JsonPointerStructureArray[]|JsonPointerString[];
     dependencies__:JsonPointerStructureArray[]|JsonPointerString[];
@@ -28,10 +28,11 @@ export interface MetaInfo{
     expr__?: string;
     compiledExpr__?: jsonata.Expression;
     temp__?:boolean; //temp field indicates this field is !${...} and will be removed after template is processed
-    exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString //the pointer to the object that this expression executes on
+    exprTargetJsonPointer__?:JsonPointerStructureArray|JsonPointerString //the pointer to the object that this expression executes on...which can be different than parent do to expression rerooting
     data__?:any
     isFunction__?:boolean
     variables__?:string[]
+    isInitialized__?:boolean
 }
 
 export type JsonPointerStructureArray = (string|number)[];

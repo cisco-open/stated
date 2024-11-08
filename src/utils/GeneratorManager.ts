@@ -33,6 +33,7 @@ export class GeneratorManager{
             return input
         }
         const timerManager = this.templateProcessor.timerManager;
+        const tp = this.templateProcessor;
         let g;
         //yield array items separated by timeout
         if(Array.isArray(input)) {
@@ -42,7 +43,7 @@ export class GeneratorManager{
                     max = Math.min(max, maxYield);
                 }
                 let i;
-                for (i=0; i < max-1; i++) {
+                for (i=0; i < max-1 && !tp.isClosed; i++) {
                     yield input[i];
                     if (interval >= 0) {
                         await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
@@ -58,9 +59,12 @@ export class GeneratorManager{
                     return await (input as ()=>any)();//return not yield, for done:true
                 }else{ //an interval is specified so we sit in a loop calling the function
                     let count = 0;
-                    while(maxYield < 0 || count++ < maxYield-1){
+                    while(!tp.isClosed && (maxYield < 0 || count++ < maxYield-1)){
                         yield await (input as ()=>any)();
                         await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
+                    }
+                    if(tp.isClosed){
+                        return null; //bail early
                     }
                     return await (input as ()=>any)();
                 }
