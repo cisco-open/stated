@@ -1886,6 +1886,41 @@ The `maxYield` parameter can also be used to stop a generator:
   ]
 }
 ```
+### accumulate, default, and self
+`$accumulate` is in some ways the opposite of `$generate`. The `$accumulate` function takes two arguments:
+1. the accumulator - the array that will accumulate the item at its end
+2. the item - the item that will be pushed on to the accumulator
+
+`$accumulate` provides an efficient, copy free way to mutate an array in place. This example illustrates how to combine 
+`$self` and `$default` to accumulate the output of a generator. `$self` refers to the value of `b` itself. On initialization 
+`$self` us undefined, as its expression has not yet evaluated. Therefore to initialize `b` to a an empty array we can 
+pass `$self` through the `$default` function, which will return [] when `$self` is undefined, but otherwise passes 
+`$self` through. 
+```json [false, "data.b=[1,2,3,4,5,6,7,8,9,10]"]
+> .init -f example/accumulate1.json
+{
+  "a": "${[1..10]~>$generate({'interval':25})}",
+  "b": "${$self~>$default([])~>$accumulate(a)}"
+}
+> .init -f example/accumulate1.json --tail "/ until a=10"
+Started tailing... Press Ctrl+C to stop.
+{
+  "a": 10,
+  "b": [
+    1,
+    2,
+    3,
+    4,
+    5,
+    6,
+    7,
+    8,
+    9,
+    10
+  ]
+}
+
+```
 
 
 ### $setTimeout

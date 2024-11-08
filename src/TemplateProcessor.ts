@@ -34,6 +34,8 @@ import * as jsonata from "jsonata";
 import {GeneratorManager} from "./utils/GeneratorManager.js";
 import {LifecycleOwner, LifecycleState} from "./Lifecycle.js";
 import {LifecycleManager} from "./LifecycleManager.js";
+import {accumulate} from "./utils/accumulate.js";
+import {defaulter} from "./utils/default.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -424,6 +426,8 @@ export default class TemplateProcessor {
             {"setTimeout": this.timerManager.setTimeout},
             {"clearTimeout": this.timerManager.clearTimeout},
             {"generate": this.generatorManager.generate},
+            {"accumulate": accumulate},
+            {"default": defaulter},
 
         );
         const safe = this.withErrorHandling.bind(this);
@@ -1601,11 +1605,13 @@ export default class TemplateProcessor {
         try {
             const context = {...this.context};
             await this.populateContextWithGeneratedFunctions(context, variables__, metaInfo, planStep);
+            this.populateContextWithSelf(context, metaInfo);
             target = jp.get(output, exprTargetJsonPointer__ as JsonPointerString); //an expression is always relative to a target
             evaluated = await compiledExpr__?.evaluate(
                 target,
                 context
             );
+            metaInfo.isInitialized__ = true;
             if (evaluated?._jsonata_lambda) {
                 evaluated = TemplateProcessor.wrapInOrdinaryFunction(evaluated);
                 metaInfo.isFunction__ = true;
@@ -1627,6 +1633,19 @@ export default class TemplateProcessor {
         }
         return evaluated
 
+    }
+
+    private populateContextWithSelf(context:any, metaInf:MetaInfo):void{
+        const {isInitialized__=false, jsonPointer__, compiledExpr__, parent__} = metaInf;
+        if(compiledExpr__ && isInitialized__){
+            context.self = jp.get(this.output, jsonPointer__); //populate context with self
+        }else{
+            context.self = undefined;
+        }
+        //parent is much trickier than self because parent is never an expression, so it
+        //means expressions will say "$parent.foo" which introduces dependencies which we would expect
+        //to resolve before accessing them. So punt on $parent for now
+        //context.parent = jp.get(this.output, parent__);
     }
 
     private setupFunctionGenerators(){
@@ -1697,6 +1716,7 @@ export default class TemplateProcessor {
             return false;
         }
         let existingData;
+        const {sideEffect__=false, value:affectedData} = data || {};
         if (jp.has(output, jsonPtr)) {
             //note get(output, 'foo/-') SHOULD and does return undefined. Don't be tempted into thinking it should
             //return the last element of the array. 'foo/-' syntax only has meaning for update operations. IF we returned
@@ -1704,13 +1724,21 @@ export default class TemplateProcessor {
             //item to what is already there, which is nonsensical.
             existingData = jp.get(output, jsonPtr);
         }
-        if (!isEqual(existingData, data)) {
-            jp.set(output, jsonPtr, data);
-            this.callDataChangeCallbacks(data, jsonPtr, false);
+        if (!sideEffect__) {
+            if(!isEqual(existingData, data)) {
+                jp.set(output, jsonPtr, data);
+                this.callDataChangeCallbacks(data, jsonPtr, false);
+                return true;
+            }else {
+                if (this.isEnabled("verbose"))this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
+                return false;
+            }
+        }else { //a side-effect happened
+            if (affectedData !== existingData){ //use pointer comparison here, not deep equality
+                jp.set(output, jsonPtr, affectedData);
+            }
+            this.callDataChangeCallbacks(affectedData, jsonPtr, false); //always call the callback as by definition a side effect changed the data
             return true;
-        } else {
-            if (this.isEnabled("verbose"))this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
-            return false;
         }
 
     }
