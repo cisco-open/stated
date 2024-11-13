@@ -21,6 +21,9 @@ export class GeneratorManager{
      * @returns The registered asynchronous generator.
      */
     public generate = (input: AsyncGenerator|any[]|any| (() => any),  options:{valueOnly:boolean, interval?:number, maxYield?:number}={valueOnly:true, interval:-1, maxYield:-1}): AsyncGenerator<any, any, unknown> => {
+        if(input===undefined) {
+            this.templateProcessor.logger.warn("undefined cannot be passed to a generator.");
+        }
         if (this.templateProcessor.isClosed) {
             throw new Error("generate() cannot be called on a closed TemplateProcessor");
         }

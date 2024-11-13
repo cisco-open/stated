@@ -2267,7 +2267,8 @@ export const __init = (templateProcessor) =>{
 }
 ```
 
-The functions can be used in the stated template context
+The functions can be used in the stated template context by using the -xf argument which spreads
+the exported values into the context making them accessible as `$` variables. For example the function `foo()` exported from the js module is available as `$foo`.
 ```json
 > .init -f example/importJS.json --xf=example/test-export.js
 {
@@ -2290,6 +2291,61 @@ This can be combined with the `--importPath` option to import files relative to 
 {
   "messageFromInitFunction": "__init sidecar succeeded",
   "res": "bar: foo"
+}
+```
+you can also directly import an entire modules using the `$import` function from within a template.
+You must set the --importPath. For instance, `example/myModule.mjs`contains functions `getGames` and `getPlayers` 
+```js
+export function getGames(){
+    return [
+        "chess",
+        "checkers",
+        "backgammon",
+        "poker",
+        "Theaterwide Biotoxic and Chemical Warfare",
+        "Global Thermonuclear War"
+    ]
+}
+
+export function getPlayers(){
+    return [
+        "dlightman",
+        "prof. Falken",
+        "joshua",
+        "WOPR"
+    ];
+}
+```
+Upon running `example/importLocalJsModule.yaml`, which does `$import('./myModule.mjs')` you will see the field `myModule`
+contains the functions, which are called in the template.
+
+```yaml
+> .init -f example/importLocalJsModule.yaml --importPath=example
+{
+  "myModule": "${$import('./myModule.mjs')}",
+  "games": "${myModule.getGames()}",
+  "players": "${myModule.getPlayers()}"
+}
+> .out
+{
+  "myModule": {
+    "getGames": "{function:}",
+    "getPlayers": "{function:}"
+  },
+  "games": [
+    "chess",
+    "checkers",
+    "backgammon",
+    "poker",
+    "Theaterwide Biotoxic and Chemical Warfare",
+    "Global Thermonuclear War"
+  ],
+  "players": [
+    "dlightman",
+    "prof. Falken",
+    "joshua",
+    "WOPR"
+  ]
 }
 ```
 

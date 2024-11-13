@@ -36,6 +36,7 @@ import {LifecycleOwner, LifecycleState} from "./Lifecycle.js";
 import {LifecycleManager} from "./LifecycleManager.js";
 import {accumulate} from "./utils/accumulate.js";
 import {defaulter} from "./utils/default.js";
+import {CliCoreBase} from "./CliCoreBase.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -652,31 +653,37 @@ export default class TemplateProcessor {
                 this.logger.debug(`Attempting to fetch imported URL '${importMe}'`);
                 resp = await this.fetchFromURL(parsedUrl);
                 resp = this.extractFragmentIfNeeded(resp, parsedUrl);
-            } else if(MetaInfoProducer.EMBEDDED_EXPR_REGEX.test(importMe)){ //this is the case of importing an expression string
+            } else if (MetaInfoProducer.EMBEDDED_EXPR_REGEX.test(importMe)) { //this is the case of importing an expression string
                 resp = importMe; //literally a direction expression like '/${foo}'
-            }else {
-                this.logger.debug(`Attempting local file import of '${importMe}'`);
-                try {
+            } else {
+                this.logger.debug(`Attempting literal import of object as json '${importMe}'`);
+                resp = this.validateAsJSON(importMe);
+                if (resp === undefined) { //it wasn't JSON
+                    this.logger.debug(`Attempting local file import of '${importMe}'`);
+                    const fileExtension = path.extname(importMe).toLowerCase();
                     if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
-                        resp = await this.localImport(importMe);
+                        try {
+                            resp = await this.localImport(importMe);
+                            if (fileExtension === '.js' || fileExtension === '.mjs') {
+                                return resp; //the module is directly returned and assigned
+                            }
+                        }catch(error){
+                            //we log here and don't rethrow because we don't want to expose serverside path information to remote clients
+                            this.logger.error((error as any).message);
+                        }
+                    } else {
+                        this.logger.error(`It appears we are running in a browser where we can't import from local ${importMe}`)
                     }
-                }catch (error){
-                    this.logger.debug("argument to import doesn't seem to be a file path");
-                }
-
-
-                if(resp === undefined){
-                    this.logger.debug(`Attempting literal import of object '${importMe}'`);
-                    resp = this.validateAsJSON(importMe);
                 }
             }
-            if(resp === undefined){
+            if (resp === undefined) {
                 throw new Error(`Import failed for '${importMe}' at '${metaInfo.jsonPointer__}'`);
             }
             await this.setContentInTemplate(resp, metaInfo);
             return TemplateProcessor.NOOP;
         }
     }
+
     private parseURL(input:string):URL|false {
         try {
             return new URL(input);
@@ -1029,8 +1036,7 @@ export default class TemplateProcessor {
          * @param dependency
          */
         const isCommonPrefix = (exprNode:JsonPointerString, dependency:JsonPointerString):boolean=>{
-            return exprNode.startsWith(dependency) || dependency.startsWith(exprNode);
-
+            return jp.isAncestor(dependency, exprNode);
         }
 
         //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
@@ -1716,7 +1722,6 @@ export default class TemplateProcessor {
             return false;
         }
         let existingData;
-        const {sideEffect__=false, value:affectedData} = data || {};
         if (jp.has(output, jsonPtr)) {
             //note get(output, 'foo/-') SHOULD and does return undefined. Don't be tempted into thinking it should
             //return the last element of the array. 'foo/-' syntax only has meaning for update operations. IF we returned
@@ -1724,6 +1729,7 @@ export default class TemplateProcessor {
             //item to what is already there, which is nonsensical.
             existingData = jp.get(output, jsonPtr);
         }
+        const {sideEffect__ = false, value:affectedData} = data || {};
         if (!sideEffect__) {
             if(!isEqual(existingData, data)) {
                 jp.set(output, jsonPtr, data);
@@ -1951,35 +1957,47 @@ export default class TemplateProcessor {
         return null;
     }
 
-    private async localImport(filePathInPackage:string) {
-        // Resolve the package path
+    private async localImport(localPath: string) {
+        this.logger.debug(`importing ${localPath}`);
+        this.logger.debug(`resolving import path using --importPath=${this.options.importPath || ""}`);
+        const fullpath = CliCoreBase.resolveImportPath(localPath, this.options.importPath);
+        this.logger.debug(`resolved import: ${fullpath}`);
         const {importPath} = this.options;
-        let fullPath = filePathInPackage;
-        let content;
-        if (importPath) {
-            // Construct the full file path
-            fullPath = path.join(importPath, filePathInPackage);
+
+        if(!importPath){
+            throw new Error(`$import statements are not allowed in templates unless the importPath is set (see TemplateProcessor.options.importPath and the --importPath command line switch`);
         }
-        try{
-            const fileExtension = path.extname(fullPath).toLowerCase();
-            // Read the file
-            content =  await fs.promises.readFile(fullPath, 'utf8');
-            if(fileExtension === ".json") {
-                return JSON.parse(content);
-            }else if (fileExtension === '.yaml' || fileExtension === '.yml') {
-                return yaml.load(content);
-            }else if (fileExtension === '.text' || fileExtension === '.txt') {
-                return content;
-            }else if (fileExtension === '.js' || fileExtension === '.mjs') {
-                throw new Error('js and mjs imports not implemented yet');
-             }else{
-                throw new Error('import file extension must be .json or .yaml or .yml');
+
+        // Ensure `fullpath` is within `importPath`. I should be able to $import('./foo.mjs') and$import('./foo.mjs')
+        // but not $import('../../iescaped/foo.mjs)
+        const resolvedImportPath = path.resolve(importPath);
+        if (!fullpath.startsWith(resolvedImportPath)) {
+            throw new Error(`Resolved import path was ${resolvedImportPath} which is outside the allowed --importPath (${importPath})`);
+        }
+
+        try {
+            const fileExtension = path.extname(fullpath).toLowerCase();
+            if (fileExtension === '.js' || fileExtension === '.mjs') {
+                return await import(fullpath);
             }
-        } catch(e) {
+
+            // Read the file
+            const content = await fs.promises.readFile(fullpath, 'utf8');
+            if (fileExtension === ".json") {
+                return JSON.parse(content);
+            } else if (fileExtension === '.yaml' || fileExtension === '.yml') {
+                return yaml.load(content);
+            } else if (fileExtension === '.text' || fileExtension === '.txt') {
+                return content;
+            }else {
+                throw new Error('Import file extension must be .json, .yaml, .yml, .txt, .js, or .mjs');
+            }
+        } catch (e) {
             this.logger.debug('import was not a local file');
             throw e;
         }
     }
+
 
     public static wrapInOrdinaryFunction(jsonataLambda:any) {
         const wrappedFunction = (...args:any[])=> {

@@ -83,7 +83,7 @@ export class CliCoreBase {
         return {...parsed, ...processedArgs}; //spread the processedArgs back into what was parsed
     }
 
-    async readFileAndParse(filepath:string, importPath?:string) {
+    static async readFileAndParse(filepath:string, importPath?:string) {
         const fileExtension = path.extname(filepath).toLowerCase().replace(/\W/g, '');
         if (fileExtension === 'js' || fileExtension === 'mjs') {
             return await import(CliCoreBase.resolveImportPath(filepath, importPath));
@@ -158,7 +158,7 @@ export class CliCoreBase {
             return undefined;
         }
         const input = await this.openFile(filepath);
-        let contextData = contextFilePath ? await this.readFileAndParse(contextFilePath, importPath) : {};
+        let contextData = contextFilePath ? await CliCoreBase.readFileAndParse(contextFilePath, importPath) : {};
         contextData = {...contextData, ...ctx} //--ctx.foo=bar creates ctx={foo:bar}. The dot argument syntax is built into minimist
         options.importPath = importPath; //path is where local imports will be sourced from. We sneak path in with the options
         // if we initialize for the first time, we need to create a new instance of TemplateProcessor
@@ -213,7 +213,7 @@ export class CliCoreBase {
         if(this.currentDirectory){
             _filepath = path.join(this.currentDirectory, _filepath);
         }
-        return await this.readFileAndParse(_filepath);
+        return await CliCoreBase.readFileAndParse(_filepath);
     }
 
 

@@ -1,0 +1,3 @@
+myModule: ${$import('./myModule.mjs')}
+games: ${myModule.getGames()}
+players: ${myModule.getPlayers()}
