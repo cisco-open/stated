@@ -36,6 +36,14 @@ export const circularReplacer = (key: any, value: any) => {
     if (tag === '[object Timeout]'|| (_idleTimeout !== undefined && _onTimeout !== undefined)) { //Node.js
       return "--interval/timeout--";
     }
+    if (tag === '[object Function]') {
+      return "{function:}";
+    }
+    // Check if value is a module-like object
+    // Check if the object has Symbol.toStringTag with value "Module"
+    if (value[Symbol.toStringTag] === '[object Module]') {
+      return "{module:}";
+    }
 
     if (value instanceof Set) {
       return Array.from(value);

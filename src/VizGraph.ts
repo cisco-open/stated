@@ -98,7 +98,12 @@ export default class VizGraph {
         return dotString;
     }
 
-    static escapeSpecialCharacters(str:string) {
+    static escapeSpecialCharacters(str:string|undefined|null) {
+        // Check if the argument is a valid string
+        if (typeof str !== 'string') {
+            return "--not implemented--";
+        }
+
         // Define the characters to escape and their escaped counterparts
         const specialCharacters = {
             '&': '&amp;',

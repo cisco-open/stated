@@ -245,7 +245,7 @@ export default class JsonPointer {
      */
     static parse(pointer:JsonPointerString) {
         if (pointer === '') { return []; }
-        if (pointer.charAt(0) !== '/') { throw new Error('Invalid JSON pointer: ' + pointer); }
+        if (pointer.charAt(0) !== '/') { throw new Error(`Stated's flavor of JSON pointer Requires JSON Pointers to begin with "/", and this did not: ${pointer}`); }
         return pointer.substring(1).split(/\//).map(JsonPointer.unescape);
     }
 
@@ -265,4 +265,31 @@ export default class JsonPointer {
         const refTokens =  Array.isArray(pointer) ? pointer : JsonPointer.parse(pointer);
         return asArray?refTokens.slice(0,-1):this.compile(refTokens.slice(0,-1));
     }
+
+    /**
+     * Returns true if potentialAncestor is an ancestor of jsonPtr.
+     * For example, if jsonPtr is /a/b/c/d and potentialAncestor is /a/b, this returns true.
+     * @param jsonPtr - The JSON pointer to check.
+     * @param potentialAncestor - The potential ancestor JSON pointer.
+     */
+    static isAncestor(jsonPtr: JsonPointerString, potentialAncestor: JsonPointerString): boolean {
+        // Parse the JSON pointers into arrays of path segments
+        const jsonPtrArray = JsonPointer.parse(jsonPtr);
+        const potentialAncestorArray = JsonPointer.parse(potentialAncestor);
+
+        // If potentialAncestor has more segments than jsonPtr, it cannot be an ancestor
+        if (potentialAncestorArray.length > jsonPtrArray.length) {
+            return false;
+        }
+
+        // Check if each segment in potentialAncestor matches the beginning of jsonPtr
+        for (let i = 0; i < potentialAncestorArray.length; i++) {
+            if (jsonPtrArray[i] !== potentialAncestorArray[i]) {
+                return false;  // If any segment does not match, potentialAncestor is not an ancestor
+            }
+        }
+
+        return true;  // All segments matched, so potentialAncestor is an ancestor of jsonPtr
+    }
+
 }
