@@ -25,6 +25,7 @@ import { default as jp } from "../../dist/src/JsonPointer.js";
 import StatedREPL from "../../dist/src/StatedREPL.js";
 import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/globals';
 import {LifecycleState} from "../../dist/src/Lifecycle.js";
+import {DataFlow} from "../../dist/src/DataFlow.js";
 
 if (typeof Bun !== 'undefined') {
     // Dynamically import Jest's globals if in Bun.js environment
@@ -3377,3 +3378,275 @@ test("test transaction", async () => {
         await tp.close();
     }
 });
+
+test("test data flow 1", async () => {
+    const o = {
+        "a": 1,
+        "b": "${a}",
+        "c": "${a}",
+        "d": "${b}",
+        "e": "${b}",
+        "x": 42,
+        "y": "${x}",
+        "z": "${x}"
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        let flows = tp.flow(0);
+        expect(flows).toStrictEqual([
+            {
+                "location": "/a",
+                "to": [
+                    {
+                        "location": "/b",
+                        "to": [
+                            {
+                                "location": "/d",
+                                "to": []
+                            },
+                            {
+                                "location": "/e",
+                                "to": []
+                            }
+                        ]
+                    },
+                    {
+                        "location": "/c",
+                        "to": []
+                    }
+                ]
+            },
+            {
+                "location": "/x",
+                "to": [
+                    {
+                        "location": "/y",
+                        "to": []
+                    },
+                    {
+                        "location": "/z",
+                        "to": []
+                    }
+                ]
+            }
+        ]);
+        flows = tp.flow(1);
+        expect(flows).toStrictEqual([
+            {
+                "location": "/a",
+                "to": [
+                    {
+                        "location": "/b",
+                        "to": [
+                            "/d",
+                            "/e"
+                        ]
+                    },
+                    "/c"
+                ]
+            },
+            {
+                "location": "/x",
+                "to": [
+                    "/y",
+                    "/z"
+                ]
+            }
+        ]);
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test data flow 2", async () => {
+    const o = {
+        "a": "${c}",
+        "b": "${d+1+e}",
+        "c": "${b+1}",
+        "d": "${e+1}",
+        "e": 1
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        let flows = tp.flow();
+        expect(flows).toStrictEqual([
+                {
+                    "location": "/e",
+                    "to": [
+                        {
+                            "location": "/b",
+                            "to": [
+                                {
+                                    "location": "/c",
+                                    "to": [
+                                        {
+                                            "location": "/a",
+                                            "to": []
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "location": "/d",
+                            "to": [
+                                {
+                                    "location": "/b",
+                                    "to": [
+                                        {
+                                            "location": "/c",
+                                            "to": [
+                                                {
+                                                    "location": "/a",
+                                                    "to": []
+                                                }
+                                            ]
+                                        }
+                                    ]
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        );
+        flows = tp.flow(1);
+        expect(flows).toStrictEqual([
+                {
+                    "location": "/e",
+                    "to": [
+                        {
+                            "location": "/b",
+                            "to": {
+                                "location": "/c",
+                                "to": "/a"
+                            }
+                        },
+                        {
+                            "location": "/d",
+                            "to": {
+                                "location": "/b",
+                                "to": {
+                                    "location": "/c",
+                                    "to": "/a"
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        );
+    } finally {
+        await tp.close();
+    }
+});
+
+test("test data flow 3", async () => {
+    const o = {
+        "commanderDetails": {
+            "fullName": "../${commander.firstName & ' ' & commander.lastName}",
+            "salutation": "../${$join([commander.rank, commanderDetails.fullName], ' ')}",
+            "systemsUnderCommand": "../${$count(systems)}"
+        },
+        "organization": "NORAD",
+        "location": "Cheyenne Mountain Complex, Colorado",
+        "commander": {
+            "firstName": "Jack",
+            "lastName": "Beringer",
+            "rank": "General"
+        },
+        "purpose": "Provide aerospace warning, air sovereignty, and defense for North America",
+        "systems": [
+            "Ballistic Missile Early Warning System (BMEWS)",
+            "North Warning System (NWS)",
+            "Space-Based Infrared System (SBIRS)",
+            "Cheyenne Mountain Complex"
+        ]
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        let flows = tp.flow();
+        expect(flows).toStrictEqual([
+                {
+                    "location": "/commander/firstName",
+                    "to": [
+                        {
+                            "location": "/commanderDetails/fullName",
+                            "to": [
+                                {
+                                    "location": "/commanderDetails/salutation",
+                                    "to": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "location": "/commander/lastName",
+                    "to": [
+                        {
+                            "location": "/commanderDetails/fullName",
+                            "to": [
+                                {
+                                    "location": "/commanderDetails/salutation",
+                                    "to": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "location": "/commander/rank",
+                    "to": [
+                        {
+                            "location": "/commanderDetails/salutation",
+                            "to": []
+                        }
+                    ]
+                },
+                {
+                    "location": "/systems",
+                    "to": [
+                        {
+                            "location": "/commanderDetails/systemsUnderCommand",
+                            "to": []
+                        }
+                    ]
+                }
+            ]
+        );
+        flows = tp.flow(1);
+        expect(flows).toStrictEqual([
+                {
+                    "location": "/commander/firstName",
+                    "to": {
+                        "location": "/commanderDetails/fullName",
+                        "to": "/commanderDetails/salutation"
+                    }
+                },
+                {
+                    "location": "/commander/lastName",
+                    "to": {
+                        "location": "/commanderDetails/fullName",
+                        "to": "/commanderDetails/salutation"
+                    }
+                },
+                {
+                    "location": "/commander/rank",
+                    "to": "/commanderDetails/salutation"
+                },
+                {
+                    "location": "/systems",
+                    "to": "/commanderDetails/systemsUnderCommand"
+                }
+            ]
+        );
+    } finally {
+        await tp.close();
+    }
+});
+
+
