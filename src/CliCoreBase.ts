@@ -23,6 +23,7 @@ import { exec } from 'child_process';
 import  http from  'http';
 import * as child_process from "child_process";
 import os from "os";
+import {FlowOpt} from "./DataFlow.js";
 
 /**
  * Base class for building CLIs. By itself can be used for a CLI that does not support the tail command. Tail command
@@ -292,6 +293,15 @@ export class CliCoreBase {
         const [jsonPtr, option] = args.split(' ');
         return option === '--shallow' ? this.templateProcessor.getDependencies(jsonPtr) : this.templateProcessor.to(jsonPtr);
     }
+
+    async flow(replCmdInputStr:string) {
+        if (!this.templateProcessor) {
+            throw new Error('Initialize the template first.');
+        }
+        const {level=0} = CliCoreBase.minimistArgs(replCmdInputStr);  //--level=5
+        return this.templateProcessor.flow(level as FlowOpt);
+    }
+
 
     async plan() {
         if (!this.templateProcessor) {

@@ -40,6 +40,7 @@ export default class StatedREPL {
         ["state", 'Show the current state of the templateMeta'],
         ["from", 'Show the dependents of a given JSON pointer'],
         ["to", 'Show the dependencies of a given JSON pointer'],
+        ["flow", 'return an array or tree structures showing the data flow from sources to destinations'],
         ["plan", 'Show the evaluation plan'],
         ["note", "returns ═══ ... for creating documentation"],
         ["log", "set the log level [debug, info, warn, error]"],

@@ -37,6 +37,7 @@ import {LifecycleManager} from "./LifecycleManager.js";
 import {accumulate} from "./utils/accumulate.js";
 import {defaulter} from "./utils/default.js";
 import {CliCoreBase} from "./CliCoreBase.js";
+import {DataFlow, DataFlowNode, FlowOpt} from "./DataFlow.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -986,7 +987,6 @@ export default class TemplateProcessor {
         }
     }
 
-
     private topologicalSort(metaInfos:MetaInfo[], exprsOnly = true, fanout=true):JsonPointerString[] {
         const visited = new Set();
         const recursionStack:Set<JsonPointerString> = new Set(); //for circular dependency detection
@@ -1876,6 +1876,17 @@ export default class TemplateProcessor {
             return this.topologicalSort([node], false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
         }
         return [];
+    }
+
+
+    /**
+     * Controls the flow of data and retrieves root nodes based on the specified level.
+     *
+     * @param {FlowOpt} level - The level specifying the granularity of the data flow.
+     * @return {DataFlowNode[]} An array of root nodes that are computed based on the specified level.
+     */
+    flow(level:FlowOpt):DataFlowNode[]{
+        return new DataFlow(this).getRoots(level);
     }
 
     /**
