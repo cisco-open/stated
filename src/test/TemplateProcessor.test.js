@@ -26,6 +26,8 @@ import StatedREPL from "../../dist/src/StatedREPL.js";
 import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/globals';
 import {LifecycleState} from "../../dist/src/Lifecycle.js";
 import {DataFlow} from "../../dist/src/DataFlow.js";
+import {ParallelPlanner} from "../../dist/src/ParallelPlanner.js";
+
 
 if (typeof Bun !== 'undefined') {
     // Dynamically import Jest's globals if in Bun.js environment
@@ -550,7 +552,7 @@ test("mysql plan", async () => {
     const o = cloneDeep(mysql);
     const tp = new TemplateProcessor(o);
     await tp.initialize();
-    const plan = await tp.getEvaluationPlan();
+    const plan = await tp.plan();
     expect(plan).toEqual(
         [
             "/count",
@@ -1587,7 +1589,7 @@ test("example from README explaining plans", async () => {
     };
     const tp = new TemplateProcessor(template);
     await tp.initialize();
-    const plan = await tp.getEvaluationPlan();
+    const plan = await tp.plan();
     expect(plan).toStrictEqual([
         "/a/c/g/i",
         "/b/e",
@@ -1625,7 +1627,7 @@ test("ex14.yaml", async () => {
     try {
         tp = new TemplateProcessor(template);
         await tp.initialize();
-        expect(await tp.getEvaluationPlan()).toStrictEqual([
+        expect(await tp.plan()).toStrictEqual([
             "/incr$",
             "/upCount$",
             "/status$"
@@ -1758,7 +1760,7 @@ test("test /__META__/tags array callback ", async () => {
         received.push({data, jsonPtr})
     });
     await tp.initialize();
-    const plan = await tp.getEvaluationPlan();
+    const plan = await tp.plan();
     expect(plan).toEqual([
           "/name",
           "/solutionId",
@@ -2143,7 +2145,7 @@ test("functions are immutable and have no 'from'", async () => {
         "/subscribeParams/to"
     ]);
 
-    expect(await tp.getEvaluationPlan()).toEqual([
+    expect(await tp.plan()).toEqual([
             "/joinResistance",
             "/subscribeParams/to",
             "/subscribeParams/type",
@@ -3648,5 +3650,378 @@ test("test data flow 3", async () => {
         await tp.close();
     }
 });
+
+test("parallel plan", async () => {
+    const o = {
+        a:'a',
+        b:'b',
+        x:'x',
+        c: "${a}",
+        d: "${[a,b,x] ~> $join('_')}",
+        e: "${b}",
+        f: "${c}",
+        g: "${c}",
+        h: "${d}",
+        i: "${d}",
+        j: "${i&h}"
+    };
+
+
+    const tp = new TemplateProcessor(o, {}, {treePlan: true});
+    try {
+        await tp.initialize();
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan("/");
+        expect(plan.toJSON()).toStrictEqual({
+            "op": "initialize",
+            "parallel": {
+                "jsonPtr": "/",
+                "parallel": [
+                    {
+                        "jsonPtr": "/e",
+                        "parallel": []
+                    },
+                    {
+                        "jsonPtr": "/f",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/c",
+                                "parallel": []
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/g",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/c",
+                                "parallel": []
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/j",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/i",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/d",
+                                        "parallel": []
+                                    }
+                                ]
+                            },
+                            {
+                                "jsonPtr": "/h",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/d",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        await pp.execute(plan);
+        expect(tp.output).toStrictEqual({
+            "a": "a",
+            "b": "b",
+            "c": "a",
+            "d": "a_b_x",
+            "e": "b",
+            "f": "a",
+            "g": "a",
+            "h": "a_b_x",
+            "i": "a_b_x",
+            "j": "a_b_xa_b_x",
+            "x": "x"
+        })
+        let [mutationPlan, jsonPtrs] = pp.getMutationPlan("/j", "NEWSTUFF", "set");
+        expect(mutationPlan.toJSON()).toStrictEqual({
+            "data": "NEWSTUFF",
+            "op": "set",
+            "parallel": {
+                "jsonPtr": "/j",
+                "parallel": []
+            }
+        });
+        expect(jsonPtrs).toStrictEqual([
+            "/j"
+        ])
+
+        let [mutationPlan2, jsonPtrs2] = pp.getMutationPlan("/a","NEWSTUFF", "set");
+        expect(mutationPlan2.toJSON()).toStrictEqual({
+            "data": "NEWSTUFF",
+            "op": "set",
+            "parallel": {
+                "jsonPtr": "/a",
+                "parallel": [
+                    {
+                        "jsonPtr": "/c",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/f",
+                                "parallel": []
+                            },
+                            {
+                                "jsonPtr": "/g",
+                                "parallel": []
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/d",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/h",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/j",
+                                        "parallel": []
+                                    }
+                                ]
+                            },
+                            {
+                                "jsonPtr": "/i",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/j",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        expect(jsonPtrs2).toStrictEqual([
+            "/a",
+            "/c",
+            "/d",
+            "/f",
+            "/g",
+            "/h",
+            "/i",
+            "/j"
+        ])
+    } finally {
+        await tp.close();
+    }
+});
+
+test("parallel plan from dag example in README", async () => {
+    const o = {
+        "a": {
+            "c": {
+                "g": {
+                    "h": 100,
+                    "i": "${h}"
+                },
+                "d": 100
+            }
+        },
+        "b": {
+            "e": "/${a.c.g}",
+            "f": "${e.i + 100}"
+        }
+    };
+
+
+    const tp = new TemplateProcessor(o, {}, {treePlan: true});
+    try {
+        await tp.initialize();
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan('/');
+        expect(plan.toJSON()).toStrictEqual({
+            "op": "initialize",
+            "parallel": {
+                "jsonPtr": "/",
+                "parallel": [
+                    {
+                        "jsonPtr": "/a/c/g/i",
+                        "parallel": []
+                    },
+                    {
+                        "jsonPtr": "/b/e",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/a/c/g/i",
+                                "parallel": []
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/b/f",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/b/e",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/a/c/g/i",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        tp.output.b.f=0; //mess it up on purpose before executing plan
+        await pp.execute(plan);
+        expect(tp.output).toStrictEqual({
+            "a": {
+                "c": {
+                    "g": {
+                        "h": 100,
+                        "i": 100
+                    },
+                    "d": 100
+                }
+            },
+            "b": {
+                "e": {
+                    "h": 100,
+                    "i": 100
+                },
+                "f": 200
+            }
+        });
+    } finally {
+        await tp.close();
+    }
+});
+
+test("parallel plan demo3.json", async () => {
+    const o = {
+        "a": {
+            "a1": "${42}",
+            "a2": {
+                "a3": "../${a1}"
+            }
+        },
+        "b": "${a}",
+        "c": "/${a.a2}"
+    };
+
+
+    const tp = new TemplateProcessor(o, {}, {treePlan: true});
+    try {
+        await tp.initialize();
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan('/');
+        expect(plan.toJSON()).toStrictEqual({
+            "op": "initialize",
+            "parallel": {
+                "jsonPtr": "/",
+                "parallel": [
+                    {
+                        "jsonPtr": "/a/a2/a3",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/a/a1",
+                                "parallel": []
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/b",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/a/a1",
+                                "parallel": []
+                            },
+                            {
+                                "jsonPtr": "/a/a2/a3",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/a/a1",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    },
+                    {
+                        "jsonPtr": "/c",
+                        "parallel": [
+                            {
+                                "jsonPtr": "/a/a2/a3",
+                                "parallel": [
+                                    {
+                                        "jsonPtr": "/a/a1",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        });
+        await pp.execute(plan);
+        expect(tp.output).toStrictEqual({
+            "a": {
+                "a1": 42,
+                "a2": {
+                    "a3": 42
+                }
+            },
+            "b": {
+                "a1": 42,
+                "a2": {
+                    "a3": 42
+                }
+            },
+            "c": {
+                "a3": 42
+            }
+        })
+
+    } finally {
+        await tp.close();
+    }
+});
+
+test("simplest parallel plan", async () => {
+    const o = {
+        "a": "${42}",
+        "b": "${42}",
+    };
+
+    const tp = new TemplateProcessor(o, {}, {treePlan: true});
+    try {
+        await tp.initialize();
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan('/');
+        expect(plan.toJSON()).toStrictEqual({
+            "op": "initialize",
+            "parallel": {
+                "jsonPtr": "/",
+                "parallel": [
+                    {
+                        "jsonPtr": "/a",
+                        "parallel": []
+                    },
+                    {
+                        "jsonPtr": "/b",
+                        "parallel": []
+                    }
+                ]
+            }
+        });
+        tp.output.a = 0; //mess up outputs to ensure pp.execute correctly works
+        tp.output.b = 0;
+        await pp.execute(plan);
+        expect(tp.output).toStrictEqual({a:42, b:42});
+    } finally {
+        await tp.close();
+    }
+});
+
 
 

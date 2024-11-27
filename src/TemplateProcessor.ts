@@ -38,6 +38,8 @@ import {accumulate} from "./utils/accumulate.js";
 import {defaulter} from "./utils/default.js";
 import {CliCoreBase} from "./CliCoreBase.js";
 import {DataFlow, DataFlowNode, FlowOpt} from "./DataFlow.js";
+import {SerialPlanner, SerialPlan} from "./SerialPlanner.js";
+import {ExecutionPlan, Planner} from "./Planner.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -51,18 +53,9 @@ export type StatedError = {
         stack?: string | null;
     };
 };
-export type Op = "set"|"delete"|"forceSetInternal";
+export type Op = "initialize"|"set"|"delete"|"forceSetInternal";
 export type Fork = {forkId:string, output:object};
-export type Plan = {
-    sortedJsonPtrs:JsonPointerString[],
-    restoreJsonPtrs:JsonPointerString[], //this is dependencies (functions and intervals/timeouts) we need to initialize on restore from a snapshot before we can evaluate the plan
-    didUpdate: boolean[] //peers with sortedJsonPointers, tells us which of those locations in output actually updated
-    data?:any, op?:Op, //if present and op="set", the data is applied to first json pointer
-    output:object,
-    forkId:string,
-    forkStack:Fork[] //allows us to have nested execution contexts that cen restored by popping this stack onto output
-    lastCompletedStep?:PlanStep,
-};
+
 type SnapshotPlan = {//a plan that simply dumps a snapshot
     op:"snapshot",
     generatedSnapshot: string
@@ -222,15 +215,17 @@ export type DataChangeCallback = (data: any, ptr: JsonPointerString|JsonPointerS
  */
 
 export default class TemplateProcessor {
+
     /**
      * Loads a template and initializes a new template processor instance.
      *
      * @static
      * @param {Object} template - The template data to be processed.
      * @param {Object} [context={}] - Optional context data for the template.
+     * @param options
      * @returns {Promise<TemplateProcessor>} Returns an initialized instance of `TemplateProcessor`.
      */
-    static async load(template:object, context = {}):Promise<TemplateProcessor> {
+    static async load(template:object, context = {}, options:object={}):Promise<TemplateProcessor> {
         const t = new TemplateProcessor(template, context);
         await t.initialize();
         return t;
@@ -268,6 +263,18 @@ export default class TemplateProcessor {
 
     private static _isNodeJS = typeof process !== 'undefined' && process.release && process.release.name === 'node';
 
+    /**
+     * An instance of the `Planner` interface used to manage execution plans.
+     *
+     * The `planner` is responsible for generating and executing `ExecutionPlan`s,
+     * which define the steps necessary to process templates. It provides methods
+     * to initialize plans based on metadata and execute those plans. The planner
+     * can be replaced by any valid Planner. We have SerialPlanner and ParallelPlanner
+     *
+     * @see Planner
+     * @see ExecutionPlan
+     */
+    planner: Planner;
     /** Represents the logger used within the template processor. */
     logger: StatedLogger;
 
@@ -282,12 +289,19 @@ export default class TemplateProcessor {
 
     /** This object mirrors the template output in structure but where the output contains actual data,
      * this object contains MetaInfo nodes that track metadata on the actual nodes */
-    templateMeta: any;
+    templateMeta: Record<JsonPointerString, MetaInfo>={};
 
     /** List of warnings generated during template processing. */
     warnings: any[] = [];
 
-    /** Maps JSON pointers of import paths to their associated meta information. */
+    /** Maps JSON pointers of import paths to their associated meta information.
+     * So, for example the key "/" -> MetaInfo[]. the MetaInfo are in no particular order
+     * HOWEVER the individual MetaInfo objects are the same objects as memory as those in
+     * the templateMeta tree. Therefore, from any MetaInfo, you can navigate to it children
+     * as its children are simply field of the object that don't end in "__". This explains
+     * why we name the MetaInfo fields with "__" suffix, so they can be differentiated from
+     * 'real' fields of the template output nodes.
+     * */
     metaInfoByJsonPointer: MetaInfoMap={};
 
     /** A set of tags associated with the template. */
@@ -307,7 +321,7 @@ export default class TemplateProcessor {
     private executionPlans: { [key: JsonPointerString]: JsonPointerString[] }={};
 
     /** A queue of execution plans awaiting processing. */
-    private readonly executionQueue:(Plan|SnapshotPlan|Transaction)[] = [];
+    private readonly executionQueue:(ExecutionPlan|SerialPlan|SnapshotPlan|Transaction)[] = [];
 
     /** function generators can be provided by a caller when functions need to be
      *  created in such a way that they are somehow 'responsive' or dependent on their
@@ -394,10 +408,11 @@ export default class TemplateProcessor {
         this.options = options;
         this.isInitializing = false;
         this.changeCallbacks = new Map();
-        //this.functionGenerators = new Map();
         this.tagSet = new Set();
         this.onInitialize = new Map();
         this.executionStatus = new ExecutionStatus(this);
+        const {planner=new SerialPlanner(this)} = options as any;
+        this.planner = planner;
     }
 
     // resetting template means that we are resetting all data holders and set up new template
@@ -527,10 +542,10 @@ export default class TemplateProcessor {
                 this.propagateTags(metaInfos);
                 this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
                 this.isClosed = false; //open the execution queue for processing
-                await this.evaluateInitialPlan(jsonPtr);
+                await this.queueInitializationPlan(jsonPtr);
             } else {
                 this.isClosed = false;
-                await this.executionStatus.restore(this);
+                await this.planner.restore(this.executionStatus);
             }
             await this.postInitialize();
             await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.PreTmpVarRemoval);
@@ -555,13 +570,15 @@ export default class TemplateProcessor {
         (this.lifecycleManager as LifecycleManager).clear();
     }
 
-    private async evaluateInitialPlan(jsonPtr:JsonPointerString) {
+    private async queueInitializationPlan(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
-        this.logger.verbose(`evaluating template (uid=${this.uniqueId})...`);
-        await this.evaluateInitialPlanDependencies(this.metaInfoByJsonPointer[jsonPtr]);
+        this.logger.verbose(`generating initialization plan for template (uid=${this.uniqueId})...`);
+        const plan:ExecutionPlan = this.planner.getInitializationPlan(jsonPtr);
+        this.executionQueue.push(plan);
+        await this.drainExecutionQueue(false);
         const endTime = Date.now(); // Capture end time
 
-        this.logger.verbose(`evaluation complete in ${endTime - startTime} ms...`);
+        this.logger.verbose(`formulated initialization plan in ${endTime - startTime} ms...`);
 
         //the commented out approach below us necessary if we want to push in imports. It has the unsolved problem
         //that if the existing template has dependencies on the to-be-imported template, and we are not forcing it
@@ -834,7 +851,7 @@ export default class TemplateProcessor {
             //so if we will never allow replacement of the entire root document. But modulo that if-statement we can setup the templateMeta
             if (meta.jsonPointer__.length > 0) {
                 //if we are here then the templateMetaData can be set to the meta we just populated
-                jp.set(this.templateMeta, meta.jsonPointer__, meta);
+                jp.set(this.templateMeta, meta.jsonPointer__, meta); //templateMeta is a tree structure of MeatInfo mirroring the actual structure
             }
             TemplateProcessor.compileToJsonPointer(meta);
         });
@@ -891,21 +908,6 @@ export default class TemplateProcessor {
                 (meta.dependees__ as JsonPointerString[]).push(i.jsonPointer__ as JsonPointerString);
             });
         });
-    }
-
-    public async evaluateInitialPlanDependencies(metaInfos:MetaInfo[]):Promise<void> {
-        const evaluationPlan = this.topologicalSort(metaInfos, true);//we want the execution plan to only be a list of nodes containing expressions (expr=true)
-        const plan = {
-            sortedJsonPtrs:evaluationPlan,
-            restoreJsonPtrs: [],
-            data: TemplateProcessor.NOOP,
-            output:this.output,
-            forkStack:[],
-            forkId:"ROOT",
-            didUpdate:[]
-        };
-        this.executionQueue.push(plan);
-        await this.drainExecutionQueue(false);
     }
 
     private makeDepsAbsolute(parentJsonPtr:JsonPointerStructureArray, localJsonPtrs:JsonPointerStructureArray[]) {
@@ -987,166 +989,6 @@ export default class TemplateProcessor {
         }
     }
 
-    private topologicalSort(metaInfos:MetaInfo[], exprsOnly = true, fanout=true):JsonPointerString[] {
-        const visited = new Set();
-        const recursionStack:Set<JsonPointerString> = new Set(); //for circular dependency detection
-        const orderedJsonPointers:Set<string> = new Set();
-        const templateMeta = this.templateMeta;
-
-        //--------------- utility sub-functions follow ----------------//
-
-        const listDependencies = (metaInfo:MetaInfo) => {
-            markAsVisited(metaInfo); //visited tells us 'globally' is a node has ever been visited
-            //...however, we also need to track the traversal of dependencies that is 'local' to a single
-            //originating node/expression. Circularity of references is limited to this "local" Scope. If we
-            //detected circularity with the global 'visited' list, it would mean that circularity was somehow
-            //a property of the entire template, which it is not. Circularity is a property of individual expression
-            //fanouts, '.from' a given expression/node
-            addToScope(metaInfo);
-
-            followDependencies(metaInfo);
-            emit(metaInfo);
-            followChildren(metaInfo);
-
-            removeFromScope(metaInfo); //...and clear that 'local' scope now that we finished processing the node
-        }
-
-        const hasJsonPointer = (metaInfo:MetaInfo) => {
-            return metaInfo.jsonPointer__ !== undefined;
-        }
-
-        const markAsVisited = (metaInfo:MetaInfo) => {
-            visited.add(metaInfo.jsonPointer__);
-        }
-
-        const addToScope = (metaInfo:MetaInfo) => {
-            recursionStack.add(metaInfo.jsonPointer__ as JsonPointerString);
-        }
-
-        const removeFromScope = (metaInfo:MetaInfo) => {
-            recursionStack.delete(metaInfo.jsonPointer__ as JsonPointerString);
-        }
-        /**
-         * Used to detect a condition where like "data:${data.foo}" which essentially declares a dependency on the
-         * expression itself. This is inherently circular. You cannot say "use that thing in this expression, where
-         * that thing is a product of evaluating this expression". You also cannot say "use that thing in this
-         * expression where that thing is a direct ancestor of this expression" as that is also circular, implying that
-         * the expression tries to reference an ancestor node, whose descendent includes this very node.
-         * @param exprNode
-         * @param dependency
-         */
-        const isCommonPrefix = (exprNode:JsonPointerString, dependency:JsonPointerString):boolean=>{
-            return jp.isAncestor(dependency, exprNode);
-        }
-
-        //metaInfo gets arranged into a tree. The fields that end with "__" are part of the meta info about the
-        //template. Fields that don't end in "__" are children of the given object in the template
-        const followChildren = (metaInfoNode:any) => {
-            for (const childKey in metaInfoNode) {
-                if (!childKey.endsWith("__")) { //ignore metadata fields
-                    const child = metaInfoNode[childKey];
-                    if (!visited.has(child.jsonPointer__)) {
-                        listDependencies(child);
-                    }
-                }
-            }
-        }
-
-        const searchUpForExpression = (childNode:MetaInfo):MetaInfo|undefined=> {
-            let pathParts = jp.parse(childNode.jsonPointer__ as JsonPointerString);
-            /*
-            const directParent = jp.compile(pathParts.slice(0, -1));
-            //if a dependency of an expression is rooted in the expression itself, such as "data:${data.foo}" then this is a circular dependency
-            if (visited.has(directParent) && (jp.get(this.templateMeta, directParent) as MetaInfo).expr__) {
-                logCircularDependency(childNode.jsonPointer__ as JsonPointerString);
-                return undefined;
-            }
-
-             */
-            while (pathParts.length > 1) {
-                pathParts = pathParts.slice(0, -1); //get the parent expression
-                const jsonPtr = jp.compile(pathParts);
-                const ancestorNode = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
-                if (ancestorNode.materialized__ === true) {
-                    return ancestorNode;
-                }
-            }
-            return undefined;
-
-        }
-
-        const followDependencies = (metaInfo:MetaInfo) => {
-            if (!metaInfo.absoluteDependencies__) return;
-
-            for (const dependency of metaInfo.absoluteDependencies__) {
-
-                if (recursionStack.has(dependency as JsonPointerString)
-                    || isCommonPrefix(metaInfo.jsonPointer__ as JsonPointerString, dependency as JsonPointerString)) {
-                    logCircularDependency(dependency as JsonPointerString);
-                    continue; //do not follow circular dependencies
-                }
-
-                if (visited.has(dependency)) continue;
-                const dependencyNode = jp.get(templateMeta, dependency) as MetaInfo;
-                processUnmaterializedDependency(dependencyNode);
-                listDependencies(dependencyNode);
-            }
-        }
-
-        const logCircularDependency = (dependency:JsonPointerString) => {
-            const e = '🔃 Circular dependency  ' + Array.from(recursionStack).join(' → ') + " → " + dependency;
-            this.warnings.push(e);
-            this.logger.log('warn', e);
-        }
-
-        const processUnmaterializedDependency = (dependencyNode:MetaInfo) => {
-            if (!dependencyNode.materialized__) {
-                const ancestor = searchUpForExpression(dependencyNode);
-                if (ancestor) {
-                    listDependencies(ancestor);
-                }
-            }
-        }
-
-        const emit = (metaInfo:MetaInfo) => {
-            if (exprsOnly && !metaInfo.expr__) return;
-            orderedJsonPointers.add(metaInfo.jsonPointer__ as JsonPointerString);
-        }
-
-        const removeExtraneous = (orderedJsonPointers:Set<string>):JsonPointerString[]=>{
-            const desiredToRetain:Set<JsonPointerString> = new Set();
-            metaInfos.forEach(m=>{
-                desiredToRetain.add(m.jsonPointer__ as JsonPointerString);
-            });
-            return [...orderedJsonPointers].reduce((acc:JsonPointerString[], jsonPtr)=>{
-                if(desiredToRetain.has(jsonPtr)){
-                    acc.push(jsonPtr as JsonPointerString);
-                }
-                return acc;
-            }, []);
-        }
-        //-------- end utility sub functions -------------//
-
-        if (!(metaInfos instanceof Set || Array.isArray(metaInfos))) {
-            metaInfos = [metaInfos];
-        }
-        // Perform topological sort
-        metaInfos.forEach(node => {
-            if (!visited.has(node.jsonPointer__)) {
-                listDependencies(node);
-            }
-        });
-        if(!fanout) {
-            //when the input metaInfos has come via ".from()" then we are just trying to ensure that any
-            //dependencies *within* that set of metaInfos gets topologically sorted. We don't want to fan
-            //out to any other dependencies
-            return removeExtraneous(orderedJsonPointers);
-        }else{
-            return [...orderedJsonPointers];
-        }
-    }
-
-
     /**
      * Sets or deletes data based on the specified operation.
      * @async
@@ -1161,8 +1003,7 @@ export default class TemplateProcessor {
         }
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
-        const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const plan:Plan = {sortedJsonPtrs: fromPlan, restoreJsonPtrs: [], data, op, output:this.output, forkStack:[], forkId:"ROOT", didUpdate:[]}
+        const [plan, fromPlan] = this.planner.getMutationPlan(jsonPtr, data, op);
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
             this.logger.debug(`execution plan (uid=${this.uniqueId}): ${stringify(plan)}`);
@@ -1193,21 +1034,21 @@ export default class TemplateProcessor {
         const {jsonPtr} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, restoreJsonPtrs: [], didUpdate:[]};
-        await this.executePlan(mutationPlan as Plan);
+        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, restoreJsonPtrs: [], didUpdate:[], op:"set"};
+        await this.executePlan(mutationPlan as SerialPlan);
         return fromPlan;
     }
 
     private async drainExecutionQueue(removeTmpVars:boolean=true){
         while (this.executionQueue.length > 0 && !this.isClosed) {
             try {
-                const plan: Plan | SnapshotPlan | Transaction= this.executionQueue[0];
+                const plan: ExecutionPlan| SerialPlan | SnapshotPlan | Transaction= this.executionQueue[0];
                 if (plan.op === "snapshot") {
                     (plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();;
                 } else if(plan.op === "transaction" ){
                     this.applyTransaction(plan as Transaction); //should this await?
                 }else{
-                    await this.executePlan(plan as Plan);
+                    await this.executePlan(plan as SerialPlan);
                 }
                 removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
             }finally {
@@ -1316,107 +1157,21 @@ export default class TemplateProcessor {
         }
     }
 
-    /**
-     * This method is used to compile and evaluate function expressions and their dependencies.
-     *
-     * Based on the metadata, we should identify all functions, and their dependencies
-     * @param plan
-     */
-    public async evaluateRestorePlan(plan:Plan) {
+    public async executePlan(plan:ExecutionPlan){
         try {
-            let {output, forkStack, forkId, didUpdate:updatesArray,restoreJsonPtrs: dependencies} = plan;
-            const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
-            const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
-            for (let i = startIndex; i < dependencies.length; i++) {
-                const jsonPtr = dependencies[i];
-                const planStep:PlanStep = {jsonPtr, output, forkStack, forkId, didUpdate:false}; //pick up the output and forkStack from the prior step
-                planStep.didUpdate = await this.evaluateNode(planStep);
-                output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
-            }
-        } catch (e) {
-            this.logger.error(`failed to initialize restore plan, error=${e}`);
-            throw e;
-        }
-    }
-
-    /**
-     * Create an initialization plan from the execution plan
-     * @param plan
-     */
-    public async createRestorePlan(plan:Plan) {
-        try {
-            let intervals: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
-            const expressions: MetaInfo[] = this.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.expr__ !== undefined);
-            const functions: MetaInfo[] = this.metaInfoByJsonPointer["/"]
-                ?.filter(metaInfo => metaInfo.expr__ !== undefined)
-                .filter(metaInfo => metaInfo.isFunction__ === true);
-            expressions.forEach(metaInfo => {
-                metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
-            });
-
-            for (const expression of functions) {
-                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-
-               if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
-                   plan.restoreJsonPtrs.push(jsonPtrStr);
-               }
-            }
-            functions.forEach(metaInfo => {
-                jp.set(plan.output, metaInfo.jsonPointer__, metaInfo.compiledExpr__);
-            })
-            for (const expression of intervals) {
-                const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-                if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
-                    plan.restoreJsonPtrs.push(jsonPtrStr);
-                }
-            }
-            await this.evaluateRestorePlan(plan);
-        } catch (error) {
-            this.logger.error("plan functions evaluation failed");
-            throw error;
-        }
-    }
-
-    public async executePlan(plan:Plan){
-        try {
-            const {data} = plan;
-            let shouldRunDependentExpressions = true;
-            if (data !== TemplateProcessor.NOOP) { //this plan begins with setting data
-                shouldRunDependentExpressions = await this.applyMutationToFirstJsonPointerOfPlan(plan);
-            }
-            // if the plan caused an initial mutation, then continue with the plan's transitive dependencies
-            shouldRunDependentExpressions && await this.executeDependentExpressions(plan);
-            await this.executeDataChangeCallbacks(plan);
+            await this.planner.execute(plan);
         }catch(error){
-            this.logger.error("plan execution failed for plan " + JSON.stringify(plan.sortedJsonPtrs));
+            this.logger.error("plan execution failed");
             throw error;
         }
     }
 
-    private async executeDependentExpressions(plan: Plan) {
-        this.executionStatus.begin(plan);
-        try {
-            let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies} = plan;
-            const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
-            const startIndex = lastCompletedStep?dependencies.indexOf(lastCompletedStep.jsonPtr)+1:0
-            for (let i = startIndex; i < dependencies.length; i++) {
-                const jsonPtr = dependencies[i];
-                const planStep:PlanStep = {jsonPtr, output, forkStack, forkId, didUpdate:false}; //pick up the output and forkStack from the prior step
-                planStep.didUpdate = await this.evaluateNode(planStep);
-                plan.lastCompletedStep = planStep;
-                output = planStep.output; // forked/joined will change the output so we have to record it to pass to next step
-                updatesArray[i] = planStep.didUpdate;
-            }
-        }finally {
-            this.executionStatus.end(plan);
-        }
-    }
 
-    private async executeDataChangeCallbacks(plan:Plan) {
+    public async executeDataChangeCallbacks(plan:SerialPlan) {
         let anyUpdates = false;
         const {receiveNoOpCallbacksOnRoot:everything = false} = this.options;
         let jsonPtrArray = plan.sortedJsonPtrs;
-        const onlyWhatChanged = (plan:Plan)=>{
+        const onlyWhatChanged = (plan:SerialPlan)=>{
             return  plan.didUpdate.reduce((acc:JsonPointerString[],didUpdate,i)=>{
                 if(didUpdate){
                     acc.push(plan.sortedJsonPtrs[i]);
@@ -1441,28 +1196,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async applyMutationToFirstJsonPointerOfPlan(plan:Plan):Promise<boolean> {
-        if(plan.lastCompletedStep){
-            return plan.lastCompletedStep?plan.sortedJsonPtrs.indexOf(plan.lastCompletedStep.jsonPtr)< plan.sortedJsonPtrs.length:false
-        }
-        this.executionStatus.begin(plan);
-        let theStep:PlanStep|undefined;
-        try {
-            const {sortedJsonPtrs} = plan;
-            const jsonPtr = sortedJsonPtrs[0];
-            theStep = {jsonPtr, ...plan, didUpdate:false}
-            const didUpdate =  await this.mutate(theStep);
-            plan.didUpdate.push(didUpdate);
-            return didUpdate;
-        }finally {
-            if(theStep){
-                plan.lastCompletedStep = theStep;
-            } //completed self
-            this.executionStatus.end(plan)
-        }
-    }
-
-    private async mutate(planStep: PlanStep):Promise<boolean> {
+    public async mutate(planStep: PlanStep):Promise<boolean> {
         try {
             const {jsonPtr: entryPoint, data, op} = planStep;
             if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
@@ -1487,7 +1221,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private async evaluateNode(step:PlanStep):Promise<boolean> {
+    async evaluateNode(step:PlanStep):Promise<boolean> {
         const {jsonPtr, data=undefined, op="set", output} = step;
         const {templateMeta} = this;
 
@@ -1565,7 +1299,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private setDataIntoTrackedLocation(templateMeta:MetaInfo, planStep:PlanStep ) {
+    private setDataIntoTrackedLocation(templateMeta:Record<JsonPointerString,MetaInfo>, planStep:PlanStep ) {
         const {jsonPtr, data=undefined, op="set"} = planStep;
         const {treeHasExpressions__} = jp.get(templateMeta, jsonPtr) as MetaInfo;
         if (treeHasExpressions__ && op !== 'forceSetInternal') {
@@ -1749,12 +1483,11 @@ export default class TemplateProcessor {
 
     }
 
+
     from(jsonPtr:JsonPointerString) {
         //check execution plan cache
         if (this.executionPlans[jsonPtr] === undefined) {
-            const affectedNodesSet:MetaInfo[] = this.getDependentsBFS(jsonPtr);
-            const topoSortedPlan:JsonPointerString[] = this.topologicalSort(affectedNodesSet, true, false);
-            this.executionPlans[jsonPtr] = [jsonPtr, ...topoSortedPlan];
+            this.executionPlans[jsonPtr] = this.planner.from(jsonPtr)
         }
         return this.executionPlans[jsonPtr];
     }
@@ -1766,100 +1499,6 @@ export default class TemplateProcessor {
             return [];
         }
     }
-
-    private getDependentsBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
-
-
-        const dependents:MetaInfo[] = [];
-        const queue:JsonPointerString[] = [jsonPtr];
-        const visited:Set<JsonPointerString> = new Set();
-        const origin = jsonPtr;
-
-        //----------------- utility functions ----------------//
-
-        const isInterval = (metaInf:MetaInfo): boolean =>{
-            const {data__} = metaInf;
-            return data__ && this.timerManager.isInterval(data__);
-        }
-
-        const isFunction = (jsonPointer:JsonPointerString)=>{
-
-            if(!jp.has(this.templateMeta, jsonPointer)){
-                return false;
-            }
-            const metaInf = jp.get(this.templateMeta, jsonPointer) as MetaInfo;
-            //treat intervals same as immutable functions. Changes should not propagate through an interval causing
-            //interval re-evaluation
-            if(isInterval(metaInf)){
-                return true;
-            }
-            return !!metaInf.isFunction__;
-        }
-
-        const queueParent = (jsonPtr:JsonPointerString)=>{
-            //search "up" from this currentPtr to find any dependees of the ancestors of currentPtr
-            const parentPointer = jp.parent(jsonPtr) as JsonPointerString;
-            if (parentPointer !== '' && !visited.has(parentPointer)) {
-                !isFunction(parentPointer) && queue.push(parentPointer);
-                visited.add(parentPointer);
-            }
-        }
-
-        const queueDependees = (metaInf: MetaInfo)=>{
-            if (metaInf.dependees__) {
-                metaInf.dependees__.forEach(dependee => {
-                    if (!visited.has(dependee as JsonPointerString)) {
-                        !isFunction(dependee as JsonPointerString) && queue.push(dependee as JsonPointerString);
-                        visited.add(dependee as JsonPointerString);
-                    }
-                });
-            }
-        }
-
-        const queueDescendents = (metaInf:MetaInfo, currentPtr:JsonPointerString)=>{
-            // Recursively traverse into children nodes.
-            for (let key in metaInf) {
-                // Skip fields that end in "__" and non-object children
-                if (key.endsWith('__') || typeof (metaInf as any)[key] !== 'object') {
-                    continue;
-                }
-                // Generate json pointer for child
-                let childPtr = `${currentPtr}/${key}`;
-                if (!visited.has(childPtr)) {
-                    !isFunction(childPtr) && queue.push(childPtr);
-                    visited.add(childPtr);
-                }
-            }
-        }
-        //----------------- end utility functions ------------------------//
-        //----------------- BFS Dependee Search Algorithm ----------------//
-
-        while (queue.length > 0) {
-            const currentPtr = queue.shift();
-            queueParent(currentPtr as JsonPointerString); //these are IMPLICIT dependees
-            //calling queueParent before the templateMeta existence check allows us to find ancestors of
-            //a jsonPointer like '/rxLog/-'. Which means "last element of rxLog". queueParent() allows us to
-            //pickup the /rxLog array as being an implicit dependency of its array elements. So if an element
-            //is added or removed, we will recognize anyone who depends on /rxLog as a dependent
-            //@ts-ignore
-            if (!jp.has(this.templateMeta, currentPtr)){
-                continue;
-            }
-            //@ts-ignore
-            const metaInf = jp.get(this.templateMeta, currentPtr) as MetaInfo;
-            if(metaInf.isFunction__){
-                continue; //function never gets re-evaluated
-            }
-            if(currentPtr !== origin && metaInf.expr__ !== undefined){
-                dependents.push(metaInf);
-            }
-            queueDependees(metaInf); //these are EXPLICIT dependees
-            queueDescendents(metaInf, currentPtr as JsonPointerString); //these are IMPLICIT dependees
-        }
-
-        return dependents;
-    }
-
 
     getDependencies(jsonPtr:JsonPointerString) {
         if (jp.has(this.templateMeta, jsonPtr)) {
@@ -1873,7 +1512,8 @@ export default class TemplateProcessor {
     to(jsonPtr:JsonPointerString) {
         if (jp.has(this.templateMeta, jsonPtr)) {
             const node = jp.get(this.templateMeta, jsonPtr) as MetaInfo;
-            return this.topologicalSort([node], false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
+            //return this.topologicalSort([node], false); //for the repl "to" command we want to see all the dependencies, not just expressions (so exprsOnly=false)
+            return new SerialPlanner(this).topologicalSort([node], false);
         }
         return [];
     }
@@ -1948,8 +1588,8 @@ export default class TemplateProcessor {
 
 
     //returns the evaluation plan for evaluating the entire template
-    async getEvaluationPlan() {
-        return this.topologicalSort(this.metaInfoByJsonPointer["/"], true);
+    async plan() {
+        return new SerialPlanner(this).topologicalSort(this.metaInfoByJsonPointer["/"], true);
     }
 
 
@@ -2224,6 +1864,17 @@ export default class TemplateProcessor {
             return rootJsonPtr.slice(0,-1);
         }
         return rootJsonPtr;
+    }
+
+    /**
+     * Retrieves the metadata information for a given JSON Pointer string.
+     *
+     * @param jsonPtr - The JSON Pointer string that identifies the template node.
+     * @returns The `MetaInfo` object corresponding to the provided JSON Pointer.
+     * @throws If the JSON Pointer does not exist in the `templateMeta`.
+     */
+    public getMetaInfo(jsonPtr:JsonPointerString):MetaInfo{
+        return jp.get(this.templateMeta, jsonPtr) as MetaInfo;
     }
 }
 

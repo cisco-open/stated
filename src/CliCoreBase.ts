@@ -307,7 +307,7 @@ export class CliCoreBase {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        return await this.templateProcessor.getEvaluationPlan();
+        return await this.templateProcessor.plan();
     }
 
     log(level:Levels) {

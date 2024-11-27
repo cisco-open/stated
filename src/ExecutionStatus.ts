@@ -1,9 +1,11 @@
 import {MetaInfo} from "./MetaInfoProducer.js";
-import TemplateProcessor, {Fork, MetaInfoMap, Plan, PlanStep} from "./TemplateProcessor.js";
+import TemplateProcessor, {Fork, MetaInfoMap, PlanStep} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
+import {ExecutionPlan} from "./Planner.js";
+import {SerialPlan} from "./SerialPlanner.js";
 
 export class ExecutionStatus {
-    public statuses: Set<Plan>;
+    public statuses: Set<SerialPlan>;
     public metaInfoByJsonPointer: MetaInfoMap;
     public tp:TemplateProcessor;
 
@@ -12,11 +14,11 @@ export class ExecutionStatus {
         this.tp = tp;
         this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
-    public begin(mutationPlan:Plan) {
-        this.statuses.add(mutationPlan)
+    public begin(mutationPlan:ExecutionPlan) {
+        this.statuses.add(mutationPlan as SerialPlan) //todo fixme - this whole class needs to be refactored to work with ExecutionPlan - it will only work now with Plan
     }
 
-    public end(mutationPlan: Plan) {
+    public end(mutationPlan: SerialPlan) {
         this.statuses.delete(mutationPlan);
     }
 
@@ -30,7 +32,7 @@ export class ExecutionStatus {
 
     public getForkMap():Map<string,Fork>{
         const outputsByForkId = new  Map<string, Fork>();
-        Array.from(this.statuses).forEach((mutationPlan:Plan)=>{
+        Array.from(this.statuses).forEach((mutationPlan)=>{
             const {forkId, output, forkStack}= mutationPlan;
             outputsByForkId.set(forkId, {forkId, output} as Fork);
             forkStack.forEach((fork:Fork)=>{
@@ -79,7 +81,7 @@ export class ExecutionStatus {
         }
         return json;
     }
-    private mutationPlanToJSON = (mutationPlan:Plan):object => {
+    private mutationPlanToJSON = (mutationPlan:SerialPlan):object => {
         let {forkId,forkStack,sortedJsonPtrs, lastCompletedStep, op, data, output} = mutationPlan;
         const json = {
             forkId,
@@ -101,11 +103,12 @@ export class ExecutionStatus {
      * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
      * @param tp TemplateProcessor
      */
+    /*
     public async restore(tp:TemplateProcessor): Promise<void> {
         // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
         // and create initialization plan from it.
         let hasRootPlan = false;
-        this.statuses.forEach((plan:Plan) => {
+        this.statuses.forEach((plan:ExecutionPlan) => {
             if(plan.forkId === "Root") {
                 hasRootPlan = true;
             }});
@@ -135,6 +138,8 @@ export class ExecutionStatus {
         }
     }
 
+     */
+
     /**
      * Reconstructs execution status and template processor internal states form an execution status snapshot
      * @param tp TemplateProcess
@@ -163,7 +168,7 @@ export class ExecutionStatus {
             } else if (planData.data === UNDEFINED_PLACEHOLDER) {
                 planData.data = undefined;
             }
-            const mutationPlan: Plan = {
+            const mutationPlan: SerialPlan = {
                 didUpdate: [],
                 forkId: planData.forkId,
                 forkStack,
