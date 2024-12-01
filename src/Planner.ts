@@ -113,3 +113,12 @@ export interface ExecutionPlan {
     // Uncomment the following line to allow additional fields in the execution plan
     // [key: string]: any;
 }
+
+export interface Snapshot{
+    template: any;
+    output: object,
+    options: {},
+    mvcc: Fork[];
+    //metaInfoByJsonPointer: this.metaInfosToJSON(this.metaInfoByJsonPointer),
+    //plans: Array.from(this.statuses).map(this.mutationPlanToJSON)
+}

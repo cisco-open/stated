@@ -101,10 +101,15 @@ export class ParallelPlanner implements Planner{
     }
 
     private makeMutationPlan(jsonPtr:JsonPointerString, data:any, op:Op):[ParallelExecutionPlan, JsonPointerString[]] {
+        if(this.tp.planner !== this){
+            throw new Error(`Illegal attempt to accessed TemplateProcessor with uniqueId ${this.tp.uniqueId} from a Planner that wasn't the template processor's Planner` );
+        } //move this check into TP
+
         this.nodeCache.clear();
         //the parallel plan root node, for a mutation always begins at the jsonPtr where the mutation occured,
         //therefore instead of having a redundant 'holder node' at the root, we just spread the
-        const parallelPlan =  new ParallelExecutionPlanDefault(this.tp, this.getDependeesNode(this.tp.getMetaInfo(jsonPtr)), {data, op}); //spread data and op into the Plan
+        const planNode = this.getDependeesNode(this.tp.getMetaInfo(jsonPtr));
+        const parallelPlan =  new ParallelExecutionPlanDefault(this.tp, planNode, {data, op}); //spread data and op into the Plan
         //the first step of the mutation plan should assume the data (the mutation) which is applied only in the first step in the plan, then "pulled" by other expressions that evaluate
         parallelPlan.parallel.data = data;
         const serializedFrom: JsonPointerString[] = this.tp.from(jsonPtr);

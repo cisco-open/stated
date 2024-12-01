@@ -877,7 +877,7 @@ export default class TemplateProcessor {
                         "dependees__": [], //a non-materialized node has a dependency on the parent node
                         "dependencies__": [], //we are passed the phase where dependencies have been converted to absolute so we can skip populating this
                         "absoluteDependencies__": [], //parent.length===0?[]:[parent], //empty parent is root document; tracking dep's on root is silly
-                        "tags__": new Set<string>(),
+                        "tags__": [],
                         "treeHasExpressions__": false,
                         parent__: parent
                     };
@@ -898,7 +898,7 @@ export default class TemplateProcessor {
                         "dependees__": [],
                         "dependencies__": [],
                         "absoluteDependencies__": [], //parent.length===0?[]:[parent],
-                        "tags__": new Set<string>(),
+                        "tags__": [],
                         "treeHasExpressions__": false,
                         parent__: parent
                     };
@@ -943,8 +943,11 @@ export default class TemplateProcessor {
                 // Recurse on the dependency to ensure we collect all its tags
                 dfs(dependency);
                 // Propagate tags from the dependency to the node
-                dependency.tags__?.forEach(tag => node.tags__.add(tag));
+                if(dependency.tags__){
+                    dependency.tags__.forEach(tag => node.tags__.push(tag));
+                }
             });
+            node.tags__ = [...new Set<string>(node.tags__)]; //uniquify the array
         }
 
         // Start DFS from all nodes in metaInfos
@@ -1263,7 +1266,7 @@ export default class TemplateProcessor {
                 }
                 this._setData({...planStep, data});
             } else {
-                this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${Array.from(tags__)}) were set with --tags`);
+                this.logger.debug(`Skipping execution of expression at ${jsonPtr}, because none of required tags (${tags__}) were set with --tags`);
                 return false;
             }
         } else {
@@ -1434,11 +1437,11 @@ export default class TemplateProcessor {
         }
     }
 
-    private allTagsPresent(tagSetOnTheExpression:Set<string>) {
-        if(tagSetOnTheExpression.size === 0 && this.tagSet.size > 0){
+    private allTagsPresent(tagSetOnTheExpression:string[]) {
+        if(tagSetOnTheExpression.length === 0 && this.tagSet.size > 0){
             return false;
         }
-        return Array.from(tagSetOnTheExpression).every(tag => this.tagSet.has(tag));
+        return tagSetOnTheExpression.every(tag => this.tagSet.has(tag));
     }
 
     private _setData(planStep: PlanStep):boolean {

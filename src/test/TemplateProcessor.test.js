@@ -3823,6 +3823,21 @@ test("parallel plan", async () => {
             "j": "NEWSTUFF_b_xNEWSTUFF_b_x",
             "x": "x"
         });
+        const fromBPlan = await tp.setData("/b", "NEWB");
+        expect(fromBPlan).toStrictEqual(["/b", "/d", "/e", "/h", "/i", "/j"]);
+        expect(tp.output).toStrictEqual({
+            "a": "NEWSTUFF",
+            "b": "NEWB",
+            "c": "NEWSTUFF",
+            "d": "NEWSTUFF_NEWB_x",
+            "e": "NEWB",
+            "f": "NEWSTUFF",
+            "g": "NEWSTUFF",
+            "h": "NEWSTUFF_NEWB_x",
+            "i": "NEWSTUFF_NEWB_x",
+            "j": "NEWSTUFF_NEWB_xNEWSTUFF_NEWB_x",
+            "x": "x"
+        });
     } finally {
         await tp.close();
     }
