@@ -104,7 +104,9 @@ export class ParallelPlanner implements Planner{
         this.nodeCache.clear();
         //the parallel plan root node, for a mutation always begins at the jsonPtr where the mutation occured,
         //therefore instead of having a redundant 'holder node' at the root, we just spread the
-        const parallelPlan =  new ParallelExecutionPlanDefault(this.tp, this.getDependeesNode(this.tp.getMetaInfo(jsonPtr)), {data, op});
+        const parallelPlan =  new ParallelExecutionPlanDefault(this.tp, this.getDependeesNode(this.tp.getMetaInfo(jsonPtr)), {data, op}); //spread data and op into the Plan
+        //the first step of the mutation plan should assume the data (the mutation) which is applied only in the first step in the plan, then "pulled" by other expressions that evaluate
+        parallelPlan.parallel.data = data;
         const serializedFrom: JsonPointerString[] = this.tp.from(jsonPtr);
         return [parallelPlan,serializedFrom];
     }
@@ -180,7 +182,7 @@ export class ParallelPlanner implements Planner{
          * of all its dependencies in parallel
          * @param step
          */
-        const _execute = async (step:ParallelPlanStep): Promise<void>=> {
+        const _execute = async (step:ParallelPlanStep, preOrPostOrder:"pre"|"post"): Promise<void>=> {
             const {jsonPtr} = step;
             let promise = promises.get(jsonPtr);
 
@@ -189,15 +191,20 @@ export class ParallelPlanner implements Planner{
             }
             //if we got here then this is the one place where we execute this step
             // Execute all dependencies first, then resolve this node
-            return await Promise.all(step.parallel.map((d) => _execute(d))).then(() => {
-                return this.evaluateStep(step);
-            });
+            if(preOrPostOrder === "post") {
+                await Promise.all(step.parallel.map((d) => _execute(d, preOrPostOrder)));
+                await this.evaluateStep(step);
+            }else{
+                await this.evaluateStep(step);
+                await Promise.all(step.parallel.map((d) => _execute(d, preOrPostOrder)));
+            }
 
 
         }
         //now get the root node of the parallel execution plan and recursively await completion of the plan
         const{parallel:root} = plan as ParallelExecutionPlan;
-        return await _execute(root);
+        const ordering = plan.op==="initialize"?"post":"pre";
+        return await _execute(root, ordering);
     }
 
     private async evaluateStep(step:ParallelPlanStep): Promise<void> {

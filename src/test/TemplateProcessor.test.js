@@ -3751,7 +3751,8 @@ test("parallel plan", async () => {
         expect(jsonPtrs).toStrictEqual([
             "/j"
         ])
-
+        await pp.execute(mutationPlan);
+        expect(tp.output.j).toBe("a_b_xa_b_x");//that's right! /j is an expression and by default trying to overwrite an expression logs a warning and ignores the change!
         let [mutationPlan2, jsonPtrs2] = pp.getMutationPlan("/a","NEWSTUFF", "set");
         expect(mutationPlan2.toJSON()).toStrictEqual({
             "data": "NEWSTUFF",
@@ -3807,7 +3808,21 @@ test("parallel plan", async () => {
             "/h",
             "/i",
             "/j"
-        ])
+        ]);
+        await pp.execute(mutationPlan2);
+        expect(tp.output).toStrictEqual({
+            "a": "NEWSTUFF",
+            "b": "b",
+            "c": "NEWSTUFF",
+            "d": "NEWSTUFF_b_x",
+            "e": "b",
+            "f": "NEWSTUFF",
+            "g": "NEWSTUFF",
+            "h": "NEWSTUFF_b_x",
+            "i": "NEWSTUFF_b_x",
+            "j": "NEWSTUFF_b_xNEWSTUFF_b_x",
+            "x": "x"
+        });
     } finally {
         await tp.close();
     }
