@@ -3673,57 +3673,76 @@ test("parallel plan", async () => {
         const pp = new ParallelPlanner(tp);
         const plan = pp.getInitializationPlan("/");
         expect(plan.toJSON()).toStrictEqual({
+            "completed": false,
+            "jsonPtr": "/",
             "op": "initialize",
-            "parallel": {
-                "jsonPtr": "/",
-                "parallel": [
-                    {
-                        "jsonPtr": "/e",
-                        "parallel": []
-                    },
-                    {
-                        "jsonPtr": "/f",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/c",
-                                "parallel": []
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/g",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/c",
-                                "parallel": []
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/j",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/i",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/d",
-                                        "parallel": []
-                                    }
-                                ]
-                            },
-                            {
-                                "jsonPtr": "/h",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/d",
-                                        "parallel": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
+            "parallel": [
+                {
+                    "completed": false,
+                    "jsonPtr": "/e",
+                    "op": "initialize",
+                    "parallel": []
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/f",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/c",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/g",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/c",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/j",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/i",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/d",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        },
+                        {
+                            "completed": false,
+                            "jsonPtr": "/h",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/d",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
         await pp.execute(plan);
         expect(tp.output).toStrictEqual({
@@ -3741,12 +3760,11 @@ test("parallel plan", async () => {
         })
         let [mutationPlan, jsonPtrs] = pp.getMutationPlan("/j", "NEWSTUFF", "set");
         expect(mutationPlan.toJSON()).toStrictEqual({
+            "completed": false,
             "data": "NEWSTUFF",
+            "jsonPtr": "/j",
             "op": "set",
-            "parallel": {
-                "jsonPtr": "/j",
-                "parallel": []
-            }
+            "parallel": []
         });
         expect(jsonPtrs).toStrictEqual([
             "/j"
@@ -3755,49 +3773,64 @@ test("parallel plan", async () => {
         expect(tp.output.j).toBe("a_b_xa_b_x");//that's right! /j is an expression and by default trying to overwrite an expression logs a warning and ignores the change!
         let [mutationPlan2, jsonPtrs2] = pp.getMutationPlan("/a","NEWSTUFF", "set");
         expect(mutationPlan2.toJSON()).toStrictEqual({
+            "completed": false,
             "data": "NEWSTUFF",
+            "jsonPtr": "/a",
             "op": "set",
-            "parallel": {
-                "jsonPtr": "/a",
-                "parallel": [
-                    {
-                        "jsonPtr": "/c",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/f",
-                                "parallel": []
-                            },
-                            {
-                                "jsonPtr": "/g",
-                                "parallel": []
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/d",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/h",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/j",
-                                        "parallel": []
-                                    }
-                                ]
-                            },
-                            {
-                                "jsonPtr": "/i",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/j",
-                                        "parallel": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
+            "parallel": [
+                {
+                    "completed": false,
+                    "jsonPtr": "/c",
+                    "op": "eval",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/f",
+                            "op": "eval",
+                            "parallel": []
+                        },
+                        {
+                            "completed": false,
+                            "jsonPtr": "/g",
+                            "op": "eval",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/d",
+                    "op": "eval",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/h",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/j",
+                                    "op": "eval",
+                                    "parallel": []
+                                }
+                            ]
+                        },
+                        {
+                            "completed": false,
+                            "jsonPtr": "/i",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/j",
+                                    "op": "eval",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
         expect(jsonPtrs2).toStrictEqual([
             "/a",
@@ -3822,6 +3855,66 @@ test("parallel plan", async () => {
             "i": "NEWSTUFF_b_x",
             "j": "NEWSTUFF_b_xNEWSTUFF_b_x",
             "x": "x"
+        });
+        expect(mutationPlan2.toJSON()).toStrictEqual({
+            "completed": true,
+            "data": "NEWSTUFF",
+            "jsonPtr": "/a",
+            "op": "set",
+            "parallel": [
+                {
+                    "completed": true,
+                    "jsonPtr": "/c",
+                    "op": "eval",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/f",
+                            "op": "eval",
+                            "parallel": []
+                        },
+                        {
+                            "completed": true,
+                            "jsonPtr": "/g",
+                            "op": "eval",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/d",
+                    "op": "eval",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/h",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "jsonPtr": "/j",
+                                    "op": "eval",
+                                    "parallel": []
+                                }
+                            ]
+                        },
+                        {
+                            "completed": true,
+                            "jsonPtr": "/i",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "jsonPtr": "/j",
+                                    "op": "eval",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
         const fromBPlan = await tp.setData("/b", "NEWB");
         expect(fromBPlan).toStrictEqual(["/b", "/d", "/e", "/h", "/i", "/j"]);
@@ -3867,39 +3960,50 @@ test("parallel plan from dag example in README", async () => {
         const pp = new ParallelPlanner(tp);
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
+            "completed": false,
+            "jsonPtr": "/",
             "op": "initialize",
-            "parallel": {
-                "jsonPtr": "/",
-                "parallel": [
-                    {
-                        "jsonPtr": "/a/c/g/i",
-                        "parallel": []
-                    },
-                    {
-                        "jsonPtr": "/b/e",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/a/c/g/i",
-                                "parallel": []
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/b/f",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/b/e",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/a/c/g/i",
-                                        "parallel": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
+            "parallel": [
+                {
+                    "completed": false,
+                    "jsonPtr": "/a/c/g/i",
+                    "op": "initialize",
+                    "parallel": []
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/b/e",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/a/c/g/i",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/b/f",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/b/e",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/a/c/g/i",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
         tp.output.b.f=0; //mess it up on purpose before executing plan
         await pp.execute(plan);
@@ -3920,6 +4024,52 @@ test("parallel plan from dag example in README", async () => {
                 },
                 "f": 200
             }
+        });
+        expect(plan.toJSON()).toStrictEqual({
+            "completed": true,
+            "jsonPtr": "/",
+            "op": "initialize",
+            "parallel": [
+                {
+                    "completed": true,
+                    "jsonPtr": "/a/c/g/i",
+                    "op": "initialize",
+                    "parallel": []
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/b/e",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/a/c/g/i",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/b/f",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/b/e",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "jsonPtr": "/a/c/g/i",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
     } finally {
         await tp.close();
@@ -3945,55 +4095,138 @@ test("parallel plan demo3.json", async () => {
         const pp = new ParallelPlanner(tp);
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
+            "completed": false,
+            "jsonPtr": "/",
             "op": "initialize",
-            "parallel": {
-                "jsonPtr": "/",
-                "parallel": [
-                    {
-                        "jsonPtr": "/a/a2/a3",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/a/a1",
-                                "parallel": []
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/b",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/a/a1",
-                                "parallel": []
-                            },
-                            {
-                                "jsonPtr": "/a/a2/a3",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/a/a1",
-                                        "parallel": []
-                                    }
-                                ]
-                            }
-                        ]
-                    },
-                    {
-                        "jsonPtr": "/c",
-                        "parallel": [
-                            {
-                                "jsonPtr": "/a/a2/a3",
-                                "parallel": [
-                                    {
-                                        "jsonPtr": "/a/a1",
-                                        "parallel": []
-                                    }
-                                ]
-                            }
-                        ]
-                    }
-                ]
-            }
+            "parallel": [
+                {
+                    "completed": false,
+                    "jsonPtr": "/a/a2/a3",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/a/a1",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/b",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/a/a1",
+                            "op": "initialize",
+                            "parallel": []
+                        },
+                        {
+                            "completed": false,
+                            "jsonPtr": "/a/a2/a3",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/a/a1",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/c",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "jsonPtr": "/a/a2/a3",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "jsonPtr": "/a/a1",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
         });
         await pp.execute(plan);
+        expect(plan.toJSON()).toStrictEqual({
+            "completed": true,
+            "jsonPtr": "/",
+            "op": "initialize",
+            "parallel": [
+                {
+                    "completed": true,
+                    "jsonPtr": "/a/a2/a3",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/a/a1",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/b",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/a/a1",
+                            "op": "initialize",
+                            "parallel": []
+                        },
+                        {
+                            "completed": true,
+                            "jsonPtr": "/a/a2/a3",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "jsonPtr": "/a/a1",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/c",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": true,
+                            "jsonPtr": "/a/a2/a3",
+                            "op": "initialize",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "jsonPtr": "/a/a1",
+                                    "op": "initialize",
+                                    "parallel": []
+                                }
+                            ]
+                        }
+                    ]
+                }
+            ]
+        });
         expect(tp.output).toStrictEqual({
             "a": {
                 "a1": 42,
@@ -4029,25 +4262,48 @@ test("simplest parallel plan", async () => {
         const pp = new ParallelPlanner(tp);
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
+            "completed": false,
+            "jsonPtr": "/",
             "op": "initialize",
-            "parallel": {
-                "jsonPtr": "/",
-                "parallel": [
-                    {
-                        "jsonPtr": "/a",
-                        "parallel": []
-                    },
-                    {
-                        "jsonPtr": "/b",
-                        "parallel": []
-                    }
-                ]
-            }
+            "parallel": [
+                {
+                    "completed": false,
+                    "jsonPtr": "/a",
+                    "op": "initialize",
+                    "parallel": []
+                },
+                {
+                    "completed": false,
+                    "jsonPtr": "/b",
+                    "op": "initialize",
+                    "parallel": []
+                }
+            ]
         });
         tp.output.a = 0; //mess up outputs to ensure pp.execute correctly works
         tp.output.b = 0;
         await pp.execute(plan);
         expect(tp.output).toStrictEqual({a:42, b:42});
+        expect(plan.toJSON()).toStrictEqual({
+            "completed": true,
+            "jsonPtr": "/",
+            "op": "initialize",
+            "parallel": [
+                {
+                    "completed": true,
+                    "jsonPtr": "/a",
+                    "op": "initialize",
+                    "parallel": []
+                },
+                {
+                    "completed": true,
+                    "jsonPtr": "/b",
+                    "op": "initialize",
+                    "parallel": []
+                }
+            ]
+        });
+
     } finally {
         await tp.close();
     }

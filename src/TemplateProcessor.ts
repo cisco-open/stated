@@ -39,13 +39,20 @@ import {defaulter} from "./utils/default.js";
 import {CliCoreBase} from "./CliCoreBase.js";
 import {DataFlow, DataFlowNode, FlowOpt} from "./DataFlow.js";
 import {SerialPlanner, SerialPlan} from "./SerialPlanner.js";
-import {ExecutionPlan, Planner} from "./Planner.js";
+import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 
 
 declare const BUILD_TARGET: string | undefined;
 
 export type MetaInfoMap = Record<JsonPointerString, MetaInfo[]>;
-export type Snapshot = {template:object, output: any, options:{}, mvcc: any, metaInfoByJsonPointer: any, plans: any}
+export type Snapshot = {
+    template:object,
+    output: any,
+    options:{},
+    mvcc: any,
+    metaInfoByJsonPointer: Record<JsonPointerString, MetaInfo[]>,
+    plans: SerializableExecutionPlan[]
+}
 export type StatedError = {
     error: {
         message: string;
@@ -53,8 +60,9 @@ export type StatedError = {
         stack?: string | null;
     };
 };
-export type Op = "initialize"|"set"|"delete"|"forceSetInternal";
-export type Fork = {forkId:string, output:object};
+export type Op = "initialize"|"set"|"delete"|"eval"|"forceSetInternal";
+export type Fork = {forkId:ForkId, output:object};
+export type ForkId = string;
 
 type SnapshotPlan = {//a plan that simply dumps a snapshot
     op:"snapshot",
@@ -468,7 +476,7 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: {}|undefined = undefined):Promise<void> {
+    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: Snapshot|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clear();
             this.executionStatus.clear();
@@ -1773,7 +1781,8 @@ export default class TemplateProcessor {
             const mvccForkstack:Fork[] = TemplateProcessor.deepCopy(forkStack); //every call to $forked creates a new planStep with its own forkStack that is a copy if current forkstack
             mvccForkstack.push({output, forkId});
             const mvccSnapshotPlanStep:PlanStep = {
-                ...planStep,jsonPtr,
+                ...planStep,
+                jsonPtr,
                 data,
                 output:mvccSnapshot ,
                 forkStack:mvccForkstack,

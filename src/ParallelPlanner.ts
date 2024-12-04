@@ -1,13 +1,17 @@
 import TemplateProcessor, {Fork, Op, PlanStep} from "./TemplateProcessor.js";
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import JsonPointer from "./JsonPointer.js";
-import {ExecutionPlan, Planner} from "./Planner.js";
+import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
-import {SerialPlanner} from "./SerialPlanner.js";
+import {SerialPlan, SerialPlanner} from "./SerialPlanner.js";
+import {dependencies} from "webpack";
+import {promises} from "readline";
+import {child} from "winston";
 
 
-export interface ParallelExecutionPlan extends ExecutionPlan {
-    parallel:ParallelPlanStep //this is the root node of the graph of ParallelPlanStep's
+export interface ParallelExecutionPlan extends ExecutionPlan, PlanStep {
+    parallel:ParallelExecutionPlan[] //this is the root node of the graph of ParallelPlanStep's
+    completed: boolean
 }
 
 export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
@@ -16,9 +20,12 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
     output: any;
     forkId: string = "ROOT";
     forkStack: Fork[] = [];
-    parallel: ParallelPlanStep;
+    parallel: ParallelExecutionPlan[];
+    completed: boolean = false;
+    jsonPtr: JsonPointerString = "/";
+    didUpdate: boolean = false;
 
-    constructor(tp:TemplateProcessor, parallelSteps:ParallelPlanStep, vals?:Partial<ParallelPlanStep> | null) {
+    constructor(tp:TemplateProcessor, parallelSteps:ParallelExecutionPlan[]=[], vals?:Partial<ParallelExecutionPlan> | null) {
         this.output = tp.output
         this.parallel = parallelSteps;
         // Copy properties from `vals` into `this`, while preserving existing defaults
@@ -30,7 +37,9 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
     toJSON(): object {
         const json = {
             op: this.op,
-            parallel: (this.parallel as ParallelPlanStepDefault).toJSON(),
+            parallel: this.parallel.map(p=>(p as ParallelExecutionPlanDefault).toJSON()),
+            completed: this.completed,
+            jsonPtr: this.jsonPtr
         };
         if(this.data){
             (json as any).data = this.data;
@@ -40,9 +49,10 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
 
 
 }
-
+/*
 type ParallelPlanStep = PlanStep & {
     parallel: ParallelPlanStep[];
+    completed: boolean;
 };
 
 export class ParallelPlanStepDefault implements ParallelPlanStep{
@@ -52,6 +62,7 @@ export class ParallelPlanStepDefault implements ParallelPlanStep{
     forkStack: Fork[] = [];
     jsonPtr: JsonPointerString = "/";
     output: object;
+    completed: boolean = false;
 
     constructor(tp:TemplateProcessor, vals?:Partial<ParallelPlanStep> | null) {
         this.output = tp.output
@@ -65,16 +76,17 @@ export class ParallelPlanStepDefault implements ParallelPlanStep{
         return {
             jsonPtr: this.jsonPtr,
             parallel: this.parallel.map((dep:any) => dep.toJSON ? dep.toJSON() : dep),
+            completed: this.completed
         };
     }
 
 
 }
-
+*/
 
 export class ParallelPlanner implements Planner{
     private tp: TemplateProcessor;
-    private nodeCache: Map<JsonPointerString, ParallelPlanStep> = new Map();
+    private nodeCache: Map<JsonPointerString, ParallelExecutionPlanDefault> = new Map();
 
     constructor(tp:TemplateProcessor) {
         this.tp = tp;
@@ -92,28 +104,24 @@ export class ParallelPlanner implements Planner{
 
     private makeInitializationPlan(jsonPtr:JsonPointerString):ParallelExecutionPlan {
         this.nodeCache.clear();
-        const leaves: MetaInfo[] = this.getInitializationPlanEntryPoints(jsonPtr);
-        const parallelStepsRoot = new ParallelPlanStepDefault(this.tp);
+        const leaves: MetaInfo[] = this.getInitializationPlanEntryPoints(jsonPtr); //todo actually we should not even have to start with roots, can literally just throw in all the nodes
+        const parallelStepsRoot = new ParallelExecutionPlanDefault(this.tp);
         for(const metaInfo of leaves){
             parallelStepsRoot.parallel.push(this.getDependenciesNode(metaInfo));
         }
-        return new ParallelExecutionPlanDefault(this.tp, parallelStepsRoot);
+        return parallelStepsRoot
     }
 
     private makeMutationPlan(jsonPtr:JsonPointerString, data:any, op:Op):[ParallelExecutionPlan, JsonPointerString[]] {
         if(this.tp.planner !== this){
             throw new Error(`Illegal attempt to accessed TemplateProcessor with uniqueId ${this.tp.uniqueId} from a Planner that wasn't the template processor's Planner` );
-        } //move this check into TP
-
+        }
         this.nodeCache.clear();
-        //the parallel plan root node, for a mutation always begins at the jsonPtr where the mutation occured,
-        //therefore instead of having a redundant 'holder node' at the root, we just spread the
-        const planNode = this.getDependeesNode(this.tp.getMetaInfo(jsonPtr));
-        const parallelPlan =  new ParallelExecutionPlanDefault(this.tp, planNode, {data, op}); //spread data and op into the Plan
-        //the first step of the mutation plan should assume the data (the mutation) which is applied only in the first step in the plan, then "pulled" by other expressions that evaluate
-        parallelPlan.parallel.data = data;
+        const plan = this.getDependeesNode(this.tp.getMetaInfo(jsonPtr));
+        plan.data = data;
+        plan.op = op;
         const serializedFrom: JsonPointerString[] = this.tp.from(jsonPtr);
-        return [parallelPlan,serializedFrom];
+        return [plan,serializedFrom];
     }
 
 
@@ -134,41 +142,45 @@ export class ParallelPlanner implements Planner{
     }
 
 
-    private getDependenciesNode(metaInfo: MetaInfo, options:{exprsOnly:boolean}={exprsOnly:true}):ParallelPlanStep {
+    private getDependenciesNode(metaInfo: MetaInfo, options:{exprsOnly:boolean}={exprsOnly:true}):ParallelExecutionPlan {
         const {jsonPointer__:jsonPtr} = metaInfo;
         const {exprsOnly} = options;
 
         let visited = this.nodeCache.get(jsonPtr as JsonPointerString);
-        if(!visited){
-            visited = new ParallelPlanStepDefault(this.tp, {
-                jsonPtr:jsonPtr as JsonPointerString,
-                "op": "set"
-            })
-            this.nodeCache.set(jsonPtr as JsonPointerString, visited)
+        if (visited){
+            return visited;
         }
-
         const dependencies:JsonPointerString[] = this.immediateAndImplicitDependencies(metaInfo, {exprsOnly});
 
-        visited.parallel = dependencies.map(ptr =>{
-         return this.getDependenciesNode(this.tp.getMetaInfo(ptr))
+        const parallel = dependencies.map(ptr =>{
+            return this.getDependenciesNode(this.tp.getMetaInfo(ptr), options)
         });
+
+        visited = new ParallelExecutionPlanDefault(this.tp, parallel,{
+            jsonPtr:jsonPtr as JsonPointerString,
+            op:"initialize"
+        })
+        this.nodeCache.set(jsonPtr as JsonPointerString, visited)
 
         return visited;
     }
 
-    private getDependeesNode(metaInfo:MetaInfo):ParallelPlanStep{
+    private getDependeesNode(metaInfo:MetaInfo):ParallelExecutionPlan{
         const {jsonPointer__:jsonPtr} = metaInfo;
         let visited = this.nodeCache.get(jsonPtr as JsonPointerString);
-        if(!visited){
-            visited = new ParallelPlanStepDefault(this.tp, {
-                jsonPtr:jsonPtr as JsonPointerString,
-                "op": "set"
-            })
-            this.nodeCache.set(jsonPtr as JsonPointerString, visited)
+        if(visited){
+            return visited;
         }
         const serialPlanner = new SerialPlanner(this.tp);
         const dependees:MetaInfo[] = serialPlanner.getDependeesBFS(jsonPtr as JsonPointerString, {maxDepth:1});
-        visited.parallel = dependees.map(m =>this.getDependeesNode(m));
+        const parallel = dependees.map(m =>this.getDependeesNode(m));
+        visited = new ParallelExecutionPlanDefault(this.tp, parallel,{
+            jsonPtr:jsonPtr as JsonPointerString,
+            op:"eval"
+        })
+        this.nodeCache.set(jsonPtr as JsonPointerString, visited)
+
+
 
         return visited;
 
@@ -187,7 +199,7 @@ export class ParallelPlanner implements Planner{
          * of all its dependencies in parallel
          * @param step
          */
-        const _execute = async (step:ParallelPlanStep, preOrPostOrder:"pre"|"post"): Promise<void>=> {
+        const _execute = async (step:ParallelExecutionPlan, preOrPostOrder:"pre"|"post"): Promise<void>=> {
             const {jsonPtr} = step;
             let promise = promises.get(jsonPtr);
 
@@ -203,16 +215,17 @@ export class ParallelPlanner implements Planner{
                 await this.evaluateStep(step);
                 await Promise.all(step.parallel.map((d) => _execute(d, preOrPostOrder)));
             }
+            step.completed = true;
 
 
         }
-        //now get the root node of the parallel execution plan and recursively await completion of the plan
-        const{parallel:root} = plan as ParallelExecutionPlan;
         const ordering = plan.op==="initialize"?"post":"pre";
-        return await _execute(root, ordering);
+        await _execute(plan as ParallelExecutionPlan, ordering);
+        (plan as ParallelExecutionPlan).completed = true;
+
     }
 
-    private async evaluateStep(step:ParallelPlanStep): Promise<void> {
+    private async evaluateStep(step:ParallelExecutionPlan): Promise<void> {
         await this.tp.evaluateNode(step);
     }
 
@@ -362,6 +375,10 @@ export class ParallelPlanner implements Planner{
 
     from(jsonPtr: JsonPointerString): JsonPointerString[] {
         return new SerialPlanner(this.tp).from(jsonPtr); //from is not
+    }
+
+    mutationPlanToJSON(mutationPlan: ExecutionPlan): SerializableExecutionPlan {
+        throw new Error("not implemented");
     }
 
 

@@ -1,9 +1,10 @@
-import {ExecutionPlan, Planner} from "./Planner.js";
+import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 import TemplateProcessor, {Op, PlanStep} from "./TemplateProcessor.js";
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import {JsonPointer as jp} from "./index.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import * as jsonata from "jsonata";
+import {NOOP_PLACEHOLDER} from "./utils/stringify.js";
 
 
 export interface SerialPlan extends ExecutionPlan{
@@ -476,6 +477,22 @@ export class SerialPlanner implements Planner{
         return [jsonPtr, ...topoSortedPlan]
     }
 
-
+    mutationPlanToJSON(mutationPlan: ExecutionPlan): SerializableExecutionPlan {
+        let {forkId,forkStack,sortedJsonPtrs, lastCompletedStep, op, data, output} = mutationPlan as SerialPlan;
+        const json = {
+            forkId,
+            forkStack: forkStack.map(fork=>fork.forkId),
+            sortedJsonPtrs,
+            op,
+            data
+        };
+        if (json.data === TemplateProcessor.NOOP) {
+            json.data = NOOP_PLACEHOLDER;
+        }
+        if(lastCompletedStep){
+            (json as any)['lastCompletedStep'] = lastCompletedStep.jsonPtr; //all we need to record is jsonpointer of last completed step
+        }
+        return json;
+    }
 
 }
