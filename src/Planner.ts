@@ -72,7 +72,9 @@ export interface Planner {
      */
     from(jsonPtr:JsonPointerString):JsonPointerString[];
 
-    mutationPlanToJSON (mutationPlan:ExecutionPlan):SerializableExecutionPlan;
+    toJSON (mutationPlan:ExecutionPlan):SerializableExecutionPlan;
+
+    executeDataChangeCallbacks(plan:ExecutionPlan): Promise<void>;
 
 }
 

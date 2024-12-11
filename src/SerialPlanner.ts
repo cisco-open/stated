@@ -55,7 +55,6 @@ export class SerialPlanner implements Planner{
         }
         // if the plan caused an initial mutation, then continue with the plan's transitive dependencies
         shouldRunDependentExpressions && await this.executeDependentExpressions(plan as SerialPlan);
-        await this.tp.executeDataChangeCallbacks(plan as SerialPlan);
     }
 
     public async executeDependentExpressions(plan: SerialPlan) {
@@ -237,7 +236,26 @@ export class SerialPlanner implements Planner{
         }
     }
 
-    public getDependeesBFS(jsonPtr:JsonPointerString, options: { maxDepth: number }={maxDepth:Number.MAX_SAFE_INTEGER}) : MetaInfo[] {
+    public static isInterval = (metaInf:MetaInfo, tp:TemplateProcessor): boolean =>{
+        const {data__} = metaInf;
+        return data__ && tp.timerManager.isInterval(data__);
+    }
+
+    public static isFunction = (jsonPointer:JsonPointerString, tp:TemplateProcessor)=>{
+
+        if(!jp.has(tp.templateMeta, jsonPointer)){
+            return false;
+        }
+        const metaInf = jp.get(tp.templateMeta, jsonPointer) as MetaInfo;
+        //treat intervals same as immutable functions. Changes should not propagate through an interval causing
+        //interval re-evaluation
+        if(SerialPlanner.isInterval(metaInf, tp)){
+            return true;
+        }
+        return !!metaInf.isFunction__;
+    }
+
+    public getDependeesBFS(jsonPtr:JsonPointerString) : MetaInfo[] {
 
 
         const dependents:MetaInfo[] = [];
@@ -247,23 +265,9 @@ export class SerialPlanner implements Planner{
 
         //----------------- utility functions ----------------//
 
-        const isInterval = (metaInf:MetaInfo): boolean =>{
-            const {data__} = metaInf;
-            return data__ && this.tp.timerManager.isInterval(data__);
-        }
 
         const isFunction = (jsonPointer:JsonPointerString)=>{
-
-            if(!jp.has(this.tp.templateMeta, jsonPointer)){
-                return false;
-            }
-            const metaInf = jp.get(this.tp.templateMeta, jsonPointer) as MetaInfo;
-            //treat intervals same as immutable functions. Changes should not propagate through an interval causing
-            //interval re-evaluation
-            if(isInterval(metaInf)){
-                return true;
-            }
-            return !!metaInf.isFunction__;
+            return SerialPlanner.isFunction(jsonPointer, this.tp);
         }
 
         const queueParent = (jsonPtr:JsonPointerString)=>{
@@ -322,12 +326,9 @@ export class SerialPlanner implements Planner{
             if(currentPtr !== origin && metaInf.expr__ !== undefined){
                 dependents.push(metaInf);
             }
-            //maxDepth only affects direct dependencies all other indirect dependencies need to be pursued
-            //to their full extent - things like walking up and down parent and descendent hierarchies are
-            //independent of maxDepth
-            if(options.maxDepth-- > 0) {
-                queueDependees(metaInf); //these are EXPLICIT dependees
-            }
+
+            queueDependees(metaInf); //these are EXPLICIT dependees
+
             queueDescendents(metaInf, currentPtr as JsonPointerString); //these are IMPLICIT dependees
         }
 
@@ -477,7 +478,7 @@ export class SerialPlanner implements Planner{
         return [jsonPtr, ...topoSortedPlan]
     }
 
-    mutationPlanToJSON(mutationPlan: ExecutionPlan): SerializableExecutionPlan {
+    toJSON(mutationPlan: ExecutionPlan): SerializableExecutionPlan {
         let {forkId,forkStack,sortedJsonPtrs, lastCompletedStep, op, data, output} = mutationPlan as SerialPlan;
         const json = {
             forkId,
@@ -493,6 +494,35 @@ export class SerialPlanner implements Planner{
             (json as any)['lastCompletedStep'] = lastCompletedStep.jsonPtr; //all we need to record is jsonpointer of last completed step
         }
         return json;
+    }
+
+    public async executeDataChangeCallbacks(plan:ExecutionPlan) {
+        let anyUpdates = false;
+        const {receiveNoOpCallbacksOnRoot:everything = false} = this.tp.options;
+        let jsonPtrArray = (plan as SerialPlan).sortedJsonPtrs;
+        const onlyWhatChanged = (plan:SerialPlan)=>{
+            return  plan.didUpdate.reduce((acc:JsonPointerString[],didUpdate,i)=>{
+                if(didUpdate){
+                    acc.push(plan.sortedJsonPtrs[i]);
+                    anyUpdates = true;
+                }
+                return acc;
+            }, []);
+        }
+        if(!everything){
+            jsonPtrArray = onlyWhatChanged(plan as SerialPlan);
+        }
+
+        if (anyUpdates || everything) {
+            const {op="set"} = plan;
+            // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
+            const removed = op==="delete";
+            //admittedly this structure of this common callback is disgusting. Essentially if you are using the
+            //common callback you don't want to get passed any data that changed because you are saying in essence
+            //"I don't care what changed".
+            //ToDO - other calls to callDataChangeCallbacks are not awaiting. Reconcile this
+            await this.tp.callDataChangeCallbacks(plan.output, jsonPtrArray, removed, op);
+        }
     }
 
 }

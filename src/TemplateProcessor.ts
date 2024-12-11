@@ -40,6 +40,7 @@ import {CliCoreBase} from "./CliCoreBase.js";
 import {DataFlow, DataFlowNode, FlowOpt} from "./DataFlow.js";
 import {SerialPlanner, SerialPlan} from "./SerialPlanner.js";
 import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
+import {ParallelPlanner} from "./ParallelPlanner.js";
 
 
 declare const BUILD_TARGET: string | undefined;
@@ -60,7 +61,7 @@ export type StatedError = {
         stack?: string | null;
     };
 };
-export type Op = "initialize"|"set"|"delete"|"eval"|"forceSetInternal";
+export type Op = "initialize"|"set"|"delete"|"eval"|"forceSetInternal"|"noop";
 export type Fork = {forkId:ForkId, output:object};
 export type ForkId = string;
 
@@ -419,7 +420,7 @@ export default class TemplateProcessor {
         this.tagSet = new Set();
         this.onInitialize = new Map();
         this.executionStatus = new ExecutionStatus(this);
-        const {planner=new SerialPlanner(this)} = options as any;
+        const {planner=new ParallelPlanner(this)} = options as any;
         this.planner = planner;
     }
 
@@ -1014,6 +1015,7 @@ export default class TemplateProcessor {
         }
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
+        //fixme should get this plan from cache "from()"
         const [plan, fromPlan] = this.planner.getMutationPlan(jsonPtr, data, op);
         this.executionQueue.push(plan);
         if(this.isEnabled("debug")) {
@@ -1042,12 +1044,12 @@ export default class TemplateProcessor {
         if(this.isClosed){
             throw new Error("Attempt to setData on a closed TemplateProcessor.")
         }
-        const {jsonPtr} = planStep;
+        const {jsonPtr, op, data} = planStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
-        const fromPlan = [...this.from(jsonPtr)]; //defensive copy
-        const mutationPlan = {...planStep, sortedJsonPtrs:fromPlan, restoreJsonPtrs: [], didUpdate:[], op:"set"};
-        await this.executePlan(mutationPlan as SerialPlan);
-        return fromPlan;
+        const [mutationPlan, from] = this.planner.getMutationPlan(jsonPtr, data, "set");
+        Object.assign(planStep,  mutationPlan);
+        await this.executePlan(mutationPlan);
+        return from;
     }
 
     private async drainExecutionQueue(removeTmpVars:boolean=true){
@@ -1059,7 +1061,8 @@ export default class TemplateProcessor {
                 } else if(plan.op === "transaction" ){
                     this.applyTransaction(plan as Transaction); //should this await?
                 }else{
-                    await this.executePlan(plan as SerialPlan);
+                    await this.executePlan(plan);
+                    await this.planner.executeDataChangeCallbacks(plan);
                 }
                 removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
             }finally {
@@ -1177,36 +1180,6 @@ export default class TemplateProcessor {
         }
     }
 
-
-    public async executeDataChangeCallbacks(plan:SerialPlan) {
-        let anyUpdates = false;
-        const {receiveNoOpCallbacksOnRoot:everything = false} = this.options;
-        let jsonPtrArray = plan.sortedJsonPtrs;
-        const onlyWhatChanged = (plan:SerialPlan)=>{
-            return  plan.didUpdate.reduce((acc:JsonPointerString[],didUpdate,i)=>{
-                if(didUpdate){
-                    acc.push(plan.sortedJsonPtrs[i]);
-                    anyUpdates = true;
-                }
-                return acc;
-            }, []);
-        }
-        if(!everything){
-            jsonPtrArray = onlyWhatChanged(plan);
-        }
-
-        if (anyUpdates || everything) {
-            const {op="set"} = plan;
-            // current callback APIs are not interested in deferred updates, so we reduce op to boolean "removed"
-            const removed = op==="delete";
-            //admittedly this structure of this common callback is disgusting. Essentially if you are using the
-            //common callback you don't want to get passed any data that changed because you are saying in essence
-            //"I don't care what changed".
-            //ToDO - other calls to callDataChangeCallbacks are not awaiting. Reconcile this
-            await this.callDataChangeCallbacks(plan.output, jsonPtrArray, removed, op);
-        }
-    }
-
     public async mutate(planStep: PlanStep):Promise<boolean> {
         try {
             const {jsonPtr: entryPoint, data, op} = planStep;
@@ -1234,6 +1207,9 @@ export default class TemplateProcessor {
 
     async evaluateNode(step:PlanStep):Promise<boolean> {
         const {jsonPtr, data=undefined, op="set", output} = step;
+        if(jsonPtr==="/"){
+            return false;  //you can't replace the root node itself
+        }
         const {templateMeta} = this;
 
         //an untracked json pointer is one that we have no metadata about. It's just a request out of the blue to
@@ -1280,6 +1256,7 @@ export default class TemplateProcessor {
         } else {
             try {
                 data = jp.get(output, jsonPtr);
+                success = data !== undefined;
             } catch (error) {
                 this.logger.log('error', `The reference with json pointer ${jsonPtr} does not exist`);
                 data = undefined;
@@ -1569,7 +1546,7 @@ export default class TemplateProcessor {
     }
 
     // TODO: change it to pass the plan
-    private async callDataChangeCallbacks(data: any, jsonPointer: JsonPointerString|JsonPointerString[], removed: boolean = false, op:Op="set") {
+    async callDataChangeCallbacks(data: any, jsonPointer: JsonPointerString|JsonPointerString[], removed: boolean = false, op:Op="set") {
         let _jsonPointer:JsonPointerString;
         if(Array.isArray(jsonPointer)){
             _jsonPointer = "/"; //when an array of pointers is provided, it means it was a change callback on "/"

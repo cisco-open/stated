@@ -50,7 +50,7 @@ export class ExecutionStatus {
             options: this.tp.options,
             mvcc:Array.from(this.getForkMap().values()),
             metaInfoByJsonPointer: this.metaInfoByJsonPointer,//this.metaInfosToJSON(this.metaInfoByJsonPointer),
-            plans: Array.from(this.statuses).map(this.tp.planner.mutationPlanToJSON)
+            plans: Array.from(this.statuses).map(this.tp.planner.toJSON)
         };
         return JSON.parse(stringifyTemplateJSON(snapshot));
     }

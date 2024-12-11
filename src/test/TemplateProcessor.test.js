@@ -27,6 +27,7 @@ import { jest, expect, describe, beforeEach, afterEach, test} from '@jest/global
 import {LifecycleState} from "../../dist/src/Lifecycle.js";
 import {DataFlow} from "../../dist/src/DataFlow.js";
 import {ParallelPlanner} from "../../dist/src/ParallelPlanner.js";
+import {SerialPlanner} from "../../dist/src/SerialPlanner.js";
 
 
 if (typeof Bun !== 'undefined') {
@@ -680,6 +681,85 @@ test("big data block", async () => {
         "foo": "${data.a.b.c}",
     });
     await tp.initialize();
+    const sp = new SerialPlanner(tp);
+    let [plan, from] = sp.getMutationPlan(
+        "/data",
+        {"a": {"b": {"c": {"bing": 1, "bang": 2, "boom": 3}}}},
+        "set")
+    expect(plan).toStrictEqual({"data": {
+            "a": {
+                "b": {
+                    "c": {
+                        "bang": 2,
+                            "bing": 1,
+                            "boom": 3
+                    }
+                }
+            }
+        },
+        "didUpdate": [],
+            "forkId": "ROOT",
+            "forkStack": [],
+            "op": "set",
+            "output": {
+                foo: undefined
+            },
+        "restoreJsonPtrs": [],
+            "sortedJsonPtrs": [
+            "/data",
+            "/foo"
+        ]
+    });
+    expect(from).toStrictEqual([
+        "/data",
+        "/foo"
+    ]);
+    const pp = new ParallelPlanner(tp);
+    [plan, from] = pp.getMutationPlan(
+        "/data",
+        {"a": {"b": {"c": {"bing": 1, "bang": 2, "boom": 3}}}},
+        "set")
+    expect(plan.toJSON()).toStrictEqual({
+        "completed": false,
+        "data": {
+            "a": {
+                "b": {
+                    "c": {
+                        "bang": 2,
+                        "bing": 1,
+                        "boom": 3
+                    }
+                }
+            }
+        },
+        "forkId": "ROOT",
+        "forkStack": [],
+        "jsonPtr": "/data",
+        "op": "set",
+        "parallel": [
+            {
+                "completed": false,
+                "forkId": "ROOT",
+                "forkStack": [],
+                "jsonPtr": "/foo",
+                "op": "eval",
+                "parallel": [
+                    {
+                        "completed": false,
+                        "forkId": "ROOT",
+                        "forkStack": [],
+                        "jsonPtr": "/data/a/b/c",
+                        "op": "eval",
+                        "parallel": []
+                    }
+                ]
+            }
+        ]
+    });
+    expect(from).toStrictEqual([
+        "/data",
+        "/foo"
+    ]);
     await tp.setData("/data", {"a": {"b": {"c": {"bing": 1, "bang": 2, "boom": 3}}}});
 
     expect(tp.output).toEqual({
@@ -2700,6 +2780,153 @@ test("snapshot contains injected fields", async () => {
     expect(tpRestored.output.b.c.g).toBe('YYY');
 })
 
+
+test("simplest forked", async () => {
+    const tp = new TemplateProcessor({
+        "start": "${ $forked('/val', 42)}",
+        "val": 0,
+        "val1": "${$joined('/done', val)}",
+        "done": -1
+
+    });
+    let latch;
+    const latchPromise = new Promise((resolve)=>{latch = resolve})
+    tp.setDataChangeCallback("/done", (done)=>{
+        if(done===42) {
+            latch();
+        }
+    })
+    await tp.initialize();
+    const pp = new ParallelPlanner(tp);
+    const initPlan = pp.getInitializationPlan("/");
+    expect(initPlan.toJSON()).toEqual({
+        "completed": false,
+        "forkId": "ROOT",
+        "forkStack": [],
+        "jsonPtr": "/",
+        "op": "initialize",
+        "parallel": [
+            {
+                "completed": false,
+                "forkId": "ROOT",
+                "forkStack": [],
+                "jsonPtr": "/start",
+                "op": "initialize",
+                "parallel": []
+            },
+            {
+                "completed": false,
+                "forkId": "ROOT",
+                "forkStack": [],
+                "jsonPtr": "/val1",
+                "op": "initialize",
+                "parallel": []
+            }
+        ]
+    });
+    await latchPromise;
+    expect(await tp.output).toStrictEqual({
+        "start": undefined,
+        "val": 42,
+        "val1": undefined,
+        "done": 42
+    })
+})
+
+test("forked0", async () => {
+    const tp = new TemplateProcessor({
+        "vals": "${[1].($forked('/val', $))}",
+        "val": 0,
+        "onVal": "${ $joined('/acc/-', $$.val) }",
+        "acc":[],
+        "done" : "${$count(acc)}"
+    });
+    let latch;
+    const latchPromise = new Promise((resolve)=>{latch = resolve})
+    tp.setDataChangeCallback("/done", (done)=>{
+        if(done===1) {
+            latch();
+        }
+    })
+    await tp.initialize();
+    const pp = new ParallelPlanner(tp);
+    const mutationPLan = pp.getMutationPlan('/acc/-', 1, 'set')
+    //const initPlan = pp.getInitializationPlan("/");
+    //pp.execute(initPlan);
+    //expect(initPlan.toJSON()).toEqual({});
+    await latchPromise;
+    expect(await tp.output.accSort).toStrictEqual([
+        {
+            "done": true,
+            "val": 0,
+            "val1": 0,
+            "val2": "0:hello"
+        },
+        {
+            "done": true,
+            "val": 1,
+            "val1": 1,
+            "val2": "1:hello"
+        },
+        {
+            "done": true,
+            "val": 2,
+            "val1": 2,
+            "val2": "2:hello"
+        },
+        {
+            "done": true,
+            "val": 3,
+            "val1": 3,
+            "val2": "3:hello"
+        },
+        {
+            "done": true,
+            "val": 4,
+            "val1": 4,
+            "val2": "4:hello"
+        },
+        {
+            "done": true,
+            "val": 5,
+            "val1": 5,
+            "val2": "5:hello"
+        },
+        {
+            "done": true,
+            "val": 6,
+            "val1": 6,
+            "val2": "6:hello"
+        },
+        {
+            "done": true,
+            "val": 7,
+            "val1": 7,
+            "val2": "7:hello"
+        },
+        {
+            "done": true,
+            "val": 8,
+            "val1": 8,
+            "val2": "8:hello"
+        },
+        {
+            "done": true,
+            "val": 9,
+            "val1": 9,
+            "val2": "9:hello"
+        },
+        {
+            "done": true,
+            "val": 10,
+            "val1": 10,
+            "val2": "10:hello"
+        }
+    ]);
+})
+
+
+
 test("forked1", async () => {
     const tp = new TemplateProcessor({
         "vals": "${[1..10].($forked('/val', $))}",
@@ -2719,6 +2946,10 @@ test("forked1", async () => {
         }
     })
     await tp.initialize();
+    //const pp = new ParallelPlanner(tp);
+    //const initPlan = pp.getInitializationPlan("/");
+    //pp.execute(initPlan);
+    //expect(initPlan.toJSON()).toEqual({});
     await latchPromise;
     expect(await tp.output.accSort).toStrictEqual([
         {
@@ -3674,22 +3905,30 @@ test("parallel plan", async () => {
         const plan = pp.getInitializationPlan("/");
         expect(plan.toJSON()).toStrictEqual({
             "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/e",
                     "op": "initialize",
                     "parallel": []
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/f",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/c",
                             "op": "initialize",
                             "parallel": []
@@ -3698,11 +3937,15 @@ test("parallel plan", async () => {
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/g",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/c",
                             "op": "initialize",
                             "parallel": []
@@ -3711,16 +3954,22 @@ test("parallel plan", async () => {
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/j",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/i",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/d",
                                     "op": "initialize",
                                     "parallel": []
@@ -3729,11 +3978,15 @@ test("parallel plan", async () => {
                         },
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/h",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/d",
                                     "op": "initialize",
                                     "parallel": []
@@ -3762,6 +4015,8 @@ test("parallel plan", async () => {
         expect(mutationPlan.toJSON()).toStrictEqual({
             "completed": false,
             "data": "NEWSTUFF",
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/j",
             "op": "set",
             "parallel": []
@@ -3775,56 +4030,119 @@ test("parallel plan", async () => {
         expect(mutationPlan2.toJSON()).toStrictEqual({
             "completed": false,
             "data": "NEWSTUFF",
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/a",
             "op": "set",
             "parallel": [
                 {
                     "completed": false,
-                    "jsonPtr": "/c",
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/f",
                     "op": "eval",
                     "parallel": [
                         {
                             "completed": false,
-                            "jsonPtr": "/f",
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/c",
                             "op": "eval",
-                            "parallel": []
-                        },
-                        {
-                            "completed": false,
-                            "jsonPtr": "/g",
-                            "op": "eval",
-                            "parallel": []
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/a",
+                                    "op": "noop",
+                                    "parallel": []
+                                }
+                            ]
                         }
                     ]
                 },
                 {
                     "completed": false,
-                    "jsonPtr": "/d",
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/g",
                     "op": "eval",
                     "parallel": [
                         {
                             "completed": false,
-                            "jsonPtr": "/h",
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/c",
                             "op": "eval",
                             "parallel": [
                                 {
                                     "completed": false,
-                                    "jsonPtr": "/j",
-                                    "op": "eval",
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/a",
+                                    "op": "noop",
                                     "parallel": []
                                 }
                             ]
-                        },
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/j",
+                    "op": "eval",
+                    "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/i",
                             "op": "eval",
                             "parallel": [
                                 {
                                     "completed": false,
-                                    "jsonPtr": "/j",
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/d",
                                     "op": "eval",
-                                    "parallel": []
+                                    "parallel": [
+                                        {
+                                            "completed": false,
+                                            "forkId": "ROOT",
+                                            "forkStack": [],
+                                            "jsonPtr": "/a",
+                                            "op": "noop",
+                                            "parallel": []
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/h",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/d",
+                                    "op": "eval",
+                                    "parallel": [
+                                        {
+                                            "completed": false,
+                                            "forkId": "ROOT",
+                                            "forkStack": [],
+                                            "jsonPtr": "/a",
+                                            "op": "noop",
+                                            "parallel": []
+                                        }
+                                    ]
                                 }
                             ]
                         }
@@ -3859,56 +4177,119 @@ test("parallel plan", async () => {
         expect(mutationPlan2.toJSON()).toStrictEqual({
             "completed": true,
             "data": "NEWSTUFF",
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/a",
             "op": "set",
             "parallel": [
                 {
                     "completed": true,
-                    "jsonPtr": "/c",
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/f",
                     "op": "eval",
                     "parallel": [
                         {
                             "completed": true,
-                            "jsonPtr": "/f",
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/c",
                             "op": "eval",
-                            "parallel": []
-                        },
-                        {
-                            "completed": true,
-                            "jsonPtr": "/g",
-                            "op": "eval",
-                            "parallel": []
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/a",
+                                    "op": "noop",
+                                    "parallel": []
+                                }
+                            ]
                         }
                     ]
                 },
                 {
                     "completed": true,
-                    "jsonPtr": "/d",
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/g",
                     "op": "eval",
                     "parallel": [
                         {
                             "completed": true,
-                            "jsonPtr": "/h",
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/c",
                             "op": "eval",
                             "parallel": [
                                 {
                                     "completed": true,
-                                    "jsonPtr": "/j",
-                                    "op": "eval",
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/a",
+                                    "op": "noop",
                                     "parallel": []
                                 }
                             ]
-                        },
+                        }
+                    ]
+                },
+                {
+                    "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/j",
+                    "op": "eval",
+                    "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/i",
                             "op": "eval",
                             "parallel": [
                                 {
                                     "completed": true,
-                                    "jsonPtr": "/j",
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/d",
                                     "op": "eval",
-                                    "parallel": []
+                                    "parallel": [
+                                        {
+                                            "completed": true,
+                                            "forkId": "ROOT",
+                                            "forkStack": [],
+                                            "jsonPtr": "/a",
+                                            "op": "noop",
+                                            "parallel": []
+                                        }
+                                    ]
+                                }
+                            ]
+                        },
+                        {
+                            "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/h",
+                            "op": "eval",
+                            "parallel": [
+                                {
+                                    "completed": true,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
+                                    "jsonPtr": "/d",
+                                    "op": "eval",
+                                    "parallel": [
+                                        {
+                                            "completed": true,
+                                            "forkId": "ROOT",
+                                            "forkStack": [],
+                                            "jsonPtr": "/a",
+                                            "op": "noop",
+                                            "parallel": []
+                                        }
+                                    ]
                                 }
                             ]
                         }
@@ -3961,42 +4342,56 @@ test("parallel plan from dag example in README", async () => {
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
             "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a/c/g/i",
                     "op": "initialize",
                     "parallel": []
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b/e",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/c/g/i",
-                            "op": "initialize",
+                            "op": "noop",
                             "parallel": []
                         }
                     ]
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b/f",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/b/e",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/c/g/i",
-                                    "op": "initialize",
+                                    "op": "noop",
                                     "parallel": []
                                 }
                             ]
@@ -4027,42 +4422,56 @@ test("parallel plan from dag example in README", async () => {
         });
         expect(plan.toJSON()).toStrictEqual({
             "completed": true,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a/c/g/i",
                     "op": "initialize",
                     "parallel": []
                 },
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b/e",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/c/g/i",
-                            "op": "initialize",
+                            "op": "noop",
                             "parallel": []
                         }
                     ]
                 },
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b/f",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/b/e",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": true,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/c/g/i",
-                                    "op": "initialize",
+                                    "op": "noop",
                                     "parallel": []
                                 }
                             ]
@@ -4092,20 +4501,43 @@ test("parallel plan demo3.json", async () => {
     const tp = new TemplateProcessor(o, {}, {treePlan: true});
     try {
         await tp.initialize();
+        expect(tp.output).toStrictEqual({
+            "a": {
+                "a1": 42,
+                "a2": {
+                    "a3": 42
+                }
+            },
+            "b": {
+                "a1": 42,
+                "a2": {
+                    "a3": 42
+                }
+            },
+            "c": {
+                "a3": 42
+            }
+        });
         const pp = new ParallelPlanner(tp);
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
             "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a/a2/a3",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a1",
                             "op": "initialize",
                             "parallel": []
@@ -4114,22 +4546,30 @@ test("parallel plan demo3.json", async () => {
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a1",
                             "op": "initialize",
                             "parallel": []
                         },
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a2/a3",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/a1",
                                     "op": "initialize",
                                     "parallel": []
@@ -4140,16 +4580,22 @@ test("parallel plan demo3.json", async () => {
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/c",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a2/a3",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": false,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/a1",
                                     "op": "initialize",
                                     "parallel": []
@@ -4163,16 +4609,22 @@ test("parallel plan demo3.json", async () => {
         await pp.execute(plan);
         expect(plan.toJSON()).toStrictEqual({
             "completed": true,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a/a2/a3",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a1",
                             "op": "initialize",
                             "parallel": []
@@ -4181,22 +4633,30 @@ test("parallel plan demo3.json", async () => {
                 },
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a1",
                             "op": "initialize",
                             "parallel": []
                         },
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a2/a3",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": true,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/a1",
                                     "op": "initialize",
                                     "parallel": []
@@ -4207,16 +4667,22 @@ test("parallel plan demo3.json", async () => {
                 },
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/c",
                     "op": "initialize",
                     "parallel": [
                         {
                             "completed": true,
+                            "forkId": "ROOT",
+                            "forkStack": [],
                             "jsonPtr": "/a/a2/a3",
                             "op": "initialize",
                             "parallel": [
                                 {
                                     "completed": true,
+                                    "forkId": "ROOT",
+                                    "forkStack": [],
                                     "jsonPtr": "/a/a1",
                                     "op": "initialize",
                                     "parallel": []
@@ -4263,17 +4729,23 @@ test("simplest parallel plan", async () => {
         const plan = pp.getInitializationPlan('/');
         expect(plan.toJSON()).toStrictEqual({
             "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a",
                     "op": "initialize",
                     "parallel": []
                 },
                 {
                     "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b",
                     "op": "initialize",
                     "parallel": []
@@ -4286,17 +4758,23 @@ test("simplest parallel plan", async () => {
         expect(tp.output).toStrictEqual({a:42, b:42});
         expect(plan.toJSON()).toStrictEqual({
             "completed": true,
+            "forkId": "ROOT",
+            "forkStack": [],
             "jsonPtr": "/",
             "op": "initialize",
             "parallel": [
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/a",
                     "op": "initialize",
                     "parallel": []
                 },
                 {
                     "completed": true,
+                    "forkId": "ROOT",
+                    "forkStack": [],
                     "jsonPtr": "/b",
                     "op": "initialize",
                     "parallel": []
@@ -4304,6 +4782,232 @@ test("simplest parallel plan", async () => {
             ]
         });
 
+    } finally {
+        await tp.close();
+    }
+});
+
+test("diamond shaped plan", async () => {
+    //x, y, and z are an independent plan and are not in the mutation path
+    //of a. Therefor expression z should get prunes from the mutation plan of A
+    const o = {
+        "a": "A",
+        "b": "${[a,c,d]~>$join(':')}",
+        "c": "${'(c-GOT-' & a & ')'}",
+        "d": "${'(d-GOT-' & a & ')'}",
+        "x": 42,
+        "y": 24,
+        "z": "${x+y}"
+    };
+
+
+    const tp = new TemplateProcessor(o, {}, {treePlan: true});
+    try {
+        await tp.initialize();
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan('/');
+        expect(plan.toJSON()).toStrictEqual({
+            "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
+            "jsonPtr": "/",
+            "op": "initialize",
+            "parallel": [
+                {
+                    "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/b",
+                    "op": "initialize",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/c",
+                            "op": "initialize",
+                            "parallel": []
+                        },
+                        {
+                            "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/d",
+                            "op": "initialize",
+                            "parallel": []
+                        }
+                    ]
+                },
+                {
+                    "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/z",
+                    "op": "initialize",
+                    "parallel": []
+                }
+            ]
+        });
+        expect(tp.output).toStrictEqual({
+            "a": "A",
+            "b": "A:(c-GOT-A):(d-GOT-A)",
+            "c": "(c-GOT-A)",
+            "d": "(d-GOT-A)",
+            "x": 42,
+            "y": 24,
+            "z": 66
+        });
+        let [mutationPlan, from] = pp.getMutationPlan("/a","X", "set" );
+        expect(mutationPlan.toJSON()).toEqual(
+            {
+                "completed": false,
+                "data": "X",
+                "forkId": "ROOT",
+                "forkStack": [],
+                "jsonPtr": "/a",
+                "op": "set",
+                "parallel": [
+                    {
+                        "completed": false,
+                        "forkId": "ROOT",
+                        "forkStack": [],
+                        "jsonPtr": "/b",
+                        "op": "eval",
+                        "parallel": [
+                            {
+                                "completed": false,
+                                "forkId": "ROOT",
+                                "forkStack": [],
+                                "jsonPtr": "/a",
+                                "op": "noop",
+                                "parallel": []
+                            },
+                            {
+                                "completed": false,
+                                "forkId": "ROOT",
+                                "forkStack": [],
+                                "jsonPtr": "/c",
+                                "op": "eval",
+                                "parallel": [
+                                    {
+                                        "completed": false,
+                                        "forkId": "ROOT",
+                                        "forkStack": [],
+                                        "jsonPtr": "/a",
+                                        "op": "noop",
+                                        "parallel": []
+                                    }
+                                ]
+                            },
+                            {
+                                "completed": false,
+                                "forkId": "ROOT",
+                                "forkStack": [],
+                                "jsonPtr": "/d",
+                                "op": "eval",
+                                "parallel": [
+                                    {
+                                        "completed": false,
+                                        "forkId": "ROOT",
+                                        "forkStack": [],
+                                        "jsonPtr": "/a",
+                                        "op": "noop",
+                                        "parallel": []
+                                    }
+                                ]
+                            }
+                        ]
+                    }
+                ]
+            }
+        );
+        expect(from).toEqual([
+            "/a",
+            "/c",
+            "/d",
+            "/b"
+        ]);
+        [mutationPlan, from] = pp.getMutationPlan("/y",-42, "set" );
+        expect(mutationPlan.toJSON()).toEqual({
+            "completed": false,
+            "data": -42,
+            "forkId": "ROOT",
+            "forkStack": [],
+            "jsonPtr": "/y",
+            "op": "set",
+            "parallel": [
+                {
+                    "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/z",
+                    "op": "eval",
+                    "parallel": [
+                        {
+                            "completed": false,
+                            "forkId": "ROOT",
+                            "forkStack": [],
+                            "jsonPtr": "/y",
+                            "op": "noop",
+                            "parallel": []
+                        }
+                    ]
+                }
+            ]
+        });
+        expect(from).toEqual([
+                "/y",
+                "/z"
+            ]);
+        await tp.setData("/y", -42, "set");
+        expect(tp.output).toEqual({
+            "a": "A",
+            "b": "A:(c-GOT-A):(d-GOT-A)",
+            "c": "(c-GOT-A)",
+            "d": "(d-GOT-A)",
+            "x": 42,
+            "y": -42,
+            "z": 0
+        });
+
+    } finally {
+        await tp.close();
+    }
+});
+
+test("simple example of an undefined reference", async () => {
+    const o = {
+        "a": {
+            "b": "${x}" //<--- this is an intentionally incorrect reference
+        }
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        expect(o).toEqual({
+            "a": {
+                "b": undefined //<--- this is an intentionally incorrect reference
+            }
+        });
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan();
+        expect(pp.toJSON(plan)).toEqual({
+            "completed": false,
+            "forkId": "ROOT",
+            "forkStack": [],
+            "jsonPtr": "/",
+            "op": "initialize",
+            "parallel": [
+                {
+                    "completed": false,
+                    "forkId": "ROOT",
+                    "forkStack": [],
+                    "jsonPtr": "/a/b",
+                    "op": "initialize",
+                    "parallel": []
+                }
+            ]
+        });
     } finally {
         await tp.close();
     }
