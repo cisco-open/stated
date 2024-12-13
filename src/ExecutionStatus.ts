@@ -4,12 +4,12 @@ import {ExecutionPlan, SerializableExecutionPlan} from "./Planner.js";
 import {SerialPlan} from "./SerialPlanner.js";
 
 export class ExecutionStatus {
-    public statuses: Set<SerialPlan>;
+    public statuses: Set<ExecutionPlan>;
     public metaInfoByJsonPointer: MetaInfoMap;
     public tp:TemplateProcessor;
 
     constructor(tp:TemplateProcessor) {
-        this.statuses = new Set();
+        this.statuses = new Set<ExecutionPlan>();
         this.tp = tp;
         this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
@@ -17,7 +17,7 @@ export class ExecutionStatus {
         this.statuses.add(mutationPlan as SerialPlan) //todo fixme - this whole class needs to be refactored to work with ExecutionPlan - it will only work now with Plan
     }
 
-    public end(mutationPlan: SerialPlan) {
+    public end(mutationPlan: ExecutionPlan) {
         this.statuses.delete(mutationPlan);
     }
 

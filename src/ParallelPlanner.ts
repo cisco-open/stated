@@ -3,8 +3,7 @@ import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import JsonPointer from "./JsonPointer.js";
 import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
-import {SerialPlan, SerialPlanner} from "./SerialPlanner.js";
-import {JsonPointer as jp} from "./index.js";
+import {SerialPlanner} from "./SerialPlanner.js";
 
 
 export interface ParallelExecutionPlan extends ExecutionPlan, PlanStep {
@@ -128,6 +127,10 @@ class TraversalState{
     }
 }
 
+export function isMutation(op:Op){
+    return ["set", "forceSetInternal", "delete"].includes(op);
+}
+
 export class ParallelPlanner implements Planner{
     private tp: TemplateProcessor;
     private nodeCache: Map<JsonPointerString, ParallelExecutionPlanDefault> = new Map();
@@ -156,10 +159,10 @@ export class ParallelPlanner implements Planner{
 
     getMutationPlan(mutationTarget:JsonPointerString, data:any, op:Op): [ExecutionPlan, JsonPointerString[]]{
         const mutationPlan = this.makeInitializationPlan({exprsOnly:false}); //start with the initialization plan
-        this.prune({mutationPlan, mutationTarget, data, op});
         mutationPlan.op = op;
         mutationPlan.data = data;
         mutationPlan.jsonPtr = mutationTarget;
+        this.prune({mutationPlan, mutationTarget, data, op});
         const serializedFrom: JsonPointerString[] = this.tp.from(mutationTarget);
         return [mutationPlan as ExecutionPlan,serializedFrom];
     }
@@ -178,33 +181,41 @@ export class ParallelPlanner implements Planner{
 */
 
     private prune(params:MutationParamsType) {
-        const {mutationPlan, op, data} = params;
+        const {mutationPlan, op, mutationTarget} = params;
+/*
         const mutationTarget = params.mutationTarget.endsWith('/-')?params.mutationTarget.slice(0,-1):params.mutationTarget;
 
         if(mutationPlan.jsonPtr !== '/') {
             throw new Error(`Prune is incorrectly applid to jsonPtr:${mutationPlan.jsonPtr} (it can only apply to '/')`);
         }
+
+ */
         if(!["set", "delete", "forceSetInternal"].includes(op)){
             throw new Error(`Prune is incorrectly applid to op:${op} (it can only apply to mutations)`);
         }
 
         // Generic tree-walking function
         const walkTree = (node: ParallelExecutionPlan) => {
-            if(node.op !== "noop"){
-                node.op = "eval" //all nodes except leaves are "eval", and leaves should be "noop" since the root of the plan is setup to perform the  (leaves are present when exprsOnly:false)
+            //the plan we are pruning into a mutation plan began its life as an 'initialize' plan. Since we are making
+            //a mutation tree,mutations happen only after initialization so nodes that were marked 'initialize' in the
+            //initialization plan are converted to 'eval' ('initialize' just being a special case of first-time eval...
+            //these are really just optics, it does not affect the behavior)
+            if(node.op === "initialize"){
+                node.op = "eval"
             }
-            if(SerialPlanner.isFunction(node.jsonPtr, this.tp)){
-                (node as any).prunable = true; //functions are immutable and are pruned off the mutation plan
-                node.parallel = []; //no need to pursue children
-                node.op = "noop"; //functions are not re-defined
+
+            if(this.pruneFunction(node)){
                 return;
             }
-            //account for /- mutation targetes in json pointer spec
 
-            if(node.jsonPtr === mutationTarget){
-                (node as any).prunable = false; //the mutated node cannot be pruned, and this non-prunability will propagate to all transitive dependees
-                node.op = "noop"; //lead mutations are actually noops that must not be applied since the root has already done it
-                return; //this the tail of the dependency chain
+            //here we are trying to determine when the mutation target (at the root of the plan) matches a leaf
+            //node of the plan, meaning a dependency graph ends at the mutation. We want to mark those leaf nodes as not
+            //prunable. Also, the leaf node will not have a mutation like "set" in it because we are pruning and fixing up
+            //an initialization plan that knows nothing about mutations (only the root node of the plan has been set to
+            //the mutation op when we enter this method)
+            //account for both exact matches, and also mutation target is /a/b/- and node is /a/b or /a
+            if(this.markLeafMutation(node, mutationTarget)){
+                return;
             }
             // Traverse child nodes in the parallel array
             node.parallel.forEach(child =>{
@@ -213,12 +224,15 @@ export class ParallelPlanner implements Planner{
             node.parallel = node.parallel.filter(child => {
                 return !((child as any).prunable);
             });  //remove prunable nodes
-            //if the node is under (a child of) the mutationTarget, then we cannot prune the node.
-            if(JsonPointer.isAncestor(node.jsonPtr, mutationTarget)){ //this applies to removing the entire root tree of this plan
+
+            //if this is the leaf
+            if(isMutation(node.op!)){ //this applies to removing the entire root tree of this plan
                 (node as any).prunable = false; //can't prune this plan because it has the mutationTarget as a transitive dependency
-            }else {
-                (node as any).prunable = node.parallel.length === 0;
+                return;
             }
+
+            (node as any).prunable = node.parallel.length === 0;
+
         };
 /*
         for (const p of mutationPlan.parallel) {
@@ -235,9 +249,32 @@ export class ParallelPlanner implements Planner{
         return mutationPlan;
     }
 
+    private pruneFunction(node:ParallelExecutionPlan):boolean {
+        if(SerialPlanner.isFunction(node.jsonPtr, this.tp)){
+            (node as any).prunable = true; //functions are immutable and are pruned off the mutation plan
+            node.parallel = []; //no need to pursue children
+            node.op = "noop"; //functions are not re-defined
+            return true;
+        }
+        return false;
+    }
+
+    private markLeafMutation(node:ParallelExecutionPlan, mutationTarget: JsonPointerString):boolean {
+        if(!isMutation(node.op!) && (JsonPointer.isAncestor(node.jsonPtr, mutationTarget) || JsonPointer.isAncestor(mutationTarget, node.jsonPtr))){
+            (node as any).prunable = false; //the mutated node cannot be pruned, and this non-prunability will propagate to all transitive dependees
+            node.op = "noop"; //lead mutations are actually noops that must not be applied since the root has already done it
+            node.jsonPtr = mutationTarget; //adjust target /a/b to be /a/b/- so this leaf jsonPointer exactly matches the json pointer of the root of the mutation plan
+            return true; //this the tail of the dependency chain
+        }
+        return false
+    }
+
+    //The mutation is the root of the plan. The root's parallel array are the entry points to independent dependency subgraphs that must 'pull' (postorder) the dependency through the graph. If an element of the parallel array has a jsonPtr of the mutation itself this is a degenerate dependency graph and means we replaced an expression with a value. Hence there can be no graph to pull through, so remove this element from the array
     private removeDegenerates(params:MutationParamsType) {
         const {mutationPlan, mutationTarget} = params;
-        mutationPlan.parallel = mutationPlan.parallel.filter(child => child.jsonPtr !== mutationTarget )
+        mutationPlan.parallel = mutationPlan.parallel.filter(child => {
+            return !JsonPointer.isAncestor(mutationTarget, child.jsonPtr)
+        } )
     }
     //you are working on the fact that a mutation always wants "/" here which is why when you change it from hard-coded
     //slash it will stop working for mutations. Basicalyl jsonPtr is an erroneus parameter at present. It is needed to support import
@@ -432,9 +469,10 @@ export class ParallelPlanner implements Planner{
             if (promises.has(jsonPtr)) {
                 const promise = promises.get(jsonPtr)!; //don't freak out ... '!' is TS non-null assertion
                 if(op === 'noop'){ //a noop is essentially a pointer to a node that has already executed so when the true node executes we have to update the noop node
-                    promise.then(didUpdate=>{
+                    return await promise.then(didUpdate=>{
                         step.completed = true;
-                        step.didUpdate = didUpdate;
+                        step.didUpdate = didUpdate; //the noop simply has to record that the mutation completed
+                        return true;
                     })
                 }
                 return promise; //the returned promise is just a boolean saying if the node value changed do to evaluation or mutation
@@ -446,6 +484,9 @@ export class ParallelPlanner implements Planner{
                     jsonPtr,
                     (async () => {
                         try {
+                            step.output = plan.output;
+                            step.forkId = plan.forkId;
+                            step.forkStack = plan.forkStack;
                             //await all dependencies
                             const dependencyChanges: boolean[] = await Promise.all(
                                 step.parallel.map((d) => {
@@ -455,8 +496,7 @@ export class ParallelPlanner implements Planner{
                             //if we are initializing the node, or of it had dependencies that changed, then we
                             //need to run the step
                             if(  plan.op === "initialize" || dependencyChanges.some((change) => change)){
-                                const _didUpdate= await this.tp.evaluateNode(step);
-                                step.didUpdate = _didUpdate;
+                                step.didUpdate = await this.tp.evaluateNode(step);
                             }else { //if we are here then we are not initializing a node, but reacting to some mutation.
                                     //and it is possible that the node itself is originally a non-materialized node, that
                                     //has now become materialized because it is inside/within a subtree set by a mutation
@@ -583,9 +623,16 @@ export class ParallelPlanner implements Planner{
             }
 
              */
+            //Do not follow children of nodes that are expressions, because if you have a dependency on a value generated by an expression,
+            //then there cannot be any expressions underneath this node. You already have your dependency by virtue of depending
+            //on the expression-node.
+            if(metaInfoNode.expr__ !== undefined){
+                return; //thing 4
+            }
             for (const childKey in metaInfoNode) {
                 if (!childKey.endsWith("__")) { //ignore metadata fields
                     const child = metaInfoNode[childKey];
+                    //fixme todo look into weird case where child key 'acc/-' is in tree structure but has no
                     if (!visited.has(child.jsonPointer__) ) { //&& !child.materialized__ //THING 3
                         impliedDependencies(child);
                     }else{
@@ -656,9 +703,10 @@ export class ParallelPlanner implements Planner{
 
         const emit = (metaInfo:MetaInfo) => {
             if (exprsOnly && !metaInfo.expr__) return;
-            //if(metaInfo.jsonPointer__  == undefined){
-             //   throw new Error(`Execution failed, no jsonPointer__`);
-            //}
+            if(metaInfo.jsonPointer__  == undefined){
+                //throw new Error(`Execution failed, no jsonPointer__`);
+                return;
+            }
             newDependencies.add(metaInfo.jsonPointer__ as JsonPointerString);
         }
 

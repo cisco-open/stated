@@ -33,7 +33,7 @@ export class SerialPlanner implements Planner{
         this.tp = tp;
     }
 
-    getInitializationPlan(jsonPointer:JsonPointerString): ExecutionPlan {
+    getInitializationPlan(jsonPointer:JsonPointerString="/"): ExecutionPlan {
         const metaInfos = this.tp.metaInfoByJsonPointer[jsonPointer];
         return {
             op: "initialize",
@@ -58,7 +58,7 @@ export class SerialPlanner implements Planner{
     }
 
     public async executeDependentExpressions(plan: SerialPlan) {
-        this.tp.executionStatus.begin(plan);
+        //this.tp.executionStatus.begin(plan);
         try {
             let {output, forkStack, forkId, didUpdate:updatesArray,sortedJsonPtrs: dependencies} = plan;
             const {lastCompletedStep} = plan; //this will tell us if we can skip ahead because some of the plan is already completed, which happens when restoring a persisted plan
@@ -72,7 +72,7 @@ export class SerialPlanner implements Planner{
                 updatesArray[i] = planStep.didUpdate;
             }
         }finally {
-            this.tp.executionStatus.end(plan);
+            //this.tp.executionStatus.end(plan);
         }
     }
 
@@ -341,7 +341,7 @@ export class SerialPlanner implements Planner{
      * deserialized from the snapshot, such as timers, and functions.
      * @param plan
      */
-    private async createRestorePlan(plan:SerialPlan) {
+    private async createRestorePlan(plan:ExecutionPlan) {
 
         try {
             let intervals: MetaInfo[] = this.tp.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
@@ -356,8 +356,8 @@ export class SerialPlanner implements Planner{
             for (const expression of functions) {
                 const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
 
-                if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
-                    plan.restoreJsonPtrs.push(jsonPtrStr);
+                if (!(plan as SerialPlan).restoreJsonPtrs.includes(jsonPtrStr)) {
+                    (plan as SerialPlan).restoreJsonPtrs.push(jsonPtrStr);
                 }
             }
             functions.forEach(metaInfo => {
@@ -365,11 +365,11 @@ export class SerialPlanner implements Planner{
             })
             for (const expression of intervals) {
                 const jsonPtrStr = Array.isArray(expression.jsonPointer__) ? expression.jsonPointer__[0] as JsonPointerString: expression.jsonPointer__ as JsonPointerString;
-                if (!plan.restoreJsonPtrs.includes(jsonPtrStr)) {
-                    plan.restoreJsonPtrs.push(jsonPtrStr);
+                if (!(plan as SerialPlan).restoreJsonPtrs.includes(jsonPtrStr)) {
+                    (plan as SerialPlan).restoreJsonPtrs.push(jsonPtrStr);
                 }
             }
-            await this.evaluateRestorePlan(plan);
+            await this.evaluateRestorePlan(plan as SerialPlan);
         } catch (error) {
             this.tp.logger.error("plan functions evaluation failed");
             throw error;
@@ -404,7 +404,7 @@ export class SerialPlanner implements Planner{
         if(_plan.lastCompletedStep){
             return _plan.lastCompletedStep?_plan.sortedJsonPtrs.indexOf(_plan.lastCompletedStep.jsonPtr)< _plan.sortedJsonPtrs.length:false
         }
-        this.tp.executionStatus.begin(_plan);
+        //this.tp.executionStatus.begin(_plan);
         let theStep:PlanStep|undefined;
         try {
             const {sortedJsonPtrs} = _plan;
@@ -417,7 +417,7 @@ export class SerialPlanner implements Planner{
             if(theStep){
                 _plan.lastCompletedStep = theStep;
             } //completed self
-            this.tp.executionStatus.end(_plan)
+          //  this.tp.executionStatus.end(_plan)
         }
     }
 

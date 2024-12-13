@@ -1038,18 +1038,18 @@ export default class TemplateProcessor {
      * copy of this.output (essentially a 'snapshot' in MVCC terminology) and therefore the mutation and propagation
      * of the fromPlan are isolated, just like snapshot isolation levels on Postres or other MVCC databases. So, do not
      * await this method. Just let 'er rip.
-     * @param planStep
+     * @param forkedPlanStep
      */
-    public async setDataForked(planStep:PlanStep):Promise<JsonPointerString[]>{
+    public async setDataForked(forkedPlanStep:PlanStep):Promise<JsonPointerString[]>{
         if(this.isClosed){
             throw new Error("Attempt to setData on a closed TemplateProcessor.")
         }
-        const {jsonPtr, op, data} = planStep;
+        const {jsonPtr, data, forkId, forkStack, output} = forkedPlanStep;
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
-        const [mutationPlan, from] = this.planner.getMutationPlan(jsonPtr, data, "set");
-        Object.assign(planStep,  mutationPlan);
+        const [mutationPlan, dumbedDownStepsForHumanConsumption] = this.planner.getMutationPlan(jsonPtr, data, "set");
+        Object.assign(mutationPlan, {forkId, forkStack, output}); //apply forky stuff onto mutation plan
         await this.executePlan(mutationPlan);
-        return from;
+        return dumbedDownStepsForHumanConsumption; //this is used only for backward compatibility, so the return from the cli/docs '.from' command does not change
     }
 
     private async drainExecutionQueue(removeTmpVars:boolean=true){
@@ -1173,10 +1173,13 @@ export default class TemplateProcessor {
 
     public async executePlan(plan:ExecutionPlan){
         try {
+            this.executionStatus.begin(plan);
             await this.planner.execute(plan);
         }catch(error){
             this.logger.error("plan execution failed");
             throw error;
+        }finally {
+            this.executionStatus.end(plan);
         }
     }
 
@@ -1317,7 +1320,6 @@ export default class TemplateProcessor {
                 "dependencies__": [],
                 "absoluteDependencies__": [],
                 "data__": data,
-                "materialized": true
             }
         );
         await this.callDataChangeCallbacks(data, jsonPtr, op==="delete", op);

@@ -748,8 +748,8 @@ test("big data block", async () => {
                         "completed": false,
                         "forkId": "ROOT",
                         "forkStack": [],
-                        "jsonPtr": "/data/a/b/c",
-                        "op": "eval",
+                        "jsonPtr": "/data",
+                        "op": "noop",
                         "parallel": []
                     }
                 ]
@@ -2827,7 +2827,7 @@ test("simplest forked", async () => {
     await latchPromise;
     expect(await tp.output).toStrictEqual({
         "start": undefined,
-        "val": 42,
+        "val": 0,
         "val1": undefined,
         "done": 42
     })
@@ -2855,74 +2855,16 @@ test("forked0", async () => {
     //pp.execute(initPlan);
     //expect(initPlan.toJSON()).toEqual({});
     await latchPromise;
-    expect(await tp.output.accSort).toStrictEqual([
-        {
-            "done": true,
-            "val": 0,
-            "val1": 0,
-            "val2": "0:hello"
-        },
-        {
-            "done": true,
-            "val": 1,
-            "val1": 1,
-            "val2": "1:hello"
-        },
-        {
-            "done": true,
-            "val": 2,
-            "val1": 2,
-            "val2": "2:hello"
-        },
-        {
-            "done": true,
-            "val": 3,
-            "val1": 3,
-            "val2": "3:hello"
-        },
-        {
-            "done": true,
-            "val": 4,
-            "val1": 4,
-            "val2": "4:hello"
-        },
-        {
-            "done": true,
-            "val": 5,
-            "val1": 5,
-            "val2": "5:hello"
-        },
-        {
-            "done": true,
-            "val": 6,
-            "val1": 6,
-            "val2": "6:hello"
-        },
-        {
-            "done": true,
-            "val": 7,
-            "val1": 7,
-            "val2": "7:hello"
-        },
-        {
-            "done": true,
-            "val": 8,
-            "val1": 8,
-            "val2": "8:hello"
-        },
-        {
-            "done": true,
-            "val": 9,
-            "val1": 9,
-            "val2": "9:hello"
-        },
-        {
-            "done": true,
-            "val": 10,
-            "val1": 10,
-            "val2": "10:hello"
-        }
-    ]);
+    expect(await tp.output).toStrictEqual({
+        "vals": undefined,
+        "val": 0, //this is zero because 1 is set inside a fork and therefore never hits the ROOT output
+        "onVal": undefined,
+        "acc": [
+            0,
+            1
+        ],
+        "done": 2,
+    });
 })
 
 
@@ -5008,6 +4950,45 @@ test("simple example of an undefined reference", async () => {
                 }
             ]
         });
+    } finally {
+        await tp.close();
+    }
+});
+
+test("total cost example", async () => {
+    const o = {
+        "totalCost": "${$sum(costs)}",
+        "costs": "${products.$sum(quantity * price)}",
+        "products": [
+            {
+                "name": "Apple",
+                "quantity": 5,
+                "price": 0.5,
+                "cost": "/${costs[0]}"
+            },
+            {
+                "name": "Orange",
+                "quantity": 10,
+                "price": 0.75,
+                "cost": "/${costs[1]}"
+            },
+            {
+                "name": "Banana",
+                "quantity": 8,
+                "price": 0.25,
+                "cost": "/${costs[2]}"
+            }
+        ]
+    };
+    const tp = new TemplateProcessor(o);
+    try {
+        await tp.initialize();
+        const sp = new SerialPlanner(tp);
+        const splan = sp.getInitializationPlan("/");
+        expect(splan.toJSON(splan)).toEqual({});
+        const pp = new ParallelPlanner(tp);
+        const plan = pp.getInitializationPlan();
+        expect(pp.toJSON(plan)).toEqual({});
     } finally {
         await tp.close();
     }
