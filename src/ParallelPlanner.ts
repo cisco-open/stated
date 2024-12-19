@@ -75,9 +75,16 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
      * make a shell of an ExecutionPlan that exist just to carry the jsonPtr, with op set to "noop"
      */
     getPointer(tp:TemplateProcessor): ParallelExecutionPlan{
-        return new ParallelExecutionPlanDefault(tp, [], {...this,
+        const ptrNode = new ParallelExecutionPlanDefault(tp, [], {...this,
             op:"noop",
-        })
+            completed: true,  //since we never execute noop, we can always treat them as completed
+            parallel:[] //pointer nodes are always leaf nodes that we don't want execution to continue through so we empty the childen
+        });
+        //delete or null out as many fields as possible
+        delete(ptrNode.data);
+        delete(ptrNode.output);
+        ptrNode.output = null;
+        return ptrNode;
     }
 
 }
@@ -94,12 +101,32 @@ type NodeTraversalOptions = {preOrPost:"preorder"|"postorder"}
 class TraversalState{
     visited = new Set();
     recursionStack:Set<JsonPointerString> = new Set(); //for circular dependency detection
+    stack: ParallelExecutionPlan[] = [];
     options:{exprsOnly:boolean} = {exprsOnly:true};
     tp:TemplateProcessor;
 
     constructor(tp:TemplateProcessor, options:{exprsOnly:boolean} ) {
         this.options = options;
         this.tp = tp;
+    }
+
+    pushNode(node: ParallelExecutionPlan):boolean{
+        const {jsonPtr, op} = node;
+        if(op !== "noop" && this.stack.map(n=>n.jsonPtr).includes(jsonPtr)){ //noop's are the end of a traversal chain and in the case of a mutation will be the same jsonPtr as the initial mutation, so not circular. But any other offender is circular
+            const e = '🔃 Circular dependency  ' + this.stack.map(n=>n.jsonPtr).join(' → ') + " → " + jsonPtr;
+            this.tp.warnings.push(e);
+            this.tp.logger.log('warn', e);
+            return false;
+        }
+        if(this.stack[this.stack.length-1]?.op==="noop"){
+            throw new Error(`attempt to push ${jsonPtr} onto traversal path that is already closed by a noop`)
+        }
+        this.stack.push(node);
+        return true;
+    }
+
+    popNode(){
+        this.stack.pop();
     }
 
     isCircular(dependency:JsonPointerString, owner:JsonPointerString) {
@@ -231,6 +258,8 @@ export class ParallelPlanner implements Planner{
                 return;
             }
 
+            this.dedupLeaves(node);
+
             (node as any).prunable = node.parallel.length === 0;
 
         };
@@ -247,6 +276,27 @@ export class ParallelPlanner implements Planner{
         this.removeDegenerates(params); //degenerate plans are those that set an expression to a scalar value. This is a very odd thing to do, but we account for it anyway
         walkTree(mutationPlan);
         return mutationPlan;
+    }
+
+    /**
+     * There are situations when an expression can result in multiple parallel paths to the same node.
+     * For example like ${a + a.b + a.c} where a is an expression (thus a.b and a.c are not materialized__)
+     * will result in `parallel` containing three nodes of '/a'.
+     * that cause
+     * @param node
+     * @private
+     */
+    private dedupLeaves(node:ParallelExecutionPlan) { //fixme todo - need to dedup across entire tree to avoid multiply running same expression..or do we? natural dduping w promise map on execute
+        const seen:Record<string, any> = {}; // Object to track unique jsonPtr 
+        const {parallel} = node;
+        for (let i = parallel.length - 1; i >= 0; i--) { // Traverse array backward
+            const {jsonPtr} = parallel[i];
+            if (seen[jsonPtr]) {
+                parallel.splice(i, 1); // Remove duplicate element
+            } else {
+                seen[jsonPtr] = true; // Mark `foo` value as seen
+            }
+        }
     }
 
     private pruneFunction(node:ParallelExecutionPlan):boolean {
@@ -284,16 +334,40 @@ export class ParallelPlanner implements Planner{
             jsonPtr?:JsonPointerString}={exprsOnly:true, jsonPtr:'/'}):ParallelExecutionPlan {
         const {jsonPtr="/", exprsOnly=true} = options;
         this.nodeCache.clear();
-        let rootExpressions: MetaInfo[] = this.getInitializationPlanEntryPoints(jsonPtr); //todo actually we should not even have to start with roots, can literally just throw in all the nodes
+        let rootExpressions: MetaInfo[] = this.getInitializationPlanEntryPoints(jsonPtr, options); //todo actually we should not even have to start with roots, can literally just throw in all the nodes
         if(rootExpressions.length === 0){ //can indicate circular dependency, or template with no expressions
             rootExpressions = this.tp.metaInfoByJsonPointer[jsonPtr].filter(metaInfo => metaInfo.expr__ !== undefined);
         }
         const parallelStepsRoot = new ParallelExecutionPlanDefault(this.tp);
-        const state = new TraversalState(this.tp, {exprsOnly});
         for(const metaInfo of rootExpressions){
-            parallelStepsRoot.parallel.push(this.getDependenciesNode(metaInfo, state));
+            parallelStepsRoot.parallel.push(this.getDependenciesNode2(metaInfo, new TraversalState(this.tp, {exprsOnly})));//this.getDependenciesNode(metaInfo, state)
         }
         return parallelStepsRoot
+    }
+
+    private getDependenciesNode2(metaInfo:MetaInfo, traversalState:TraversalState) {
+        const {options} = traversalState
+        const node = new ParallelExecutionPlanDefault(this.tp, [],{
+            jsonPtr:metaInfo.jsonPointer__ as JsonPointerString,
+            op:"initialize"
+        });
+        const ok = traversalState.pushNode(node);
+        if(!ok){ //circular
+            node.op = "noop"; //break circular chain by marking op as noop and breaking out of recursion
+            return node;
+        }
+        node.parallel = (metaInfo.absoluteDependencies__ as JsonPointerString[])
+            .map(jsonPtr => {
+                return JsonPointer.get(this.tp.templateMeta, jsonPtr) as MetaInfo;
+            })
+            .filter(metaInf =>{
+                return !options.exprsOnly || metaInf.expr__ !== undefined; //filter to only expression nodes if exprsOnly:true
+            })
+            .map(metaInfo=>{
+                return this.getDependenciesNode2(metaInfo as MetaInfo, traversalState);
+            });
+        traversalState.popNode();
+        return node;
     }
 
 
@@ -321,15 +395,47 @@ export class ParallelPlanner implements Planner{
      * from.
      * @private
      */
-    private getInitializationPlanEntryPoints(jsonPtr:JsonPointerString):MetaInfo[]{
+    private getInitializationPlanEntryPoints(jsonPtr:JsonPointerString,  options:{
+        exprsOnly?:boolean,
+        jsonPtr?:JsonPointerString}={exprsOnly:true, jsonPtr:'/'}):MetaInfo[]{
         const leaves: MetaInfo[] = [];
         const metaInfos = this.tp.metaInfoByJsonPointer[jsonPtr];
+        //link up the implicit dependencies into both the dependencies of this MetaInfo, and the dependees
+        //of the dependencies
         metaInfos.forEach(metaInfo => {
-            //collect entry points but skip the root which can be generated as an implicit parent dependency
-            if(metaInfo.dependees__.length === 0 && metaInfo.expr__ !== undefined && !JsonPointer.rootish(metaInfo.jsonPointer__ as JsonPointerString) ){
+            if(metaInfo.expr__) {
+                const {
+                    newDependencies,
+                    previouslyVisitedDependencies
+                } = this.immediateAndImplicitDependencies(metaInfo, new TraversalState(this.tp, {exprsOnly:options.exprsOnly!}));
+                /*
+                if(previouslyVisitedDependencies.length > 0){
+                    throw new Error(`unexpected previouslyVisitedDependencies ${JSON.stringify(previouslyVisitedDependencies)} for ${metaInfo.expr__}`);
+                }*/
+                metaInfo.absoluteDependencies__ = [...new Set([
+                    ...metaInfo.absoluteDependencies__ as JsonPointerString[],
+                    ...newDependencies as JsonPointerString[]])];
+
+                newDependencies.forEach((dependency:JsonPointerString) => {
+                    //add new 'implicit' dependencies into existing set
+
+                    const dependee:MetaInfo = JsonPointer.get(this.tp.templateMeta, dependency) as MetaInfo;
+                    dependee.dependees__ = [...new Set([
+                        ...dependee.dependees__ as JsonPointerString[],
+                        metaInfo.jsonPointer__ as JsonPointerString])];//dependency])];
+                })
+
+
+
+            }
+        });
+        //now iterate over the MetaInfos again, this time, collecting entry points that have no dependees, now that we have
+        // accunted for implicit dependees but skip the root which can be generated as an implicit parent dependency
+        metaInfos.forEach(metaInfo => {
+            if (metaInfo.dependees__.length === 0 && metaInfo.expr__ !== undefined && !JsonPointer.rootish(metaInfo.jsonPointer__ as JsonPointerString)) {
                 leaves.push(metaInfo); //has no dependencies, therefore is an entry point to the graph
             }
-        })
+        });
         return leaves;
     }
 
@@ -455,31 +561,38 @@ export class ParallelPlanner implements Planner{
         //we create a map of Promises. This is very important as two or more ParallelPlanSteps can have dependency
         //on the same node (by jsonPtr). These must await on the same Promise. For any jsonPtr, there must be only
         //one Promise that all the dependees wait on
-        const promises =new Map<JsonPointerString, Promise<boolean>>();
+        const promises =new Map<JsonPointerString, Promise<ParallelExecutionPlan>>();
 
         /**
          * define a local recursive function that has access to the map of promises and awaits the completion
          * of all its dependencies in parallel
          * @param step
          */
-        const _execute = async (step: ParallelExecutionPlan): Promise<boolean> => {
+        const _execute = async (step: ParallelExecutionPlan): Promise<ParallelExecutionPlan> => {
             const { jsonPtr, op } = step;
 
             // Check if a Promise already exists for this jsonPtr (mutation is put in the map first since it is the root of the plan, so will be found by the leaves that depend on it)
             if (promises.has(jsonPtr)) {
                 const promise = promises.get(jsonPtr)!; //don't freak out ... '!' is TS non-null assertion
+                /*
                 if(op === 'noop'){ //a noop is essentially a pointer to a node that has already executed so when the true node executes we have to update the noop node
                     return await promise.then(didUpdate=>{
                         step.completed = true;
                         step.didUpdate = didUpdate; //the noop simply has to record that the mutation completed
-                        return true;
-                    })
+                        return true; //fixme? shouldn't it return didUpdate
+                    });
                 }
-                return promise; //the returned promise is just a boolean saying if the node value changed do to evaluation or mutation
+
+                 */
+                //return a 'pointer' to the cached plan, or else we create loops with lead nodes in a mutation plan pointing back to the root of the
+                //plan that holds the mutation
+                return promise.then(plan=>{
+                    return (plan as ParallelExecutionPlanDefault).getPointer(this.tp);
+                }); //the returned promise is just a boolean saying if the node value changed do to evaluation or mutation
             }
 
             // Create a placeholder Promise immediately and store it in the map
-            const placeholderPromise: Promise<boolean> = new Promise<boolean>((resolve, reject) => {
+            const placeholderPromise: Promise<ParallelExecutionPlan> = new Promise<ParallelExecutionPlan>((resolve, reject) => {
                 promises.set(
                     jsonPtr,
                     (async () => {
@@ -487,15 +600,18 @@ export class ParallelPlanner implements Planner{
                             step.output = plan.output;
                             step.forkId = plan.forkId;
                             step.forkStack = plan.forkStack;
-                            //await all dependencies
-                            const dependencyChanges: boolean[] = await Promise.all(
+                            //await all dependencies ...and replace the parallel array with the executed array, since the
+                            //`promises` Map has caused already executed subtrees to be replaces with their cache-normalized
+                            //equivalent
+                            step.parallel = await Promise.all(
                                 step.parallel.map((d) => {
-                                    return _execute(d)
+                                    const executed = _execute(d);
+                                    return executed
                                 })
                             );
                             //if we are initializing the node, or of it had dependencies that changed, then we
                             //need to run the step
-                            if(  plan.op === "initialize" || dependencyChanges.some((change) => change)){
+                            if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate)){
                                 step.didUpdate = await this.tp.evaluateNode(step);
                             }else { //if we are here then we are not initializing a node, but reacting to some mutation.
                                     //and it is possible that the node itself is originally a non-materialized node, that
@@ -507,7 +623,7 @@ export class ParallelPlanner implements Planner{
                                     if(!theMutation){
                                         throw new Error(`failed to retrieve mutation from cache for ${_plan.jsonPtr}`);
                                     }
-                                    const mutationCausedAChange= await theMutation;
+                                    const mutationCausedAChange= (await theMutation).didUpdate;
                                     if(mutationCausedAChange){
                                         const _didUpdate= await this.tp.evaluateNode(step);
                                         step.didUpdate = _didUpdate;
@@ -515,12 +631,14 @@ export class ParallelPlanner implements Planner{
                                 }
                             }
                             step.completed = true;
-                            resolve(step.didUpdate);
+                            resolve(step);
                         } catch (error) {
                             promises.delete(jsonPtr); // Clean up failed promise
                             reject(error);
                         }
-                    })().then(() => step.didUpdate) // Explicitly return a boolean
+                    })().then(() => {//IIFE returns void, so we can't take it as parameter to then
+                        return step as ParallelExecutionPlan; //return the step from the closure
+                    }) // Explicitly return a ParallelExecutionPlan becuase IIFE does not return a known type
                 );
             });
 
@@ -532,13 +650,13 @@ export class ParallelPlanner implements Planner{
             //on a mutation, the very first node of the plan will use postoder
             const isMutation = ["set", "forceSetInternal", "delete"].includes(_plan.op);
             if(isMutation){
-                const mutationPromise: Promise<boolean> = this.tp.evaluateNode(_plan).then((didUpdate)=>{
+                const mutationPromise: Promise<ParallelExecutionPlan> = this.tp.evaluateNode(_plan).then((didUpdate)=>{
                     _plan.didUpdate = didUpdate;
-                    return didUpdate;
+                    return _plan;
                 });
                 promises.set(_plan.jsonPtr, mutationPromise);
-                const didChange = await mutationPromise; //allow mutation to complete before triggering reaction plan
-                if(didChange) { //react to change
+                const {didUpdate} = await mutationPromise; //allow mutation to complete before triggering reaction plan
+                if(didUpdate) { //react to change
                     await Promise.all(_plan.parallel.map(p => {
                         return _execute(p)
                     }));

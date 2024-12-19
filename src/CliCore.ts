@@ -151,7 +151,7 @@ export default class CliCore extends CliCoreBase{
                 countDown--;
             }
 
-            if(countDown === 0 || await compiledExpr.evaluate(data)===true){ //check if the expression in the 'until' argument (the stop tailing condition) has evaluated to true
+            if(countDown === 0 || await compiledExpr.evaluate(_data)===true){ //check if the expression in the 'until' argument (the stop tailing condition) has evaluated to true
                 done = true;
                 unplug();
                 resolve(); //resolve the latch promise

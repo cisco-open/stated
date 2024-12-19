@@ -14,7 +14,7 @@ export class ExecutionStatus {
         this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
     public begin(mutationPlan:ExecutionPlan) {
-        this.statuses.add(mutationPlan as SerialPlan) //todo fixme - this whole class needs to be refactored to work with ExecutionPlan - it will only work now with Plan
+        this.statuses.add(mutationPlan) //todo fixme - this whole class needs to be refactored to work with ExecutionPlan - it will only work now with Plan
     }
 
     public end(mutationPlan: ExecutionPlan) {

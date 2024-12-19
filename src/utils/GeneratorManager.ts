@@ -63,7 +63,8 @@ export class GeneratorManager{
                 }else{ //an interval is specified so we sit in a loop calling the function
                     let count = 0;
                     while(!tp.isClosed && (maxYield < 0 || count++ < maxYield-1)){
-                        yield await (input as ()=>any)();
+                        const funcRes = await (input as ()=>any)();
+                        yield funcRes;
                         await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
                     }
                     if(tp.isClosed){

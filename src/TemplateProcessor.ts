@@ -1062,7 +1062,6 @@ export default class TemplateProcessor {
                     this.applyTransaction(plan as Transaction); //should this await?
                 }else{
                     await this.executePlan(plan);
-                    await this.planner.executeDataChangeCallbacks(plan);
                 }
                 removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
             }finally {
@@ -1175,6 +1174,7 @@ export default class TemplateProcessor {
         try {
             this.executionStatus.begin(plan);
             await this.planner.execute(plan);
+            await this.planner.executeDataChangeCallbacks(plan);
         }catch(error){
             this.logger.error("plan execution failed");
             throw error;
