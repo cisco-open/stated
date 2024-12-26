@@ -6,7 +6,6 @@ import {ExecutionStatus} from "./ExecutionStatus.js";
 import {SerialPlanner} from "./SerialPlanner.js";
 import * as jsonata from "jsonata";
 import {JsonPointer as jp} from "./index.js";;
-import * as console from "node:console";
 import {Snapshot} from "./TemplateProcessor.js";
 
 
