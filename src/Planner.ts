@@ -1,4 +1,4 @@
-import {Fork, ForkId, Op, PlanStep} from "./TemplateProcessor.js";
+import {Fork, ForkId, Op, PlanStep, Snapshot} from "./TemplateProcessor.js";
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import { ExecutionStatus } from "./ExecutionStatus.js";
 import {SerialPlan} from "./SerialPlanner.js";
@@ -49,16 +49,14 @@ export interface Planner {
     execute(plan: ExecutionPlan): Promise<void>;
 
     /**
-     * Restores a TemplateProcessor to the state recorded in an ExecutionStatus object
-     * and resumes execution.
+     * Runs ExecutionPlans that were in-flight and recorded in a snapshot
      *
-     * This method allows for resuming interrupted or paused execution by restoring
-     * the previous state from the `ExecutionStatus` object.
      *
-     * @param executionStatus - The execution status containing the state to restore.
+     * @param plans - The ExecutionPlan's that came from a snapshot
      * @returns A promise that resolves once restoration and resumption are complete.
      */
-    restore(executionStatus: ExecutionStatus): Promise<void>;
+
+    //restore(plans: ExecutionPlan[]): Promise<void>;
 
     /**
      * Returns a 'total ordering' of the dependency graph. A single array of JSON pointers
@@ -72,7 +70,20 @@ export interface Planner {
      */
     from(jsonPtr:JsonPointerString):JsonPointerString[];
 
+    /**
+     * Creates a storable version of the execution plan that is a pure json object
+     * @param mutationPlan
+     */
     toJSON (mutationPlan:ExecutionPlan):SerializableExecutionPlan;
+
+    /**
+     * This is the inverse of the toJSON. It takes a serializable execution plan and returns an object
+     * that can be used in the runtime.The snapshot is necessary because it contains normalization structures
+     * that have to be used to rehydrate an ExecutionPlan from a SerializableExecutionPlan
+     * @param plan
+     */
+    fromJSON(plan:SerializableExecutionPlan, snapshot:Snapshot, forks: Map<string, Fork>):ExecutionPlan;
+
 
     executeDataChangeCallbacks(plan:ExecutionPlan): Promise<void>;
 
@@ -119,7 +130,7 @@ export interface ExecutionPlan {
     /**
      * The last completed step in the execution plan, if any.
      */
-    lastCompletedStep?: PlanStep; //todo this should only be in the serial plan
+    lastCompletedStep?: PlanStep; //fixme todo this should only be in the serial plan
 }
 
 /**

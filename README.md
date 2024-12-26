@@ -2888,7 +2888,7 @@ file.
 
 To create a periodic snapshot of the template every time it changes 
 ```js
-const tempalte = {
+const template = {
    "count": 0,
    "counter": "${ $setInterval(function(){$set('/count', count+1)}, 10) }",
    "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"

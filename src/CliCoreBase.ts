@@ -186,7 +186,7 @@ export class CliCoreBase {
                 tailPromise = this.tail(tail);
             }
             if (fromSnapshot) { // restore from a snapshot
-                await this.templateProcessor.initialize(undefined, "/", input);
+                await this.templateProcessor.restoreFromSnapshotObject(input);//.initialize(undefined, "/", input);
             } else {
                 await this.templateProcessor.initialize(input);
             }

@@ -4,89 +4,165 @@
     "name": null,
     "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
     "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+    "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
     "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
     "homeworlds": []
   },
   "output": {
-    "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
+    "data": null,
     "name": null,
-    "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-    "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-    "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-    "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
+    "personDetails": null,
+    "homeworldURL": null,
+    "homeworldDetails": null,
+    "homeworldName": null,
     "homeworlds": []
   },
   "options": {},
   "mvcc": [
     {
+      "forkId": "yj4g8owyh2algywib75fue",
+      "output": {
+        "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
+        "name": "luke",
+        "personDetails": {
+          "properties": {
+            "height": "172",
+            "mass": "77",
+            "hair_color": "blond",
+            "skin_color": "fair",
+            "eye_color": "blue",
+            "birth_year": "19BBY",
+            "gender": "male",
+            "created": "2024-12-23T18:01:23.198Z",
+            "edited": "2024-12-23T18:01:23.198Z",
+            "name": "Luke Skywalker",
+            "homeworld": "https://www.swapi.tech/api/planets/1",
+            "url": "https://www.swapi.tech/api/people/1"
+          },
+          "description": "A person within the Star Wars universe",
+          "_id": "5f63a36eee9fd7000499be42",
+          "uid": "1",
+          "__v": 0
+        },
+        "homeworldURL": "https://www.swapi.tech/api/planets/1",
+        "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+        "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
+        "homeworlds": []
+      }
+    },
+    {
       "output": {
         "data": null,
         "name": null,
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-        "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
+        "personDetails": null,
+        "homeworldURL": null,
+        "homeworldDetails": null,
+        "homeworldName": null,
         "homeworlds": []
       },
       "forkId": "ROOT"
     },
     {
-      "forkId": "qzwq2gyhalb8dxqpaesyuj",
-      "output": {
-        "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
-        "name": "luke",
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
-        "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
-        "homeworlds": []
-      }
-    },
-    {
-      "forkId": "iuy21b82z0fkx5pcfrmme",
+      "forkId": "lyhn2iq7w2owogfytl12c",
       "output": {
         "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
         "name": "han",
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+        "personDetails": {
+          "properties": {
+            "height": "180",
+            "mass": "80",
+            "hair_color": "brown",
+            "skin_color": "fair",
+            "eye_color": "brown",
+            "birth_year": "29BBY",
+            "gender": "male",
+            "created": "2024-12-23T18:01:23.198Z",
+            "edited": "2024-12-23T18:01:23.198Z",
+            "name": "Han Solo",
+            "homeworld": "https://www.swapi.tech/api/planets/22",
+            "url": "https://www.swapi.tech/api/people/14"
+          },
+          "description": "A person within the Star Wars universe",
+          "_id": "5f63a36eee9fd7000499be4f",
+          "uid": "14",
+          "__v": 0
+        },
+        "homeworldURL": "https://www.swapi.tech/api/planets/22",
+        "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
         "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
         "homeworlds": []
       }
     },
     {
-      "forkId": "dke8e2mw39wtp9k7fyzptn",
+      "forkId": "ckg992xkg8qtvxzsady1k",
       "output": {
         "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
         "name": "leia",
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+        "personDetails": {
+          "properties": {
+            "height": "150",
+            "mass": "49",
+            "hair_color": "brown",
+            "skin_color": "light",
+            "eye_color": "brown",
+            "birth_year": "19BBY",
+            "gender": "female",
+            "created": "2024-12-23T18:01:23.198Z",
+            "edited": "2024-12-23T18:01:23.198Z",
+            "name": "Leia Organa",
+            "homeworld": "https://www.swapi.tech/api/planets/2",
+            "url": "https://www.swapi.tech/api/people/5"
+          },
+          "description": "A person within the Star Wars universe",
+          "_id": "5f63a36eee9fd7000499be46",
+          "uid": "5",
+          "__v": 0
+        },
+        "homeworldURL": "https://www.swapi.tech/api/planets/2",
+        "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
         "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
         "homeworlds": []
       }
     },
     {
-      "forkId": "wbp9heo4z6tvjkt9vrfkv",
+      "forkId": "768m0vzo50klwvmmfuzwvl",
       "output": {
         "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
         "name": "chewbacca",
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+        "personDetails": null,
+        "homeworldURL": null,
+        "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
         "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
         "homeworlds": []
       }
     },
     {
-      "forkId": "r1xgkp6r8n87pc0sz12hce",
+      "forkId": "b1vbrafg3axj0m6dwyl6",
       "output": {
         "data": "${['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))}",
         "name": "Lando",
-        "personDetails": "${ (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save}",
-        "homeworldURL": "${ personDetails!=null?personDetails.properties.homeworld:null }",
-        "homeworldDetails": "${ homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
+        "personDetails": {
+          "properties": {
+            "height": "177",
+            "mass": "79",
+            "hair_color": "black",
+            "skin_color": "dark",
+            "eye_color": "brown",
+            "birth_year": "31BBY",
+            "gender": "male",
+            "created": "2024-12-23T18:01:23.198Z",
+            "edited": "2024-12-23T18:01:23.198Z",
+            "name": "Lando Calrissian",
+            "homeworld": "https://www.swapi.tech/api/planets/30",
+            "url": "https://www.swapi.tech/api/people/25"
+          },
+          "description": "A person within the Star Wars universe",
+          "_id": "5f63a36fee9fd7000499be59",
+          "uid": "25",
+          "__v": 0
+        },
+        "homeworldURL": "https://www.swapi.tech/api/planets/30",
+        "homeworldDetails": "${homeworldURL!=null?$fetch(homeworldURL).json().result:null}",
         "homeworldName": "${ homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null }",
         "homeworlds": []
       }
@@ -120,8 +196,11 @@
         "expr__": "['luke', 'han', 'leia', 'chewbacca', 'Lando'].($forked('/name',$))",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
-        "data__": null,
-        "variables__": ["forked"]
+        "variables__": [
+          "forked"
+        ],
+        "isInitialized__": true,
+        "data__": null
       },
       {
         "materialized__": true,
@@ -141,9 +220,12 @@
         "parent__": "",
         "temp__": false,
         "exprRootPath__": null,
-        "expr__": " homeworldURL!=null?$fetch(homeworldURL).json().result:null",
+        "expr__": "homeworldURL!=null?$fetch(homeworldURL).json().result:null",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
+        "variables__": [
+          "fetch"
+        ],
         "properties": {
           "name": {
             "materialized__": false,
@@ -158,7 +240,8 @@
             "parent__": "/homeworldDetails/properties"
           }
         },
-        "variables__": ["fetch"]
+        "isInitialized__": true,
+        "data__": null
       },
       {
         "materialized__": true,
@@ -180,7 +263,11 @@
         "expr__": " homeworldDetails!=null?$joined('/homeworlds/-', homeworldDetails.properties.name):null ",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
-        "variables__": ["joined"]
+        "variables__": [
+          "joined"
+        ],
+        "isInitialized__": true,
+        "data__": null
       },
       {
         "materialized__": true,
@@ -203,7 +290,10 @@
         "exprRootPath__": null,
         "expr__": " personDetails!=null?personDetails.properties.homeworld:null ",
         "exprTargetJsonPointer__": "",
-        "compiledExpr__": "--compiled expression--"
+        "compiledExpr__": "--compiled expression--",
+        "variables__": [],
+        "isInitialized__": true,
+        "data__": "https://www.swapi.tech/api/planets/2"
       },
       {
         "materialized__": true,
@@ -253,6 +343,10 @@
         "expr__": " (name!=null?$fetch('https://swapi.tech/api/people/?name='&name).json().result[0]:null) ~>$save",
         "exprTargetJsonPointer__": "",
         "compiledExpr__": "--compiled expression--",
+        "variables__": [
+          "fetch",
+          "save"
+        ],
         "properties": {
           "homeworld": {
             "materialized__": false,
@@ -267,7 +361,27 @@
             "parent__": "/personDetails/properties"
           }
         },
-        "variables__": ["fetch", "save"]
+        "isInitialized__": true,
+        "data__": {
+          "properties": {
+            "height": "150",
+            "mass": "49",
+            "hair_color": "brown",
+            "skin_color": "light",
+            "eye_color": "brown",
+            "birth_year": "19BBY",
+            "gender": "female",
+            "created": "2024-12-23T18:01:23.198Z",
+            "edited": "2024-12-23T18:01:23.198Z",
+            "name": "Leia Organa",
+            "homeworld": "https://www.swapi.tech/api/planets/2",
+            "url": "https://www.swapi.tech/api/people/5"
+          },
+          "description": "A person within the Star Wars universe",
+          "_id": "5f63a36eee9fd7000499be46",
+          "uid": "5",
+          "__v": 0
+        }
       },
       {
         "materialized__": false,
@@ -297,98 +411,364 @@
   },
   "plans": [
     {
-      "forkId": "ROOT",
-      "forkStack": [],
-      "sortedJsonPtrs": [
-        "/data",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
+      "op": "set",
+      "parallel": [
+        {
+          "op": "eval",
+          "parallel": [
+            {
+              "op": "eval",
+              "parallel": [
+                {
+                  "op": "eval",
+                  "parallel": [
+                    {
+                      "op": "eval",
+                      "parallel": [
+                        {
+                          "op": "noop",
+                          "parallel": [],
+                          "completed": true,
+                          "jsonPtr": "/name",
+                          "forkStack": [
+                            "ROOT"
+                          ],
+                          "forkId": "yj4g8owyh2algywib75fue",
+                          "didUpdate": true
+                        }
+                      ],
+                      "completed": true,
+                      "jsonPtr": "/personDetails",
+                      "forkStack": [
+                        "ROOT"
+                      ],
+                      "forkId": "yj4g8owyh2algywib75fue",
+                      "didUpdate": true
+                    }
+                  ],
+                  "completed": true,
+                  "jsonPtr": "/homeworldURL",
+                  "forkStack": [
+                    "ROOT"
+                  ],
+                  "forkId": "yj4g8owyh2algywib75fue",
+                  "didUpdate": true
+                }
+              ],
+              "completed": false,
+              "jsonPtr": "/homeworldDetails",
+              "forkStack": [
+                "ROOT"
+              ],
+              "forkId": "yj4g8owyh2algywib75fue",
+              "didUpdate": false
+            }
+          ],
+          "completed": false,
+          "jsonPtr": "/homeworldName",
+          "forkStack": [
+            "ROOT"
+          ],
+          "forkId": "yj4g8owyh2algywib75fue",
+          "didUpdate": false
+        }
       ],
-      "op": null,
-      "data": "__NOOP__",
-      "lastCompletedStep": "/data"
-    },
-    {
-      "forkId": "qzwq2gyhalb8dxqpaesyuj",
+      "completed": false,
+      "jsonPtr": "/name",
       "forkStack": [
         "ROOT"
       ],
-      "sortedJsonPtrs": [
-        "/name",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
-      ],
-      "op": null,
-      "data": "luke",
-      "lastCompletedStep": "/name"
+      "forkId": "yj4g8owyh2algywib75fue",
+      "didUpdate": true,
+      "data": "luke"
     },
     {
-      "forkId": "iuy21b82z0fkx5pcfrmme",
+      "op": "set",
+      "parallel": [
+        {
+          "op": "eval",
+          "parallel": [
+            {
+              "op": "eval",
+              "parallel": [
+                {
+                  "op": "eval",
+                  "parallel": [
+                    {
+                      "op": "eval",
+                      "parallel": [
+                        {
+                          "op": "noop",
+                          "parallel": [],
+                          "completed": true,
+                          "jsonPtr": "/name",
+                          "forkStack": [
+                            "ROOT"
+                          ],
+                          "forkId": "lyhn2iq7w2owogfytl12c",
+                          "didUpdate": true
+                        }
+                      ],
+                      "completed": true,
+                      "jsonPtr": "/personDetails",
+                      "forkStack": [
+                        "ROOT"
+                      ],
+                      "forkId": "lyhn2iq7w2owogfytl12c",
+                      "didUpdate": true
+                    }
+                  ],
+                  "completed": true,
+                  "jsonPtr": "/homeworldURL",
+                  "forkStack": [
+                    "ROOT"
+                  ],
+                  "forkId": "lyhn2iq7w2owogfytl12c",
+                  "didUpdate": true
+                }
+              ],
+              "completed": false,
+              "jsonPtr": "/homeworldDetails",
+              "forkStack": [
+                "ROOT"
+              ],
+              "forkId": "lyhn2iq7w2owogfytl12c",
+              "didUpdate": false
+            }
+          ],
+          "completed": false,
+          "jsonPtr": "/homeworldName",
+          "forkStack": [
+            "ROOT"
+          ],
+          "forkId": "lyhn2iq7w2owogfytl12c",
+          "didUpdate": false
+        }
+      ],
+      "completed": false,
+      "jsonPtr": "/name",
       "forkStack": [
         "ROOT"
       ],
-      "sortedJsonPtrs": [
-        "/name",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
-      ],
-      "op": null,
-      "data": "han",
-      "lastCompletedStep": "/name"
+      "forkId": "lyhn2iq7w2owogfytl12c",
+      "didUpdate": true,
+      "data": "han"
     },
     {
-      "forkId": "dke8e2mw39wtp9k7fyzptn",
+      "op": "set",
+      "parallel": [
+        {
+          "op": "eval",
+          "parallel": [
+            {
+              "op": "eval",
+              "parallel": [
+                {
+                  "op": "eval",
+                  "parallel": [
+                    {
+                      "op": "eval",
+                      "parallel": [
+                        {
+                          "op": "noop",
+                          "parallel": [],
+                          "completed": true,
+                          "jsonPtr": "/name",
+                          "forkStack": [
+                            "ROOT"
+                          ],
+                          "forkId": "ckg992xkg8qtvxzsady1k",
+                          "didUpdate": true
+                        }
+                      ],
+                      "completed": true,
+                      "jsonPtr": "/personDetails",
+                      "forkStack": [
+                        "ROOT"
+                      ],
+                      "forkId": "ckg992xkg8qtvxzsady1k",
+                      "didUpdate": true
+                    }
+                  ],
+                  "completed": true,
+                  "jsonPtr": "/homeworldURL",
+                  "forkStack": [
+                    "ROOT"
+                  ],
+                  "forkId": "ckg992xkg8qtvxzsady1k",
+                  "didUpdate": true
+                }
+              ],
+              "completed": false,
+              "jsonPtr": "/homeworldDetails",
+              "forkStack": [
+                "ROOT"
+              ],
+              "forkId": "ckg992xkg8qtvxzsady1k",
+              "didUpdate": false
+            }
+          ],
+          "completed": false,
+          "jsonPtr": "/homeworldName",
+          "forkStack": [
+            "ROOT"
+          ],
+          "forkId": "ckg992xkg8qtvxzsady1k",
+          "didUpdate": false
+        }
+      ],
+      "completed": false,
+      "jsonPtr": "/name",
       "forkStack": [
         "ROOT"
       ],
-      "sortedJsonPtrs": [
-        "/name",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
-      ],
-      "op": null,
-      "data": "leia",
-      "lastCompletedStep": "/name"
+      "forkId": "ckg992xkg8qtvxzsady1k",
+      "didUpdate": true,
+      "data": "leia"
     },
     {
-      "forkId": "wbp9heo4z6tvjkt9vrfkv",
+      "op": "set",
+      "parallel": [
+        {
+          "op": "eval",
+          "parallel": [
+            {
+              "op": "eval",
+              "parallel": [
+                {
+                  "op": "eval",
+                  "parallel": [
+                    {
+                      "op": "eval",
+                      "parallel": [
+                        {
+                          "op": "noop",
+                          "parallel": [],
+                          "completed": true,
+                          "jsonPtr": "/name",
+                          "forkStack": [
+                            "ROOT"
+                          ],
+                          "forkId": "768m0vzo50klwvmmfuzwvl",
+                          "didUpdate": true
+                        }
+                      ],
+                      "completed": false,
+                      "jsonPtr": "/personDetails",
+                      "forkStack": [
+                        "ROOT"
+                      ],
+                      "forkId": "768m0vzo50klwvmmfuzwvl",
+                      "didUpdate": false
+                    }
+                  ],
+                  "completed": false,
+                  "jsonPtr": "/homeworldURL",
+                  "forkStack": [
+                    "ROOT"
+                  ],
+                  "forkId": "768m0vzo50klwvmmfuzwvl",
+                  "didUpdate": false
+                }
+              ],
+              "completed": false,
+              "jsonPtr": "/homeworldDetails",
+              "forkStack": [
+                "ROOT"
+              ],
+              "forkId": "768m0vzo50klwvmmfuzwvl",
+              "didUpdate": false
+            }
+          ],
+          "completed": false,
+          "jsonPtr": "/homeworldName",
+          "forkStack": [
+            "ROOT"
+          ],
+          "forkId": "768m0vzo50klwvmmfuzwvl",
+          "didUpdate": false
+        }
+      ],
+      "completed": false,
+      "jsonPtr": "/name",
       "forkStack": [
         "ROOT"
       ],
-      "sortedJsonPtrs": [
-        "/name",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
-      ],
-      "op": null,
-      "data": "chewbacca",
-      "lastCompletedStep": "/name"
+      "forkId": "768m0vzo50klwvmmfuzwvl",
+      "didUpdate": true,
+      "data": "chewbacca"
     },
     {
-      "forkId": "r1xgkp6r8n87pc0sz12hce",
+      "op": "set",
+      "parallel": [
+        {
+          "op": "eval",
+          "parallel": [
+            {
+              "op": "eval",
+              "parallel": [
+                {
+                  "op": "eval",
+                  "parallel": [
+                    {
+                      "op": "eval",
+                      "parallel": [
+                        {
+                          "op": "noop",
+                          "parallel": [],
+                          "completed": true,
+                          "jsonPtr": "/name",
+                          "forkStack": [
+                            "ROOT"
+                          ],
+                          "forkId": "b1vbrafg3axj0m6dwyl6",
+                          "didUpdate": true
+                        }
+                      ],
+                      "completed": true,
+                      "jsonPtr": "/personDetails",
+                      "forkStack": [
+                        "ROOT"
+                      ],
+                      "forkId": "b1vbrafg3axj0m6dwyl6",
+                      "didUpdate": true
+                    }
+                  ],
+                  "completed": true,
+                  "jsonPtr": "/homeworldURL",
+                  "forkStack": [
+                    "ROOT"
+                  ],
+                  "forkId": "b1vbrafg3axj0m6dwyl6",
+                  "didUpdate": true
+                }
+              ],
+              "completed": false,
+              "jsonPtr": "/homeworldDetails",
+              "forkStack": [
+                "ROOT"
+              ],
+              "forkId": "b1vbrafg3axj0m6dwyl6",
+              "didUpdate": false
+            }
+          ],
+          "completed": false,
+          "jsonPtr": "/homeworldName",
+          "forkStack": [
+            "ROOT"
+          ],
+          "forkId": "b1vbrafg3axj0m6dwyl6",
+          "didUpdate": false
+        }
+      ],
+      "completed": false,
+      "jsonPtr": "/name",
       "forkStack": [
         "ROOT"
       ],
-      "sortedJsonPtrs": [
-        "/name",
-        "/personDetails",
-        "/homeworldURL",
-        "/homeworldDetails",
-        "/homeworldName"
-      ],
-      "op": null,
-      "data": "Lando",
-      "lastCompletedStep": "/name"
+      "forkId": "b1vbrafg3axj0m6dwyl6",
+      "didUpdate": true,
+      "data": "Lando"
     }
   ]
 }

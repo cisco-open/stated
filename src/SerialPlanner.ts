@@ -1,10 +1,11 @@
 import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
-import TemplateProcessor, {Op, PlanStep} from "./TemplateProcessor.js";
+import TemplateProcessor, {Fork, Op, PlanStep} from "./TemplateProcessor.js";
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import {JsonPointer as jp} from "./index.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import * as jsonata from "jsonata";
 import {NOOP_PLACEHOLDER} from "./utils/stringify.js";
+import {Snapshot} from "./TemplateProcessor.js";
 
 
 export interface SerialPlan extends ExecutionPlan{
@@ -335,13 +336,51 @@ export class SerialPlanner implements Planner{
         return dependents;
     }
 
+    /**
+     * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
+     * @param executionStatus
+     */
+    /*
+    public async restore(executionStatus:ExecutionStatus): Promise<void> {
+        // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
+        // and create initialization plan from it.
+        let hasRootPlan = false;
+        executionStatus.plans.forEach((plan:ExecutionPlan) => {
+            if(plan.forkId === "Root") { //fixme <-- wrong case! this could NEVER have worked! WTF
+                hasRootPlan = true;
+            }});
+        if (executionStatus.plans?.size === 0 || !hasRootPlan) {
+            // we need to add new root plan to the beginning of the set, so the functions/timers are reevaluated and can be used
+            executionStatus.plans = new Set([{
+                sortedJsonPtrs: [],
+                restoreJsonPtrs: [],
+                data: TemplateProcessor.NOOP,
+                output: this.tp.output,
+                forkStack: [],
+                forkId: "ROOT",
+                didUpdate: []
+            }, ...executionStatus.plans]);
+        }
+        // restart all plans.
+        for (const mutationPlan of executionStatus.plans) {
+            // we initialize all functions/timeouts for each plan
+            await this.restoreIntervalsExpressionsAndFunctions(mutationPlan);
+            //we don't await here. In fact, it is critical NOT to await here because the presence of multiple mutationPlan
+            //means that there was concurrent ($forked) execution and we don't want to serialize what was intended to
+            //run concurrently
+            this.tp.executePlan(mutationPlan); // restart the restored plan asynchronously
+
+        }
+    }
+
+     */
 
     /**
      * Create an initialization plan from the execution plan, that intializes outputs that cannot be serialized and
      * deserialized from the snapshot, such as timers, and functions.
      * @param plan
      */
-    private async createRestorePlan(plan:ExecutionPlan) {
+    private async restoreIntervalsExpressionsAndFunctions(plan:ExecutionPlan) {
 
         try {
             let intervals: MetaInfo[] = this.tp.metaInfoByJsonPointer["/"]?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--');
@@ -410,50 +449,14 @@ export class SerialPlanner implements Planner{
             const {sortedJsonPtrs} = _plan;
             const jsonPtr = sortedJsonPtrs[0];
             theStep = {jsonPtr, ..._plan, didUpdate:false}
-            const didUpdate =  await this.tp.mutate(theStep);
-            _plan.didUpdate.push(didUpdate);
-            return didUpdate;
+            await this.tp.mutate(theStep);
+            _plan.didUpdate.push(theStep.didUpdate);
+            return theStep.didUpdate;
         }finally {
             if(theStep){
                 _plan.lastCompletedStep = theStep;
             } //completed self
           //  this.tp.executionStatus.end(_plan)
-        }
-    }
-
-    /**
-     * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
-     * @param executionStatus
-     */
-    public async restore(executionStatus:ExecutionStatus): Promise<void> {
-        // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
-        // and create initialization plan from it.
-        let hasRootPlan = false;
-        executionStatus.statuses.forEach((plan:ExecutionPlan) => {
-            if(plan.forkId === "Root") {
-                hasRootPlan = true;
-            }});
-        if (executionStatus.statuses?.size === 0 || !hasRootPlan) {
-            // we need to add new root plan to the beginning of the set, so the functions/timers are reevaluated and can be used
-            executionStatus.statuses = new Set([{
-                sortedJsonPtrs: [],
-                restoreJsonPtrs: [],
-                data: TemplateProcessor.NOOP,
-                output: this.tp.output,
-                forkStack: [],
-                forkId: "ROOT",
-                didUpdate: []
-            }, ...executionStatus.statuses]);
-        }
-        // restart all plans.
-        for (const mutationPlan of executionStatus.statuses) {
-            // we initialize all functions/timeouts for each plan
-            await this.createRestorePlan(mutationPlan);
-            //we don't await here. In fact, it is critical NOT to await here because the presence of multiple mutationPlan
-            //means that there was concurrent ($forked) execution and we don't want to serialize what was intended to
-            //run concurrently
-            this.tp.executePlan(mutationPlan); // restart the restored plan asynchronously
-
         }
     }
 
@@ -523,6 +526,20 @@ export class SerialPlanner implements Planner{
             //ToDO - other calls to callDataChangeCallbacks are not awaiting. Reconcile this
             await this.tp.callDataChangeCallbacks(plan.output, jsonPtrArray, removed, op);
         }
+    }
+
+    fromJSON(planData: SerializableExecutionPlan, snapshot: Snapshot, forks: Map<string, Fork>): ExecutionPlan {
+        return {
+            didUpdate: [],
+            forkId: planData.forkId,
+            forkStack:planData.forkStack.map((forkId: string) => forks.get(forkId)!),
+            sortedJsonPtrs: (planData as any).sortedJsonPtrs,
+            restoreJsonPtrs: [],
+            op: planData.op,
+            data: planData.data,
+            output: forks.get(planData.forkId)?.output || {}, // Assuming output needs to be set
+            lastCompletedStep: planData.lastCompletedStep ? { jsonPtr: (planData as any).lastCompletedStep } as PlanStep : undefined
+        } as SerialPlan;
     }
 
 }

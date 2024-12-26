@@ -480,14 +480,18 @@ export default class TemplateProcessor {
     public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: Snapshot|undefined = undefined):Promise<void> {
         if(jsonPtr === "/"){
             this.timerManager.clear();
-            this.executionStatus.clear();
+            if(!executionStatusSnapshot){ //if we intend to restore a snapshot, then executionStatus has been preloaded intentionally and we musn't clear it
+                this.executionStatus.clear();
+            }
         }
         // if initialize is called with a importedSubtemplate and root json pointer (which is "/" b default)
         // we need to reset the importedSubtemplate. Otherwise, we rely on the one provided in the constructor
         if (importedSubtemplate !== undefined && jsonPtr === "/") {
             this.resetTemplate(importedSubtemplate)
         }
+        /*
         if (executionStatusSnapshot !== undefined) {
+            this.metaInfoByJsonPointer = executionStatusSnapshot.metaInfoByJsonPointer; //todo: ugh this is a side effect that probably should happen explicitely in tp.intialize
             this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(this, executionStatusSnapshot);
             // here we restore metaInfoByJsonPointer from the executionStatus
             this.templateMeta = {};
@@ -503,6 +507,8 @@ export default class TemplateProcessor {
 
                 });
         }
+
+         */
 
         if (jsonPtr === "/" && this.isInitializing) {
             this.logger.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
@@ -543,19 +549,21 @@ export default class TemplateProcessor {
             }
             // Recreating the meta info if execution status is not provided
             if (executionStatusSnapshot === undefined) {
-                const metaInfos = await this.createMetaInfos(compilationTarget , parsedJsonPtr);
+                const metaInfos = await this.createMetaInfos(compilationTarget, parsedJsonPtr);
                 this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
                 this.sortMetaInfos(metaInfos);
                 this.populateTemplateMeta(metaInfos);
                 this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
                 this.propagateTags(metaInfos);
-                this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(metaInfos)];
+            }
+                this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(this.metaInfoByJsonPointer[jsonPtr])];
                 this.isClosed = false; //open the execution queue for processing
                 await this.queueInitializationPlan(jsonPtr);
-            } else {
-                this.isClosed = false;
-                await this.planner.restore(this.executionStatus);
-            }
+            //}
+            //else {
+            //    this.isClosed = false;
+            //    await this.planner.restore(this.executionStatus);
+            //}
             await this.postInitialize();
             await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.PreTmpVarRemoval);
             this.removeTemporaryVariables(this.tempVars, jsonPtr);
@@ -1057,7 +1065,8 @@ export default class TemplateProcessor {
             try {
                 const plan: ExecutionPlan| SerialPlan | SnapshotPlan | Transaction= this.executionQueue[0];
                 if (plan.op === "snapshot") {
-                    (plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();;
+                    //(plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();
+                    throw new Error("Snapshots should not be placed in execution queue")
                 } else if(plan.op === "transaction" ){
                     this.applyTransaction(plan as Transaction); //should this await?
                 }else{
@@ -1183,24 +1192,25 @@ export default class TemplateProcessor {
         }
     }
 
-    public async mutate(planStep: PlanStep):Promise<boolean> {
+    public async mutate(planStep: PlanStep):Promise<PlanStep> {
         try {
             const {jsonPtr: entryPoint, data, op} = planStep;
             if (!jp.has(this.output, entryPoint)) { //node doesn't exist yet, so just create it
-                return  await this.evaluateNode(planStep);
+                planStep.didUpdate = await this.evaluateNode(planStep);
+                return planStep
             } else {
                 // Check if the node contains an expression. If so, print a warning and return.
                 const firstMeta = jp.get(this.templateMeta, entryPoint) as MetaInfo;
                 if (firstMeta.expr__ !== undefined && op !== "forceSetInternal") { //setDeferred allows $defer('/foo') to 'self replace' with a value
                     this.logger.log('warn', `Attempted to replace expressions with data under ${entryPoint}. This operation is ignored.`);
-                    return false;
+                    planStep.didUpdate = false;
                 } else {
                     planStep.didUpdate = await this.evaluateNode(planStep); // Evaluate the node provided with the data provided
                     if (!planStep.didUpdate) {
                         this.logger.verbose(`data did not change for ${entryPoint}, short circuiting dependents.`);
                     }
-                    return planStep.didUpdate;
                 }
+                return planStep;
             }
         }catch(error:any){
             this.logger.error(`mutation failed: ${planStep.jsonPtr} with error msg '${error.message}'`);
@@ -1209,7 +1219,7 @@ export default class TemplateProcessor {
     }
 
     async evaluateNode(step:PlanStep):Promise<boolean> {
-        const {jsonPtr, data=undefined, op="set", output} = step;
+        const {jsonPtr, data=undefined, op="set"} = step;
         if(jsonPtr==="/"){
             return false;  //you can't replace the root node itself
         }
@@ -1434,15 +1444,18 @@ export default class TemplateProcessor {
     private _setData(planStep: PlanStep):boolean {
         const {jsonPtr, data=undefined, op="set", output} = planStep;
         if (data === TemplateProcessor.NOOP) { //a No-Op is used as the return from 'import' where we don't actually need to make the assignment as init has already dont it
+            planStep.didUpdate = false;
             return false;
         }
 
         if(op === 'delete'){
             if(jp.has(output, jsonPtr)) {
                 jp.remove(output, jsonPtr);
+                planStep.didUpdate = true; //we need to immediately update planStep.didUpdate because dataChangeCallbacks can actually be used to do snapshot capture and we need to get didUpdate correct in the snapshot
                 this.callDataChangeCallbacks(data, jsonPtr, true, op);
                 return true;
             }
+            planStep.didUpdate = false
             return false;
         }
         let existingData;
@@ -1457,9 +1470,11 @@ export default class TemplateProcessor {
         if (!sideEffect__) {
             if(!isEqual(existingData, data)) {
                 jp.set(output, jsonPtr, data);
+                planStep.didUpdate = true;
                 this.callDataChangeCallbacks(data, jsonPtr, false);
                 return true;
             }else {
+                planStep.didUpdate = false;
                 if (this.isEnabled("verbose"))this.logger.verbose(`data to be set at ${jsonPtr} did not change, ignored. `);
                 return false;
             }
@@ -1467,6 +1482,7 @@ export default class TemplateProcessor {
             if (affectedData !== existingData){ //use pointer comparison here, not deep equality
                 jp.set(output, jsonPtr, affectedData);
             }
+            planStep.didUpdate = true;
             this.callDataChangeCallbacks(affectedData, jsonPtr, false); //always call the callback as by definition a side effect changed the data
             return true;
         }
@@ -1709,16 +1725,19 @@ export default class TemplateProcessor {
      * TemplateProcessor
      */
     public async snapshot():Promise<string> {
+        /*
         const snapshotPlan:SnapshotPlan = {op:"snapshot", generatedSnapshot:"replace me"}; //generatedSnapshot gets filled in
         this.executionQueue.push(snapshotPlan);
         await this.drainExecutionQueue();
         const {generatedSnapshot} = snapshotPlan;
         return generatedSnapshot;
+         */
+        return this.executionStatus.toJsonString();
     }
 
-    public static async fromExecutionStatusString(snapshot: string, context: {} = {}) {
+    public static async fromSnapshot(snapshot: string, context: {} = {}) {
         const tp = new TemplateProcessor({}, context);
-        await tp.initializeFromExecutionStatusString(snapshot);
+        await tp.restore(snapshot);
         return tp;
     }
 
@@ -1742,9 +1761,55 @@ export default class TemplateProcessor {
         return new TemplateProcessor(template, context, options);
     }
 
-    public async initializeFromExecutionStatusString(exectuionStatusStr: string):Promise<void> {
-        const exectuionStatus = JSON.parse(exectuionStatusStr);
-        return await this.initialize(undefined, "/", exectuionStatus);
+
+    public async restore(executionStatusStr: string):Promise<void> {
+        const snapshotObject:Snapshot = JSON.parse(executionStatusStr);
+        await this.restoreFromSnapshotObject(snapshotObject);
+    }
+
+    public async restoreFromSnapshotObject(snapshotObject:Snapshot){
+        this.metaInfoByJsonPointer = snapshotObject.metaInfoByJsonPointer; //todo: ugh this is a side effect that probably should happen explicitely in tp.intialize
+        this.templateMeta = this.compileMetaInfo(this.metaInfoByJsonPointer);
+        const snapshottedPlans:ExecutionPlan[] = ExecutionStatus.getExecutionPlansFromSnapshot(this, snapshotObject);
+        this.input = snapshotObject.template;
+        this.output = snapshotObject.output;
+        await this.initialize(undefined, "/", snapshotObject);
+        snapshottedPlans.forEach(this.restoreFunctions);
+        snapshottedPlans.forEach(plan=>(plan as any).restore = true); //set the 'restore' bit on each plan
+        // Execute all plans concurrently
+        await Promise.all(snapshottedPlans.map(plan => this.executePlan(plan)));
+    }
+
+    private compileMetaInfo(metaInfoByJsonPointer: MetaInfoMap):Record<JsonPointerString, MetaInfo> {
+        //reset templateMeta
+        const templateMeta:Record<JsonPointerString, MetaInfo> = {};
+        metaInfoByJsonPointer["/"]?.forEach(
+            (metaInfo) => {
+                if (metaInfo.expr__ !== undefined) {
+                    metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
+                }
+                //setup templateMeta in the TemplateProcessor
+                jp.set(templateMeta, metaInfo.jsonPointer__ === "" ? "/" : metaInfo.jsonPointer__, metaInfo);
+
+            });
+        return templateMeta;
+    }
+
+
+
+    private restoreFunctions = (planOutput:any):void => {
+        try {
+            this.metaInfoByJsonPointer["/"]
+                ?.filter(metaInfo => metaInfo.isFunction__)
+                .forEach(metaInfo => {
+                    const jsonPtr = metaInfo.jsonPointer__ as JsonPointerString;
+                    const func = jp.get(this.output, jsonPtr);
+                    jp.set(planOutput, jsonPtr, func);
+                });
+        } catch (error) {
+            this.logger.error();
+            throw error;
+        }
     }
 
     /**

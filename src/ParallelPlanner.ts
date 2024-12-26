@@ -4,12 +4,17 @@ import JsonPointer from "./JsonPointer.js";
 import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {SerialPlanner} from "./SerialPlanner.js";
+import * as jsonata from "jsonata";
+import {JsonPointer as jp} from "./index.js";;
+import * as console from "node:console";
+import {Snapshot} from "./TemplateProcessor.js";
 
 
 export interface ParallelExecutionPlan extends ExecutionPlan, PlanStep {
-    parallel:ParallelExecutionPlan[] //this is the root node of the graph of ParallelPlanStep's
-    completed: boolean
+    parallel: ParallelExecutionPlan[] //this is the root node of the graph of ParallelPlanStep's
+    completed: boolean //true when the entire execution subtree rooted in this node has finished
     jsonPtr: JsonPointerString
+    restore?: boolean //used to mark plans as being used in association with a restore operation
 }
 
 export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
@@ -22,6 +27,7 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
     completed: boolean = false;
     jsonPtr: JsonPointerString = "/";
     didUpdate: boolean = false;
+    restore?: boolean = false;
 
     constructor(tp:TemplateProcessor, parallelSteps:ParallelExecutionPlan[]=[], vals?:Partial<ParallelExecutionPlan> | null) {
         this.output = tp.output
@@ -39,7 +45,8 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
             completed: this.completed,
             jsonPtr: this.jsonPtr,
             forkStack: this.forkStack.map(fork=>fork.forkId),
-            forkId: this.forkId
+            forkId: this.forkId,
+            didUpdate: this.didUpdate
         };
         if(this.data){
             (json as any).data = this.data;
@@ -611,8 +618,10 @@ export class ParallelPlanner implements Planner{
                             );
                             //if we are initializing the node, or of it had dependencies that changed, then we
                             //need to run the step
-                            if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate)){
-                                step.didUpdate = await this.tp.evaluateNode(step);
+                            if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate || step.completed)){
+                                if(!step.completed){ //fast forward past completed stels
+                                    step.didUpdate = await this.tp.evaluateNode(step);
+                                }
                             }else { //if we are here then we are not initializing a node, but reacting to some mutation.
                                     //and it is possible that the node itself is originally a non-materialized node, that
                                     //has now become materialized because it is inside/within a subtree set by a mutation
@@ -647,20 +656,23 @@ export class ParallelPlanner implements Planner{
 
         try { //mutation plan
             const _plan = plan as ParallelExecutionPlanDefault;
-            //on a mutation, the very first node of the plan will use postoder
+            //on a mutation, the root node will be a mutation and the child nodes are independent dependency graphs
             const isMutation = ["set", "forceSetInternal", "delete"].includes(_plan.op);
-            if(isMutation){
-                const mutationPromise: Promise<ParallelExecutionPlan> = this.tp.evaluateNode(_plan).then((didUpdate)=>{
-                    _plan.didUpdate = didUpdate;
-                    return _plan;
-                });
-                promises.set(_plan.jsonPtr, mutationPromise);
+            if(isMutation && !_plan.completed){
+                const mutationPromise = this.tp.mutate(_plan);
+                promises.set(_plan.jsonPtr, mutationPromise as Promise<ParallelExecutionPlan>);
                 const {didUpdate} = await mutationPromise; //allow mutation to complete before triggering reaction plan
-                if(didUpdate) { //react to change
-                    await Promise.all(_plan.parallel.map(p => {
+                _plan.didUpdate = didUpdate; //if you dig deep you will find technically _plan.didUpdate is already set, but doing it again here is good for comprehensibility
+
+                //if a mutation came from a snapshot we cannot trust didUpdate to determine if we execute the rest
+                //of the plan. THis is because a snapshot can be taken in between output getting set, and change
+                //propagation. So if are restoring a snapshot we must always kickoff change propagation.
+                if(_plan.didUpdate || _plan.restore) {
+                    await Promise.all(_plan.parallel.map(p => { //change propagation
                         return _execute(p)
                     }));
                 }
+
             }else {
                 await _execute(plan as ParallelExecutionPlan);
             }
@@ -862,9 +874,76 @@ export class ParallelPlanner implements Planner{
 
     }
 
-    restore(executionStatus: ExecutionStatus): Promise<void> {
-        throw new Error("ParallelPlanner doesn't implement restore yet");
+    public async restore(executionStatus: ExecutionStatus): Promise<void> {
+
+
+        // restart all plans.
+        for (const mutationPlan of executionStatus.plans) {
+            // restore functions into plan output
+            this.restoreFunctions(mutationPlan.output);
+            // restore intervals and timer handles into plan output
+            //this.restoreIntervalsAndTimers(mutationPlan.output, restarts);
+            (mutationPlan as any).restore = true; //add the 'restore' marker to the plan so that downstream consumers like Plan.execute() know they are doing a restore
+            //we don't await here. In fact, it is critical NOT to await here because the presence of multiple mutationPlan
+            //means that there was concurrent ($forked) execution and we don't want to serialize what was intended to
+            //run concurrently
+            this.tp.executePlan(mutationPlan); // restart the restored plan asynchronously
+
+        }
     }
+
+    private async restoreFunctions(output:any) {
+        try {
+            this.tp.metaInfoByJsonPointer["/"]
+                ?.filter(metaInfo => metaInfo.isFunction__)
+            .forEach(metaInfo => {
+                const jsonPtr = metaInfo.jsonPointer__ as JsonPointerString;
+                const func = jp.get(this.tp.output, jsonPtr);
+                jp.set(output, jsonPtr, func);
+            });
+        } catch (error) {
+            this.tp.logger.error();
+            throw error;
+        }
+    }
+
+    private  restoreIntervalsAndTimers(output:any, restarts:JsonPointerString[]) {
+        try {
+            //put the restarted timers and intervals in place in the MVCC plan
+            restarts.forEach(jsonPtr=>{
+                const intervalOrTimer = jp.get(this.tp.output, jsonPtr);
+                jp.set(output, jsonPtr, intervalOrTimer)
+            });
+        } catch (error) {
+            this.tp.logger.error(error);
+            throw error;
+        }
+    }
+
+    async restartIntervalsAndTimers():Promise<JsonPointerString[]> {
+        try {
+            return await Promise.all(
+                this.tp.metaInfoByJsonPointer["/"]
+                    ?.filter(metaInfo => metaInfo.data__ === '--interval/timeout--')
+                    .map(async metaInfo => {
+                        const jsonPtr = metaInfo.jsonPointer__ as JsonPointerString;
+                        this.tp.evaluateNode({
+                            op: "eval",
+                            jsonPtr,
+                            output: this.tp.output,
+                            forkStack: [],
+                            forkId: "ROOT",
+                            didUpdate: false
+                        });
+                        return jsonPtr;
+                    })
+            );
+        } catch (error) {
+            this.tp.logger.error("Failed to restart intervals/timers:", error);
+            throw error;
+        }
+    }
+
 
 
     from(jsonPtr: JsonPointerString): JsonPointerString[] {
@@ -893,6 +972,15 @@ export class ParallelPlanner implements Planner{
             //ToDO - other calls to callDataChangeCallbacks are not awaiting. Reconcile this
             await this.tp.callDataChangeCallbacks(plan.output, jsonPtrArray, removed, op);
         }
+    }
+
+    fromJSON(planData: SerializableExecutionPlan, snapshot: Snapshot, forks: Map<string, Fork>): ExecutionPlan {
+        const parallelPlan = new ParallelExecutionPlanDefault(this.tp, [], {
+            ...planData,
+            forkStack:planData.forkStack.map((forkId: string) => forks.get(forkId)!),
+            output: forks.get(planData.forkId)?.output || {},
+        });
+        return parallelPlan;
     }
 
 

@@ -10,11 +10,9 @@
     "stop": "not done"
   },
   "options": {
-    "snapshot": {
-      "seconds": 1
-    },
-    "importPath": "/Users/sesergee/projects/sandbox/workflows/stated-workflow"
   },
+  "mvcc": [],
+  "plans": [],
   "metaInfoByJsonPointer": {
     "/": [
       {
