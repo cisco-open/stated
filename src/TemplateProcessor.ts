@@ -584,7 +584,7 @@ export default class TemplateProcessor {
         this.changeCallbacks.clear();
         this.executionStatus.clear();
         await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.Closed);
-        (this.lifecycleManager as LifecycleManager).clear();
+       // (this.lifecycleManager as LifecycleManager).clear();
     }
 
     private async queueInitializationPlan(jsonPtr:JsonPointerString) {
@@ -1019,7 +1019,7 @@ export default class TemplateProcessor {
      */
     async setData(jsonPtr:JsonPointerString, data:any=null, op:Op="set"):Promise<JsonPointerString[]> {
         if(this.isClosed){
-            throw new Error("Attempt to setData on a closed TemplateProcessor.")
+            throw new Error(`Attempt to setData on a closed TemplateProcessor (${this.uniqueId}) with data ${data} at jsonPointer ${jsonPtr}`)
         }
         this.isEnabled("debug") && this.logger.debug(`setData on ${jsonPtr} for TemplateProcessor uid=${this.uniqueId}`)
         //get all the jsonPtrs we need to update, including this one, to percolate the change
@@ -1770,7 +1770,7 @@ export default class TemplateProcessor {
     public async restoreFromSnapshotObject(snapshotObject:Snapshot){
         this.metaInfoByJsonPointer = snapshotObject.metaInfoByJsonPointer; //todo: ugh this is a side effect that probably should happen explicitely in tp.intialize
         this.templateMeta = this.compileMetaInfo(this.metaInfoByJsonPointer);
-        const snapshottedPlans:ExecutionPlan[] = ExecutionStatus.getExecutionPlansFromSnapshot(this, snapshotObject);
+        const snapshottedPlans:ExecutionPlan[] = ExecutionStatus.fromJsonObject(this, snapshotObject);
         this.input = snapshotObject.template;
         this.output = snapshotObject.output;
         await this.initialize(undefined, "/", snapshotObject);
@@ -1837,7 +1837,7 @@ export default class TemplateProcessor {
         }
     }
 
-    private static simpleUniqueId():string {
+    static simpleUniqueId():string {
         return Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
     }
 
@@ -1868,7 +1868,12 @@ export default class TemplateProcessor {
         return async (jsonPtr:JsonPointerString, data:any, op:Op='set')=>{
             const {output, forkId} = planStep.forkStack.pop() || {output:this.output, forkId:"ROOT"};
             if(forkId === "ROOT"){
-                this.setData(jsonPtr, data, op); //return to 'normal' non-forked operation
+                try {
+                    this.setData(jsonPtr, data, op); //return to 'normal' non-forked operation
+                }catch(error){
+                    console.error(`caught error from ${(planStep as any).callToJSON()}`);
+                    throw error;
+                }
             }else{
                 this.setDataForked( {...planStep, output, data, forkId}); //still in a nested fork
             }

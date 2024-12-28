@@ -1,13 +1,12 @@
-import TemplateProcessor, {Fork, Op, PlanStep} from "./TemplateProcessor.js";
+import TemplateProcessor, {Fork, Op, PlanStep, Snapshot} from "./TemplateProcessor.js";
 import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
 import JsonPointer from "./JsonPointer.js";
 import {ExecutionPlan, Planner, SerializableExecutionPlan} from "./Planner.js";
 import {ExecutionStatus} from "./ExecutionStatus.js";
 import {SerialPlanner} from "./SerialPlanner.js";
-import * as jsonata from "jsonata";
-import {JsonPointer as jp} from "./index.js";;
-import {Snapshot} from "./TemplateProcessor.js";
+import {JsonPointer as jp, LifecycleState} from "./index.js";
 
+;
 
 export interface ParallelExecutionPlan extends ExecutionPlan, PlanStep {
     parallel: ParallelExecutionPlan[] //this is the root node of the graph of ParallelPlanStep's
@@ -27,6 +26,7 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
     jsonPtr: JsonPointerString = "/";
     didUpdate: boolean = false;
     restore?: boolean = false;
+    //uid: string = crypto.randomUUID();
 
     constructor(tp:TemplateProcessor, parallelSteps:ParallelExecutionPlan[]=[], vals?:Partial<ParallelExecutionPlan> | null) {
         this.output = tp.output
@@ -37,20 +37,38 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
         }
     }
 
-    toJSON(): SerializableExecutionPlan {
+    private static _toJSON(p:ParallelExecutionPlanDefault):SerializableExecutionPlan{
         const json = {
-            op: this.op,
-            parallel: this.parallel.map(p=>(p as ParallelExecutionPlanDefault).toJSON()),
-            completed: this.completed,
-            jsonPtr: this.jsonPtr,
-            forkStack: this.forkStack.map(fork=>fork.forkId),
-            forkId: this.forkId,
-            didUpdate: this.didUpdate
+            op: p.op,
+            parallel: p.parallel.map(p=> ParallelExecutionPlanDefault._toJSON(p as any) ),
+            completed: p.completed,
+            jsonPtr: p.jsonPtr,
+            forkStack: p.forkStack.map(fork=>fork.forkId),
+            forkId: p.forkId,
+            didUpdate: p.didUpdate,
+            //uid: p.uid
         };
-        if(this.data){
-            (json as any).data = this.data;
+        if(p.data){
+            (json as any).data = p.data;
         }
         return json;
+    }
+
+    toJSON(): SerializableExecutionPlan {
+        return ParallelExecutionPlanDefault._toJSON(this);
+    }
+
+    cleanCopy(tp:TemplateProcessor, source:ParallelExecutionPlanDefault=this):ParallelExecutionPlanDefault{
+        return new ParallelExecutionPlanDefault(tp, [], {
+            op: source.op,
+            parallel: source.parallel.map(p=> source.cleanCopy(tp, p as any) ),
+            completed: false,
+            jsonPtr: source.jsonPtr,
+            forkStack: [],
+            forkId: "ROOT",
+            didUpdate: false,
+            data: source.data
+        });
     }
 
     getNodeList(all:boolean=false): JsonPointerString[] {
@@ -84,7 +102,7 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan{
         const ptrNode = new ParallelExecutionPlanDefault(tp, [], {...this,
             op:"noop",
             completed: true,  //since we never execute noop, we can always treat them as completed
-            parallel:[] //pointer nodes are always leaf nodes that we don't want execution to continue through so we empty the childen
+            parallel:[] //pointer nodes are always pointers to nodes that have been, or are being processed, therefore a pointer node can behave as if it has no dependencies
         });
         //delete or null out as many fields as possible
         delete(ptrNode.data);
@@ -166,11 +184,18 @@ export function isMutation(op:Op){
 
 export class ParallelPlanner implements Planner{
     private tp: TemplateProcessor;
-    private nodeCache: Map<JsonPointerString, ParallelExecutionPlanDefault> = new Map();
+    //private nodeCache: Map<JsonPointerString, ParallelExecutionPlanDefault> = new Map();
+    private planCache: Map<JsonPointerString, [ExecutionPlan, JsonPointerString[]]> = new Map();
 
     constructor(tp:TemplateProcessor) {
         this.tp = tp;
         tp.planner = this as Planner;
+        tp.lifecycleManager.setLifecycleCallback(LifecycleState.StartInitialize, async (state) => {
+            this.planCache.clear();
+        });
+        tp.lifecycleManager.setLifecycleCallback(LifecycleState.Closed, async (state) => {
+            this.planCache.clear()
+        })
     }
 
     private logCircularDependency = (dependency:JsonPointerString, state:TraversalState) => {
@@ -191,13 +216,34 @@ export class ParallelPlanner implements Planner{
     */
 
     getMutationPlan(mutationTarget:JsonPointerString, data:any, op:Op): [ExecutionPlan, JsonPointerString[]]{
-        const mutationPlan = this.makeInitializationPlan({exprsOnly:false}); //start with the initialization plan
-        mutationPlan.op = op;
-        mutationPlan.data = data;
-        mutationPlan.jsonPtr = mutationTarget;
-        this.prune({mutationPlan, mutationTarget, data, op});
-        const serializedFrom: JsonPointerString[] = this.tp.from(mutationTarget);
-        return [mutationPlan as ExecutionPlan,serializedFrom];
+
+        let mutationPlan;
+        let legacyFromPlan:JsonPointerString[];
+
+        if(this.planCache.has(mutationTarget)) { //cache hit
+            [mutationPlan, legacyFromPlan] =  this.planCache.get(mutationTarget)!;
+        }else { //cache-miss
+
+
+            mutationPlan = this.makeInitializationPlan({exprsOnly: false}); //start with the initialization plan
+            mutationPlan.op = op;
+            mutationPlan.data = data;
+            mutationPlan.jsonPtr = mutationTarget;
+            //pruning is performed to remove parts of the initialization plan that are independent of the mutation
+            this.prune({mutationPlan, mutationTarget, data, op});
+            legacyFromPlan = this.tp.from(mutationTarget);
+            //return [mutationPlan, legacyFromPlan];
+
+            this.planCache.set(mutationTarget, [mutationPlan, legacyFromPlan]);
+
+        }
+        //it is very important to return a defensively copied version of the mutationPlan since the plan includes fields
+        //like isComplete, didUpdate, etc that are mutated as a plan is executed
+        const cleanCopy = (mutationPlan as ParallelExecutionPlanDefault).cleanCopy(this.tp);
+        cleanCopy.data = data;
+        return [cleanCopy, legacyFromPlan];
+
+
     }
 
 
@@ -339,19 +385,19 @@ export class ParallelPlanner implements Planner{
             exprsOnly?:boolean,
             jsonPtr?:JsonPointerString}={exprsOnly:true, jsonPtr:'/'}):ParallelExecutionPlan {
         const {jsonPtr="/", exprsOnly=true} = options;
-        this.nodeCache.clear();
+        //this.nodeCache.clear();
         let rootExpressions: MetaInfo[] = this.getInitializationPlanEntryPoints(jsonPtr, options); //todo actually we should not even have to start with roots, can literally just throw in all the nodes
         if(rootExpressions.length === 0){ //can indicate circular dependency, or template with no expressions
             rootExpressions = this.tp.metaInfoByJsonPointer[jsonPtr].filter(metaInfo => metaInfo.expr__ !== undefined);
         }
         const parallelStepsRoot = new ParallelExecutionPlanDefault(this.tp);
         for(const metaInfo of rootExpressions){
-            parallelStepsRoot.parallel.push(this.getDependenciesNode2(metaInfo, new TraversalState(this.tp, {exprsOnly})));//this.getDependenciesNode(metaInfo, state)
+            parallelStepsRoot.parallel.push(this.getDependenciesNode(metaInfo, new TraversalState(this.tp, {exprsOnly})));//this.getDependenciesNode(metaInfo, state)
         }
         return parallelStepsRoot
     }
 
-    private getDependenciesNode2(metaInfo:MetaInfo, traversalState:TraversalState) {
+    private getDependenciesNode(metaInfo:MetaInfo, traversalState:TraversalState) {
         const {options} = traversalState
         const node = new ParallelExecutionPlanDefault(this.tp, [],{
             jsonPtr:metaInfo.jsonPointer__ as JsonPointerString,
@@ -370,30 +416,26 @@ export class ParallelPlanner implements Planner{
                 return !options.exprsOnly || metaInf.expr__ !== undefined; //filter to only expression nodes if exprsOnly:true
             })
             .map(metaInfo=>{
-                return this.getDependenciesNode2(metaInfo as MetaInfo, traversalState);
+                return this.getDependenciesNode(metaInfo as MetaInfo, traversalState);
             });
         traversalState.popNode();
         return node;
     }
 
-
+/*
     private makeMutationPlan(jsonPtr:JsonPointerString, data:any, op:Op):[ParallelExecutionPlan, JsonPointerString[]] {
         if(this.tp.planner !== this){
             throw new Error(`Illegal attempt to accessed TemplateProcessor with uniqueId ${this.tp.uniqueId} from a Planner that wasn't the template processor's Planner` );
         }
         this.nodeCache.clear();
-        /*
-        if (!jp.has(this.tp.templateMeta, currentPtr)){
-            continue;
-        }
-
-         */
         const plan = this.getDependeesNode(jsonPtr);
         plan.data = data;
         plan.op = op;
         const serializedFrom: JsonPointerString[] = this.tp.from(jsonPtr);
         return [plan,serializedFrom];
     }
+
+ */
 
 
     /**
@@ -445,6 +487,7 @@ export class ParallelPlanner implements Planner{
         return leaves;
     }
 
+    /*
     private getDependenciesNode(metaInfo: MetaInfo, state:TraversalState):ParallelExecutionPlan {
         const {jsonPointer__:jsonPtr} = metaInfo;
         const {exprsOnly} = state.options;
@@ -514,7 +557,7 @@ export class ParallelPlanner implements Planner{
         return node;
     }
 
-/*
+
     private getDependenciesNode2(metaInfo: MetaInfo, options:{exprsOnly:boolean}={exprsOnly:true}):ParallelExecutionPlan {
         const {jsonPointer__:jsonPtr} = metaInfo;
         const {exprsOnly} = options;
@@ -538,7 +581,7 @@ export class ParallelPlanner implements Planner{
         return visited;
     }
 
- */
+
 
     private getDependeesNode(jsonPtr:JsonPointerString):ParallelExecutionPlan{
         if(jsonPtr === undefined){
@@ -561,9 +604,11 @@ export class ParallelPlanner implements Planner{
         return visited;
     }
 
+     */
+
 
     async execute(plan: ExecutionPlan): Promise<void>{
-
+        //console.log(`executing ${stringifyTemplateJSON(plan)}`);
         //we create a map of Promises. This is very important as two or more ParallelPlanSteps can have dependency
         //on the same node (by jsonPtr). These must await on the same Promise. For any jsonPtr, there must be only
         //one Promise that all the dependees wait on
@@ -618,8 +663,14 @@ export class ParallelPlanner implements Planner{
                             //if we are initializing the node, or of it had dependencies that changed, then we
                             //need to run the step
                             if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate || step.completed)){
-                                if(!step.completed){ //fast forward past completed stels
-                                    step.didUpdate = await this.tp.evaluateNode(step);
+                                if(!step.completed){ //fast forward past completed steps
+                                    try {
+                                       // console.log(`calling evaluateNode with ${(step as any).uid}`);
+                                        step.didUpdate = await this.tp.evaluateNode(step);
+                                    }catch(error){
+                                        //console.error(`error while executing ${step.jsonPtr} on plan\n: ${stringifyTemplateJSON(plan)}`);
+                                        throw error;
+                                    }
                                 }
                             }else { //if we are here then we are not initializing a node, but reacting to some mutation.
                                     //and it is possible that the node itself is originally a non-materialized node, that
@@ -678,7 +729,7 @@ export class ParallelPlanner implements Planner{
 
             (plan as ParallelExecutionPlan).completed = true;
         } catch (error) {
-            console.error("Execution failed", error);
+            this.tp.logger.error("Execution failed", error);
             throw error;
         }
     }
@@ -875,9 +926,9 @@ export class ParallelPlanner implements Planner{
 
     public async restore(executionStatus: ExecutionStatus): Promise<void> {
 
-
         // restart all plans.
         for (const mutationPlan of executionStatus.plans) {
+            this.validatePlan(mutationPlan as ParallelExecutionPlanDefault); //
             // restore functions into plan output
             this.restoreFunctions(mutationPlan.output);
             // restore intervals and timer handles into plan output
@@ -888,6 +939,12 @@ export class ParallelPlanner implements Planner{
             //run concurrently
             this.tp.executePlan(mutationPlan); // restart the restored plan asynchronously
 
+        }
+    }
+
+    private validatePlan(plan: ParallelExecutionPlanDefault): void {
+        if(!plan.toJSON()){
+            throw new Error(`plan is missing toJSON method; this probably indicates you forgot to rehydrate the JSON via ExecutionStatus.fromJsonObject, resulting in a borked plan`);
         }
     }
 
@@ -944,7 +1001,10 @@ export class ParallelPlanner implements Planner{
     }
 
 
-
+    /**
+     * to preserve backward compatibility of the from command, the parallel ple
+     * @param jsonPtr
+     */
     from(jsonPtr: JsonPointerString): JsonPointerString[] {
         return new SerialPlanner(this.tp).from(jsonPtr);
     }

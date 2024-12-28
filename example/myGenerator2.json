@@ -1,5 +1,6 @@
 {
   "generated": "${$myGenerator()}",
   "onGenerated": "${$set('/accumulator/-', $$.generated)}",
-  "accumulator": []
+  "accumulator": [],
+  "log": "${$console.log($$.accumulator)}"
 }

@@ -161,7 +161,7 @@ export class GeneratorManager{
                 // Break the loop if the generator is done
                 if (done) break;
             } catch (error: any) {
-                if (error.message === "Attempt to setData on a closed TemplateProcessor.") {
+                if (error.message.startsWith("Attempt to setData on a closed TemplateProcessor.")) {
                     await generator.return();
                     break;
                 }
