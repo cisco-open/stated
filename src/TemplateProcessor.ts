@@ -1770,7 +1770,7 @@ export default class TemplateProcessor {
     public async restoreFromSnapshotObject(snapshotObject:Snapshot){
         this.metaInfoByJsonPointer = snapshotObject.metaInfoByJsonPointer; //todo: ugh this is a side effect that probably should happen explicitely in tp.intialize
         this.templateMeta = this.compileMetaInfo(this.metaInfoByJsonPointer);
-        const snapshottedPlans:ExecutionPlan[] = ExecutionStatus.fromJsonObject(this, snapshotObject);
+        const snapshottedPlans:ExecutionPlan[] = Array.from(ExecutionStatus.fromJsonObject(this, snapshotObject).plans);
         this.input = snapshotObject.template;
         this.output = snapshotObject.output;
         await this.initialize(undefined, "/", snapshotObject);

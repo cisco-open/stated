@@ -16,8 +16,9 @@ export class ExecutionStatus {
         this.tp = tp;
         this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
+
     public begin(mutationPlan:ExecutionPlan) {
-        this.plans.add(mutationPlan) //todo fixme - this whole class needs to be refactored to work with ExecutionPlan - it will only work now with Plan
+        this.plans.add(mutationPlan);
     }
 
     public end(mutationPlan: ExecutionPlan) {
@@ -68,41 +69,16 @@ export class ExecutionStatus {
      * @param tp TemplateProcess
      * @param snapshot Snapshot
      */
-    public static fromJsonObject(tp:TemplateProcessor, snapshot: Snapshot): ExecutionPlan[] {
-        const plans = [];
-        //ExecutionStatus.jsonToMetaInfos(obj.metaInfoByJsonPointer);
-        //tp.metaInfoByJsonPointer = snapshot.metaInfoByJsonPointer;
-        //const executionStatus = new ExecutionStatus(tp);
-        //tp.executionStatus = executionStatus; //fixme todo i don't like having these side effects inside this function
-
-        /*
-        tp.input = snapshot.template;
-        tp.output = snapshot.output;
-        */
+    public static fromJsonObject(tp:TemplateProcessor, snapshot: Snapshot): ExecutionStatus {
+        //const plans = [];
         // Reconstruct Forks
         const forks = new Map<string, Fork>();
         snapshot.mvcc?.forEach((forkData: any) => {
             forks.set(forkData.forkId, forkData);
         });
 
-        // Reconstruct Plans...this is mostly restoring the in-memory forkStack of individual ExecutionPlan from the normalized Snapshot
-        /*
-        const rehydratedPlans:ExecutionPlan[] = snapshot.plans?.reduce((acc:any, planData:any) => {
-            if(planData.op === 'initialize'){
-                return acc; //initialize plans never go into a snapshot because we initilaize templates as one of the first steps or restore()
-            }
-            if (planData.data === NOOP_PLACEHOLDER) {
-                planData.data = TemplateProcessor.NOOP;
-            } else if (planData.data === UNDEFINED_PLACEHOLDER) {
-                planData.data = undefined;
-            }
-            acc.push(tp.planner.fromJSON(planData, snapshot, forks));
-            return acc;
-            //executionStatus.begin(mutationPlan); //just adds teh mutationPlan to the 'plans' array inside the ExecutionStatus object
-        },[] as ExecutionPlan[]);
 
-         */
-        const rehydratedPlans = snapshot.plans.map(planData=>{
+        const rehydratedPlans:ExecutionPlan[] = snapshot.plans.map(planData=>{
             if(planData.op === 'initialize'){
                 throw new Error(`op='initialize' found in snapshot - this is illegal`); //initialize plans never go into a snapshot because we initilaize templates as one of the first steps or restore()
             }
@@ -115,13 +91,9 @@ export class ExecutionStatus {
             return tp.planner.fromJSON(planData, snapshot, forks);
 
         });
-        return rehydratedPlans;
-
-        //todo HEY --- is this 'restore output' needed?
-
-        // restore the output from root plan in-flight, or set it to the stored obj.output otherwise
-        //tp.output = snapshot.output; //fixme todo - redundant with the first set
-        ///return executionStatus;
+        const xs = new ExecutionStatus(tp);
+        xs.plans = new Set(rehydratedPlans);
+        return xs;
     }
 
 }
