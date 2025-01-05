@@ -23,7 +23,7 @@ export interface MetaInfo{
     dependencies__:JsonPointerStructureArray[]|JsonPointerString[];
     absoluteDependencies__:JsonPointerStructureArray[]|JsonPointerString[];
     treeHasExpressions__: boolean;
-    tags__:Set<string>;
+    tags__: string[]; //array of unique tag strings
     exprRootPath__?: string;
     expr__?: string;
     compiledExpr__?: jsonata.Expression;
@@ -65,7 +65,7 @@ export default class MetaInfoProducer {
                 "dependencies__": [],
                 "absoluteDependencies__": [],
                 "treeHasExpressions__": false,
-                "tags__": new Set(),
+                "tags__": [],
                 "parent__": jp.parent(path),
                 "temp__": isTemp
             };
@@ -106,7 +106,7 @@ export default class MetaInfoProducer {
                         "exprTargetJsonPointer__": jp.parent(path)
                     };
                     if (tag) {
-                        stack[stack.length - 1].tags__.add(tag);
+                        stack[stack.length - 1].tags__.push(tag);
                     }
                     //if the expression is like '! /${...}'
                     if (exclamationPoint) {
@@ -117,6 +117,7 @@ export default class MetaInfoProducer {
                     stack.forEach(metaInfo => metaInfo.treeHasExpressions__ = true);
                 }
             }
+            metaInfo.tags__ = [...new Set<string>(metaInfo.tags__)]; //unique the tags
             //@ts-ignore
             emit.push(stack.pop());
         }

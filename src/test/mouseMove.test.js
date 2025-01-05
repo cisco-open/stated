@@ -36,6 +36,6 @@ test("mouse move", async () => {
     const endTime = performance.now();
     const elapsedTime = endTime - startTime;
     const avgTime = elapsedTime/MAX;
-    console.log(`Elapsed time: ${elapsedTime} milliseconds. Avg time = ${avgTime}`);
+    console.log(`Elapsed time: ${elapsedTime} milliseconds. Avg time = ${avgTime} ms`);
     expect(callCount).toEqual(i);
 });

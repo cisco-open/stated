@@ -1,36 +1,44 @@
-import {MetaInfo} from "./MetaInfoProducer.js";
-import TemplateProcessor, {Fork, MetaInfoMap, Plan, PlanStep} from "./TemplateProcessor.js";
+import TemplateProcessor, {Fork, MetaInfoMap, PlanStep, Snapshot} from "./TemplateProcessor.js";
 import {NOOP_PLACEHOLDER, stringifyTemplateJSON, UNDEFINED_PLACEHOLDER} from './utils/stringify.js';
+import {ExecutionPlan, SerializableExecutionPlan} from "./Planner.js";
+import {SerialPlan} from "./SerialPlanner.js";
+import {JsonPointerString, MetaInfo} from "./MetaInfoProducer.js";
+import * as jsonata from "jsonata";
+import {JsonPointer as jp} from "./index.js";
 
 export class ExecutionStatus {
-    public statuses: Set<Plan>;
+    public plans: Set<ExecutionPlan>;
     public metaInfoByJsonPointer: MetaInfoMap;
     public tp:TemplateProcessor;
 
     constructor(tp:TemplateProcessor) {
-        this.statuses = new Set();
+        this.plans = new Set<ExecutionPlan>();
         this.tp = tp;
         this.metaInfoByJsonPointer = tp.metaInfoByJsonPointer;
     }
-    public begin(mutationPlan:Plan) {
-        this.statuses.add(mutationPlan)
+
+    public begin(mutationPlan:ExecutionPlan) {
+        this.plans.add(mutationPlan);
     }
 
-    public end(mutationPlan: Plan) {
-        this.statuses.delete(mutationPlan);
+    public end(mutationPlan: ExecutionPlan) {
+        this.plans.delete(mutationPlan);
     }
 
     public clear() {
-        this.statuses.clear();
+        this.plans.clear();
     }
 
     public toJsonString():string{
         return stringifyTemplateJSON(this.toJsonObject());
     }
+    public static fromJsonString(s:string){
+        throw new Error("fromJsonString not implemented");
+    }
 
     public getForkMap():Map<string,Fork>{
         const outputsByForkId = new  Map<string, Fork>();
-        Array.from(this.statuses).forEach((mutationPlan:Plan)=>{
+        Array.from(this.plans).forEach((mutationPlan)=>{
             const {forkId, output, forkStack}= mutationPlan;
             outputsByForkId.set(forkId, {forkId, output} as Fork);
             forkStack.forEach((fork:Fork)=>{
@@ -41,160 +49,52 @@ export class ExecutionStatus {
         return outputsByForkId;
     }
 
-    public toJsonObject():object{
+    public toJsonObject():Snapshot{
 
-        const snapshot = {
+        const snapshot:Snapshot = {
             template: this.tp.input,
             output: this.tp.output,
             options: this.tp.options,
             mvcc:Array.from(this.getForkMap().values()),
-            metaInfoByJsonPointer: this.metaInfosToJSON(this.metaInfoByJsonPointer),
-            plans: Array.from(this.statuses).map(this.mutationPlanToJSON)
+            metaInfoByJsonPointer: this.metaInfoByJsonPointer,//this.metaInfosToJSON(this.metaInfoByJsonPointer),
+            //remove initialize plans ... snapshot assume they are to be restored on an initialized template
+            plans: Array.from(this.plans).filter(p=> p.op !=='initialize').map(this.tp.planner.toJSON)
         };
         return JSON.parse(stringifyTemplateJSON(snapshot));
     }
 
-    private planStepToJSON = (planStep:PlanStep):object => {
-        const {forkId,forkStack,jsonPtr, op, data, output} = planStep;
-        return {
-            forkId,
-            forkStack: forkStack.map(fork=>forkId),
-            jsonPtr,
-            data,
-            op
-        };
-    }
-
-    private metaInfosToJSON = (metaInfoByJsonPointer: MetaInfoMap): object => {
-        const json: any = {};
-        for (const jsonPtr in metaInfoByJsonPointer) {
-            if (metaInfoByJsonPointer.hasOwnProperty(jsonPtr)) {
-                json[jsonPtr] = metaInfoByJsonPointer[jsonPtr].map((metaInfo: MetaInfo) => {
-                    return {
-                        ...metaInfo,
-                        tags__: Array.from(metaInfo.tags__)
-                    };
-                });
-            }
-        }
-        return json;
-    }
-    private mutationPlanToJSON = (mutationPlan:Plan):object => {
-        let {forkId,forkStack,sortedJsonPtrs, lastCompletedStep, op, data, output} = mutationPlan;
-        const json = {
-            forkId,
-            forkStack: forkStack.map(fork=>fork.forkId),
-            sortedJsonPtrs,
-            op,
-            data
-        };
-        if (json.data === TemplateProcessor.NOOP) {
-            json.data = NOOP_PLACEHOLDER;
-        }
-        if(lastCompletedStep){
-            (json as any)['lastCompletedStep'] = lastCompletedStep.jsonPtr; //all we need to record is jsonpointer of last completed step
-        }
-        return json;
-    }
-
-    /**
-     * Restores ExecutionStatuses, initialize plans and executes all plans in-flight
-     * @param tp TemplateProcessor
-     */
-    public async restore(tp:TemplateProcessor): Promise<void> {
-        // if we don't have any plans in flight, we need to reevaluate all functions/timeouts. We create a NOOP plan
-        // and create initialization plan from it.
-        let hasRootPlan = false;
-        this.statuses.forEach((plan:Plan) => {
-            if(plan.forkId === "Root") {
-                hasRootPlan = true;
-            }});
-        if (this.statuses?.size === 0 || !hasRootPlan) {
-            // we need to add new root plan to the beginning of the set, so the functions/timers are reevaluated and can be used
-            this.statuses = new Set([{
-                sortedJsonPtrs: [],
-                restoreJsonPtrs: [],
-                data: TemplateProcessor.NOOP,
-                output: tp.output,
-                forkStack: [],
-                forkId: "ROOT",
-                didUpdate: []
-            }, ...this.statuses]);
-        }
-        // restart all plans.
-        for (const mutationPlan of this.statuses) {
-            // we initialize all functions/timeouts for each plan
-            await tp.createRestorePlan(mutationPlan);
-            //we don't await here. In fact, it is critical NOT to await here because the presence of multiple mutationPlan
-            //means that there was concurrent ($forked) execution and we don't want to serialize what was intended to
-            //run concurrently
-            tp.executePlan(mutationPlan).catch(error => {
-                console.error(`Error executing plan for mutation: ${this.mutationPlanToJSON(mutationPlan)}`, error);
-            }); // restart the restored plan asynchronously
-
-        }
-    }
 
     /**
      * Reconstructs execution status and template processor internal states form an execution status snapshot
      * @param tp TemplateProcess
-     * @param json
+     * @param snapshot Snapshot
      */
-    public static createExecutionStatusFromJson(tp:TemplateProcessor, obj: any): ExecutionStatus {
-
-        const metaInfoByJsonPointer = ExecutionStatus.jsonToMetaInfos(obj.metaInfoByJsonPointer);
-        tp.metaInfoByJsonPointer = metaInfoByJsonPointer;
-        const executionStatus = new ExecutionStatus(tp);
-        tp.executionStatus = executionStatus;
-        tp.input = obj.template;
-        tp.output = obj.output;
-
+    public static fromJsonObject(tp:TemplateProcessor, snapshot: Snapshot): ExecutionStatus {
+        //const plans = [];
         // Reconstruct Forks
         const forks = new Map<string, Fork>();
-        obj.mvcc?.forEach((forkData: any) => {
+        snapshot.mvcc?.forEach((forkData: any) => {
             forks.set(forkData.forkId, forkData);
         });
 
-        // Reconstruct Plans
-        obj.plans?.forEach((planData: any) => {
-            const forkStack = planData.forkStack.map((forkId: string) => forks.get(forkId));
+
+        const rehydratedPlans:ExecutionPlan[] = snapshot.plans.map(planData=>{
+            if(planData.op === 'initialize'){
+                throw new Error(`op='initialize' found in snapshot - this is illegal`); //initialize plans never go into a snapshot because we initilaize templates as one of the first steps or restore()
+            }
+            //there are certain in-memoty values that cannpt be represented in JSON so we use placeholders in the JSON to represent them
             if (planData.data === NOOP_PLACEHOLDER) {
                 planData.data = TemplateProcessor.NOOP;
             } else if (planData.data === UNDEFINED_PLACEHOLDER) {
                 planData.data = undefined;
             }
-            const mutationPlan: Plan = {
-                didUpdate: [],
-                forkId: planData.forkId,
-                forkStack,
-                sortedJsonPtrs: planData.sortedJsonPtrs,
-                restoreJsonPtrs: [],
-                op: planData.op,
-                data: planData.data,
-                output: forks.get(planData.forkId)?.output || {}, // Assuming output needs to be set
-                lastCompletedStep: planData.lastCompletedStep ? { jsonPtr: planData.lastCompletedStep } as PlanStep : undefined
-            };
-            executionStatus.begin(mutationPlan);
+            return tp.planner.fromJSON(planData, snapshot, forks);
+
         });
-
-        // restore the output from root plan in-flight, or set it to the stored obj.output otherwise
-        tp.output = obj.output;
-        return executionStatus;
+        const xs = new ExecutionStatus(tp);
+        xs.plans = new Set(rehydratedPlans);
+        return xs;
     }
 
-    private static jsonToMetaInfos(json: any): MetaInfoMap {
-        const metaInfoMap: MetaInfoMap = {};
-        for (const jsonPtr in json) {
-            if (json.hasOwnProperty(jsonPtr)) {
-                metaInfoMap[jsonPtr] = json[jsonPtr].map((metaInfo: any) => {
-                    return {
-                        ...metaInfo,
-                        tags__: new Set(metaInfo.tags__)
-                    };
-                });
-            }
-        }
-        return metaInfoMap;
-    }
 }
 

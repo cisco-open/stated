@@ -63,7 +63,8 @@ export class GeneratorManager{
                 }else{ //an interval is specified so we sit in a loop calling the function
                     let count = 0;
                     while(!tp.isClosed && (maxYield < 0 || count++ < maxYield-1)){
-                        yield await (input as ()=>any)();
+                        const funcRes = await (input as ()=>any)();
+                        yield funcRes;
                         await new Promise<void>((resolve) => timerManager.setTimeout(resolve, interval));
                     }
                     if(tp.isClosed){
@@ -160,7 +161,7 @@ export class GeneratorManager{
                 // Break the loop if the generator is done
                 if (done) break;
             } catch (error: any) {
-                if (error.message === "Attempt to setData on a closed TemplateProcessor.") {
+                if (error.message.startsWith("Attempt to setData on a closed TemplateProcessor.")) {
                     await generator.return();
                     break;
                 }

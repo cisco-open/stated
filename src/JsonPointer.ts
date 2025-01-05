@@ -292,4 +292,8 @@ export default class JsonPointer {
         return true;  // All segments matched, so potentialAncestor is an ancestor of jsonPtr
     }
 
+    static rootish(ptrString:JsonPointerString){
+        return ptrString === '' || ptrString==="/"; //support hideous but correct spec where root is '', as well as our nice convention that root is '/'
+    }
+
 }

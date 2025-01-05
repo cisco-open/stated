@@ -1832,36 +1832,42 @@ Started tailing... Press Ctrl+C to stop.
 ```
 This `example/myGenerator3.yaml` shows how you can call `return` and stop a generator.
 ```yaml
-generated: ${$generate($random, {'interval':10, 'valueOnly':false})}
-onGenerated: |
-  ${
-    $count(accumulator)<3
-      ? $set('/accumulator/-', $$.generated.value)
-      : generated.return() /* shut off the generator when the accumulator has 10 items */
-  }
+generated: ${$generate($random, {'interval':100, 'valueOnly':false})}
+onGenerated: ${$set('/accumulator/-', generated.value)}
 accumulator: []
+shutOff: ${ $count(accumulator)=10?generated.return('finished!') } # * shut off the generator when the accumulator has 10 items *
+
 ```
-```json ["$count(data.accumulator)=3"]
-> .init -f example/myGenerator3.yaml --tail "/ until $count(accumulator)=3"
+```json ["$count(data.accumulator)=10"]
+> .init -f example/myGenerator3.yaml --tail "/ until $count(accumulator)=10"
 Started tailing... Press Ctrl+C to stop.
 {
   "generated": {
-    "value": 0.23433826655570145,
+    "value": 0.7158161017599369,
     "done": false,
     "return": "{function:}"
   },
-  "onGenerated": {
-    "value": null,
-    "done": true
-  },
+  "onGenerated": [
+    "/accumulator/-",
+    "/shutOff"
+  ],
   "accumulator": [
-    0.23433826655570145,
-    0.23433826655570145,
-    0.23433826655570145
-  ]
+    0.9708143589815799,
+    0.8066003597170972,
+    0.8373617979948078,
+    0.7594063106379574,
+    0.5473418944379163,
+    0.13642852595187982,
+    0.25886999662811583,
+    0.6100150330466272,
+    0.5257481750954689,
+    0.7158161017599369
+  ],
+  "shutOff": {
+    "value": "finished!",
+    "done": true
+  }
 }
-
-
 ```
 The `maxYield` parameter can also be used to stop a generator:
 ```json ["$count(data.accumulator)=0", "$count(data.accumulator)=5"]
@@ -2882,7 +2888,7 @@ file.
 
 To create a periodic snapshot of the template every time it changes 
 ```js
-const tempalte = {
+const template = {
    "count": 0,
    "counter": "${ $setInterval(function(){$set('/count', count+1)}, 10) }",
    "stop": "${ count=10?($clearInterval($$.counter);'done'):'not done'  }"

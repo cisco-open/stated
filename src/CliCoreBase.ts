@@ -186,7 +186,7 @@ export class CliCoreBase {
                 tailPromise = this.tail(tail);
             }
             if (fromSnapshot) { // restore from a snapshot
-                await this.templateProcessor.initialize(undefined, "/", input);
+                await this.templateProcessor.restoreFromSnapshotObject(input);
             } else {
                 await this.templateProcessor.initialize(input);
             }
@@ -307,7 +307,7 @@ export class CliCoreBase {
         if (!this.templateProcessor) {
             throw new Error('Initialize the template first.');
         }
-        return await this.templateProcessor.getEvaluationPlan();
+        return await this.templateProcessor.plan();
     }
 
     log(level:Levels) {
