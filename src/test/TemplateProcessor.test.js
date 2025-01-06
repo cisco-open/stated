@@ -5678,6 +5678,22 @@ test("test fibonacci", async () => {
     }
 });
 
+test("test import with props", async () => {
+    const tp = new TemplateProcessor({
+        a:42,
+        b: "${$import({'c':'doink','d':'boink', 'e':42},{'e':-1, 'f':'nice props'})}"
+    });
+    try {
+        await tp.initialize();
+        expect(tp.output).toEqual({
+            a:42,
+            b: {'c':'doink','d':'boink', 'e':-1, 'f':'nice props'}
+        });
+    } finally {
+        await tp.close();
+    }
+});
+
 
 
 
