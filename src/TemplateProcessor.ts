@@ -679,9 +679,9 @@ export default class TemplateProcessor {
 
     public static NOOP = Symbol('NOOP');
 
-    private getImport = (metaInfo: MetaInfo):(templateToImport:string)=>Promise<symbol> => { //we provide the JSON Pointer that targets where the imported content will go
-        //import the template to the location pointed to by jsonPtr
-        return async (importMe) => {
+    private getImport = (metaInfo: MetaInfo):(templateToImport:string, mergeMe?:object)=>Promise<symbol> => { //we provide the JSON Pointer that targets where the imported content will go
+        //import the template to the location pointed to by jsonPtr. `mergeMe` is like props merges into the imported object before the object is loaded into the template
+        return async (importMe:any, mergeMe?:object) => {
             let resp;
             const parsedUrl = this.parseURL(importMe);
             if (parsedUrl) { //remote download
@@ -714,7 +714,8 @@ export default class TemplateProcessor {
             if (resp === undefined) {
                 throw new Error(`Import failed for '${importMe}' at '${metaInfo.jsonPointer__}'`);
             }
-            await this.setContentInTemplate(resp, metaInfo);
+            const template = mergeMe?{...resp, ...mergeMe}:resp;
+            await this.setContentInTemplate(template, metaInfo);
             return TemplateProcessor.NOOP;
         }
     }
