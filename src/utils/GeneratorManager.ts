@@ -154,6 +154,10 @@ export class GeneratorManager{
                     done,
                     return: TemplateProcessor.wrapInOrdinaryFunction(generator.return.bind(generator))
                 };
+                //done with undefined value indicates generator function has finished without an explicit return value
+                if(done && item===undefined){
+                    break;
+                }
 
                 // Pass the entire item object to setData
                 await templateProcessor.setData(metaInfo.jsonPointer__ as string, item, "forceSetInternal");
