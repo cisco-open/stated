@@ -5694,6 +5694,23 @@ test("test import with props", async () => {
     }
 });
 
+test("test async function stringifyy", async () => {
+    const foo = async function(){
+        return 'bar';
+    };
+
+    const o = {
+        a:42,
+        b: foo
+    };
+    expect(JSON.parse(stringifyTemplateJSON(o))).toStrictEqual({
+        a:42,
+        b: "{function:}"
+    })
+});
+
+
+
 
 
 
