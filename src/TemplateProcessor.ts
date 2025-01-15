@@ -699,7 +699,7 @@ export default class TemplateProcessor {
                     if (TemplateProcessor._isNodeJS || (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web')) {
                         try {
                             resp = await this.localImport(importMe);
-                            if (fileExtension === '.js' || fileExtension === '.mjs') {
+                            if (fileExtension === '.js' || fileExtension === '.mjs' || fileExtension === '.ts' || fileExtension === '.mts') {
                                 return resp; //the module is directly returned and assigned
                             }
                         }catch(error){
@@ -1415,6 +1415,7 @@ export default class TemplateProcessor {
         const safe = this.withErrorHandling.bind(this);
         for (const name of functionNames) {
             try {
+            
                 let generator:any = this.functionGenerators.get(name);
                 if (generator) {
                     const generated:any = await generator(metaInf, this);
@@ -1635,6 +1636,16 @@ export default class TemplateProcessor {
 
         try {
             const fileExtension = path.extname(fullpath).toLowerCase();
+           
+            // Check if TypeScript files can be imported
+            if (fileExtension === '.ts' || fileExtension === '.mts') {
+                try {
+                    // Attempt to import TypeScript file
+                    return await import(fullpath);
+                } catch (e) {
+                     throw new Error('TypeScript imports not supported in this environment');
+                }
+            }
             if (fileExtension === '.js' || fileExtension === '.mjs') {
                 return await import(fullpath);
             }

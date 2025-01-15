@@ -5694,6 +5694,41 @@ test("test import with props", async () => {
     }
 });
 
+test("import js", async () => {
+    const tp = new TemplateProcessor({
+        "lib": "${$import('./test-export.js')}",
+        "fooResult": "${lib.foo()}",
+        "barResult": "${lib.bar('test input')}"
+    }, {}, {importPath: 'example'}
+    );
+    
+    await tp.initialize();
+    
+    // Verify the imported functions work correctly
+    expect(tp.output.fooResult).toBe("foo");
+    expect(tp.output.barResult).toBe("bar: test input");
+    
+});
 
-
-
+test("import ts", async () => {
+    const tp = new TemplateProcessor({
+        "lib": "${$import('./test-export.ts')}",
+        "fooResult": "${lib.foo()}",
+        "barResult": "${lib.bar('test input')}"
+    }, {}, {importPath: 'example'}
+    );
+    
+    await tp.initialize();
+    
+    // Skip test if not running in Bun
+    if (process.versions.bun) {
+   
+        // Verify the imported functions work correctly
+        expect(tp.output.fooResult).toBe("foo");
+        expect(tp.output.barResult).toBe("bar: test input");
+        
+    } else {
+        // TypeScript imports are not supported in node
+        expect(tp.output.lib.error).toBeDefined();
+    }
+});
