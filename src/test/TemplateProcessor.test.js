@@ -5491,6 +5491,7 @@ test("total cost example", async () => {
                                     "op": "initialize",
                                     "parallel": [
                                         {
+                                            "circular": true,
                                             "completed": false,
                                             "didUpdate": false,
                                             "forkId": "ROOT",
@@ -5510,6 +5511,7 @@ test("total cost example", async () => {
                                     "op": "initialize",
                                     "parallel": [
                                         {
+                                            "circular": true,
                                             "completed": false,
                                             "didUpdate": false,
                                             "forkId": "ROOT",
@@ -5529,6 +5531,7 @@ test("total cost example", async () => {
                                     "op": "initialize",
                                     "parallel": [
                                         {
+                                            "circular": true,
                                             "completed": false,
                                             "didUpdate": false,
                                             "forkId": "ROOT",

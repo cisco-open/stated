@@ -16,6 +16,8 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
     jsonPtr: JsonPointerString = "/";
     didUpdate: boolean = false;
     restore?: boolean = false;
+    circular?:boolean;
+
     constructor(tp: TemplateProcessor, parallelSteps: ParallelExecutionPlan[] = [], vals?: Partial<ParallelExecutionPlan> | null) {
         this.output = tp.output;
         this.parallel = parallelSteps;
@@ -38,6 +40,9 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
         if (p.data) {
             (json as any).data = p.data;
         }
+        if(p.circular){
+            (json as any).circular = p.circular
+        }
         return json;
     }
 
@@ -46,7 +51,7 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
     }
 
     cleanCopy(tp: TemplateProcessor, source: ParallelExecutionPlanDefault = this): ParallelExecutionPlanDefault {
-        return new ParallelExecutionPlanDefault(tp, [], {
+        const fields:any = {
             op: source.op,
             parallel: source.parallel.map(p => source.cleanCopy(tp, p as any)),
             completed: false,
@@ -55,7 +60,11 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
             forkId: "ROOT",
             didUpdate: false,
             data: source.data
-        });
+        };
+        if(source.circular){
+            fields.circular = source.circular;
+        }
+        return new ParallelExecutionPlanDefault(tp, [], fields);
     }
 
     getNodeList(all: boolean = false): JsonPointerString[] {

@@ -76,7 +76,8 @@ export type PlanStep = {
     output:object,
     forkStack:Fork[],
     forkId:string,
-    didUpdate:boolean
+    didUpdate:boolean,
+    circular?:boolean
 }
 export type Mutation =  {jsonPtr:JsonPointerString, op:Op, data:any};
 
