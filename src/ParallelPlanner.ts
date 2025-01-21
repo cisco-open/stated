@@ -264,7 +264,7 @@ export class ParallelPlanner implements Planner{
         return leaves;
     }
 
-   
+
 
     async execute(plan: ExecutionPlan): Promise<void>{
         //console.log(`executing ${stringifyTemplateJSON(plan)}`);
@@ -279,76 +279,83 @@ export class ParallelPlanner implements Planner{
          * @param step
          */
         const _execute = async (step: ParallelExecutionPlan): Promise<ParallelExecutionPlan> => {
-            const { jsonPtr, op } = step;
+            const { jsonPtr, op, circular=false } = step;
+
+            if(circular){ //if step is marked as circular, evaluate it's expression and bail without following its reference
+                step.didUpdate = await this.tp.evaluateNode(step);
+                this.tp.logger.debug(`execute: circular, abort ${step.jsonPtr}`);
+                return step;
+            }
 
             // Check if a Promise already exists for this jsonPtr (mutation is put in the map first since it is the root of the plan, so will be found by the leaves that depend on it)
             if (promises.has(jsonPtr)) {
+                this.tp.logger.debug(`execute: waiting ${step.jsonPtr}`);
                 const promise = promises.get(jsonPtr)!; //don't freak out ... '!' is TS non-null assertion
                 //return a 'pointer' to the cached plan, or else we create loops with lead nodes in a mutation plan pointing back to the root of the
                 //plan that holds the mutation
                 return promise.then(plan=>{
                     return (plan as ParallelExecutionPlanDefault).getPointer(this.tp);
-                }); 
+                });
             }
 
-            // Create a placeholder Promise immediately and store it in the map
-            const placeholderPromise: Promise<ParallelExecutionPlan> = new Promise<ParallelExecutionPlan>((resolve, reject) => {
-                promises.set(
-                    jsonPtr,
-                    (async () => {
-                        try {
-                            step.output = plan.output;
-                            step.forkId = plan.forkId;
-                            step.forkStack = plan.forkStack;
-                            //await all dependencies ...and replace the parallel array with the executed array, since the
-                            //`promises` Map has caused already executed subtrees to be replaces with their cache-normalized
-                            //equivalent
-                            step.parallel = await Promise.all(
-                                step.parallel.map((d) => {
-                                    const executed = _execute(d);
-                                    return executed
-                                })
-                            );
-                            //if we are initializing the node, or of it had dependencies that changed, then we
-                            //need to run the step
-                            if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate || step.completed)){
-                                if(!step.completed){ //fast forward past completed steps
-                                    try {
-                                        step.didUpdate = await this.tp.evaluateNode(step);
-                                    }catch(error){
-                                        throw error;
-                                    }
-                                }
-                            }else { //if we are here then we are not initializing a node, but reacting to some mutation.
-                                    //and it is possible that the node itself is originally a non-materialized node, that
-                                    //has now become materialized because it is inside/within a subtree set by a mutation
-                                const _plan = plan as ParallelExecutionPlanDefault;
-                                const insideMutation = this.stepIsDescendantOfMutationTarget(step, _plan );
-                                if(insideMutation){
-                                    const theMutation = promises.get(_plan.jsonPtr);
-                                    if(!theMutation){
-                                        throw new Error(`failed to retrieve mutation from cache for ${_plan.jsonPtr}`);
-                                    }
-                                    const mutationCausedAChange= (await theMutation).didUpdate;
-                                    if(mutationCausedAChange){
-                                        const _didUpdate= await this.tp.evaluateNode(step);
-                                        step.didUpdate = _didUpdate;
-                                    }
-                                }
-                            }
-                            step.completed = true;
-                            resolve(step);
-                        } catch (error) {
-                            promises.delete(jsonPtr); // Clean up failed promise
-                            reject(error);
-                        }
-                    })().then(() => {//IIFE returns void, so we can't take it as parameter to then
-                        return step as ParallelExecutionPlan; //return the step from the closure
-                    }) // Explicitly return a ParallelExecutionPlan becuase IIFE does not return a known type
-                );
+            let resolve:any, reject:any;
+            const placeHolderPromise:Promise<ParallelExecutionPlan> = new Promise((res, rej) => {
+                resolve = res;
+                reject = rej;
             });
 
-            return placeholderPromise;
+            const executor = async () => {
+                try {
+                    step.output = plan.output;
+                    step.forkId = plan.forkId;
+                    step.forkStack = plan.forkStack;
+                    //await all dependencies ...and replace the parallel array with the executed array, since the
+                    //`promises` Map has caused already executed subtrees to be replaces with their cache-normalized
+                    //equivalent
+                    step.parallel = await Promise.all(
+                        step.parallel.map((d) => {
+                            const executed = _execute(d);
+                            return executed
+                        })
+                    );
+                    //if we are initializing the node, or of it had dependencies that changed, then we
+                    //need to run the step
+                    if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate || step.completed)){
+                        if(!step.completed){ //fast forward past completed steps
+                            this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
+                            step.didUpdate = await this.tp.evaluateNode(step);
+                        }
+                    }else { //if we are here then we are not initializing a node, but reacting to some mutation.
+                        //and it is possible that the node itself is originally a non-materialized node, that
+                        //has now become materialized because it is inside/within a subtree set by a mutation
+                        const _plan = plan as ParallelExecutionPlanDefault;
+                        const insideMutation = this.stepIsDescendantOfMutationTarget(step, _plan );
+                        if(insideMutation){
+                            const theMutation = promises.get(_plan.jsonPtr);
+                            if(!theMutation){
+                                throw new Error(`failed to retrieve mutation from cache for ${_plan.jsonPtr}`);
+                            }
+                            const mutationCausedAChange= (await theMutation).didUpdate;
+                            if(mutationCausedAChange){
+                                this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
+                                const _didUpdate= await this.tp.evaluateNode(step);
+                                step.didUpdate = _didUpdate;
+                            }
+                        }
+                    }
+                    step.completed = true;
+                    resolve(step);
+                } catch (error) {
+                    promises.delete(jsonPtr); // Clean up failed promise
+                    reject(error);
+                }
+            };
+
+            promises.set(jsonPtr, placeHolderPromise)
+            executor(); //it is critical that the placeholder be placed in the promises map before we begin executing
+
+
+            return placeHolderPromise;
         }; //end _execute
 
         try { //mutation plan

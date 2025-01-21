@@ -21,6 +21,7 @@ export class TraversalState {
             const e = '🔃 Circular dependency  ' + this.stack.map(n => n.jsonPtr).join(' → ') + " → " + jsonPtr;
             this.tp.warnings.push(e);
             this.tp.logger.log('warn', e);
+            node.circular = true; //flag this step as circular so that during plan execution we can drop circular steps
             return false;
         }
         if (this.stack[this.stack.length - 1]?.op === "noop") {
