@@ -1432,12 +1432,22 @@ test("local import with absolute --importPath", async () => {
 
 test("local import with non-absolute --importPath", async () => {
     const template = {
+        "once": "${$random()}", // We will check and make sure this doesn't run twice
         "foo": "bar",
         "baz": "${ $import('ex01.json') }"
     };
-    const tp = new TemplateProcessor(template, {}, {importPath: 'example'});
+    const tp = new TemplateProcessor(template, {}, { importPath: 'example' });
+
+    // Use jest.fn() to track calls
+    const mockCallback = jest.fn((ptr, data)=>{
+        console.log(data);
+    });
+    tp.setDataChangeCallback("/once", mockCallback);
+    tp.logger.level = "debug";
     await tp.initialize();
-    expect(tp.output).toEqual({
+
+    // Corrected assertion: Use toMatchObject instead of toContain for object comparison
+    expect(tp.output).toMatchObject({
         "baz": {
             "a": 42,
             "b": 42,
@@ -1445,7 +1455,14 @@ test("local import with non-absolute --importPath", async () => {
         },
         "foo": "bar"
     });
+
+    // Ensure async code runs before checking callback count
+    await new Promise(resolve => setTimeout(resolve, 1000));
+
+    // Corrected: Remove `mockCallback()`, just check mock function directly
+    expect(mockCallback).toHaveBeenCalledTimes(1);
 });
+
 
 test("local import textfile with non-absolute --importPath", async () => {
     const template = {
@@ -5710,6 +5727,32 @@ test("test async function stringifyy", async () => {
         a:42,
         b: "{function:}"
     })
+});
+
+test("test resourceMapperB example", async () => {
+
+    const o = {
+        "input": {
+            "foo": 42,
+            "bar": "something",
+            "zap": "zing"
+        },
+        "resourceMapperAFn":"${$import('https://raw.githubusercontent.com/cisco-open/stated/main/example/resourceMapperA.json#/resourceMapperFn')}",
+        "resourceMapperBFn": "${ function($in){$in.foo < 30 and $in.zap='zing'?[{'type':'B', 'id':$in.foo, 'bar':$in.bar, 'zap':$in.zing}]:[]}  }",
+        "BEntities": "${ (resourceMapperBFn(input))}",
+        "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
+    };
+    const tp = new TemplateProcessor(o);
+    tp.logger.level = "debug";
+    await tp.initialize();
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    expect(tp.output.entities).toStrictEqual( [
+        {
+            "Type": "A",
+            "id": 42,
+            "bar": "something"
+        }
+    ]);
 });
 
 

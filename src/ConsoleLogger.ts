@@ -45,6 +45,10 @@ export default class ConsoleLogger implements StatedLogger{
         this.level = initialLevel;
     }
 
+    setLevel(level:Levels):void {
+        this.level = level;
+    }
+
     debug(...args: any[]) {
         if (LOG_LEVELS[this.level] >= LOG_LEVELS.debug) {
             console.debug(...args);

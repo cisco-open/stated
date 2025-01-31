@@ -267,6 +267,15 @@ export class ParallelPlanner implements Planner{
 
 
     async execute(plan: ExecutionPlan): Promise<void>{
+
+        const isDebug = this.tp.isEnabled("debug");
+
+        if((plan as ParallelExecutionPlan).completed){
+            const msg = `Attempt to re-execute a completed plan: ${(plan as ParallelExecutionPlanDefault).toJSON()}`;
+            this.tp.logger.error(msg);
+            throw new Error(msg);
+        }
+
         //console.log(`executing ${stringifyTemplateJSON(plan)}`);
         //we create a map of Promises. This is very important as two or more ParallelPlanSteps can have dependency
         //on the same node (by jsonPtr). These must await on the same Promise. For any jsonPtr, there must be only
@@ -283,13 +292,13 @@ export class ParallelPlanner implements Planner{
 
             if(circular){ //if step is marked as circular, evaluate it's expression and bail without following its reference
                 step.didUpdate = await this.tp.evaluateNode(step);
-                this.tp.logger.debug(`execute: circular, abort ${step.jsonPtr}`);
+                isDebug && this.tp.logger.debug(`execute: circular, abort ${step.jsonPtr}`);
                 return step;
             }
 
             // Check if a Promise already exists for this jsonPtr (mutation is put in the map first since it is the root of the plan, so will be found by the leaves that depend on it)
             if (promises.has(jsonPtr)) {
-                this.tp.logger.debug(`execute: waiting ${step.jsonPtr}`);
+                isDebug && this.tp.logger.debug(`execute: waiting ${step.jsonPtr}`);
                 const promise = promises.get(jsonPtr)!; //don't freak out ... '!' is TS non-null assertion
                 //return a 'pointer' to the cached plan, or else we create loops with lead nodes in a mutation plan pointing back to the root of the
                 //plan that holds the mutation
@@ -306,6 +315,7 @@ export class ParallelPlanner implements Planner{
 
             const executor = async () => {
                 try {
+                    isDebug && this.tp.logger.debug(`execute: ${step.jsonPtr}`)
                     step.output = plan.output;
                     step.forkId = plan.forkId;
                     step.forkStack = plan.forkStack;
@@ -322,7 +332,7 @@ export class ParallelPlanner implements Planner{
                     //need to run the step
                     if(  plan.op === "initialize" || step.parallel.some((step) => step.didUpdate || step.completed)){
                         if(!step.completed){ //fast forward past completed steps
-                            this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
+                            isDebug && this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
                             step.didUpdate = await this.tp.evaluateNode(step);
                         }
                     }else { //if we are here then we are not initializing a node, but reacting to some mutation.
@@ -337,7 +347,7 @@ export class ParallelPlanner implements Planner{
                             }
                             const mutationCausedAChange= (await theMutation).didUpdate;
                             if(mutationCausedAChange){
-                                this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
+                                isDebug && this.tp.logger.debug(`execute: evaluate ${step.jsonPtr}`);
                                 const _didUpdate= await this.tp.evaluateNode(step);
                                 step.didUpdate = _didUpdate;
                             }
