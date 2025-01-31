@@ -32,7 +32,7 @@ jobs:
 
       - name: Upload npm debug log on failure
         if: failure()
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v4
         with:
           name: npm-debug-log
           path: /home/runner/.npm/_logs/*-debug.log

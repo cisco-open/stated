@@ -225,6 +225,9 @@ export type DataChangeCallback = (data: any, ptr: JsonPointerString|JsonPointerS
  */
 
 export default class TemplateProcessor {
+    public static NOOP = Symbol('NOOP');
+
+    private isExecutingPlan: boolean = false;
 
     /**
      * Loads a template and initializes a new template processor instance.
@@ -373,7 +376,7 @@ export default class TemplateProcessor {
      * @deprecated use lifecycleManager instead
      */
     public postInitialize: ()=> Promise<void> = async () =>{};
-    public readonly lifecycleManager:LifecycleOwner = new LifecycleManager(this);
+    public readonly lifecycleManager:LifecycleManager = new LifecycleManager(this);
 
     public executionStatus: ExecutionStatus;
 
@@ -455,6 +458,7 @@ export default class TemplateProcessor {
             {"generate": this.generatorManager.generate},
             {"accumulate": accumulate},
             {"default": defaulter},
+            {"logger": this.logger}
 
         );
         const safe = this.withErrorHandling.bind(this);
@@ -478,103 +482,147 @@ export default class TemplateProcessor {
      * @param snapshottedOutput - if provided, output is set to this initial value
      *
      */
-    public async initialize(importedSubtemplate: {}|undefined = undefined, jsonPtr: string = "/", executionStatusSnapshot: Snapshot|undefined = undefined):Promise<void> {
-        if(jsonPtr === "/"){
-            this.timerManager.clear();
-            if(!executionStatusSnapshot){ //if we intend to restore a snapshot, then executionStatus has been preloaded intentionally and we musn't clear it
-                this.executionStatus.clear();
-            }
-        }
-        // if initialize is called with a importedSubtemplate and root json pointer (which is "/" b default)
-        // we need to reset the importedSubtemplate. Otherwise, we rely on the one provided in the constructor
-        if (importedSubtemplate !== undefined && jsonPtr === "/") {
-            this.resetTemplate(importedSubtemplate)
-        }
-        /*
-        if (executionStatusSnapshot !== undefined) {
-            this.metaInfoByJsonPointer = executionStatusSnapshot.metaInfoByJsonPointer; //todo: ugh this is a side effect that probably should happen explicitely in tp.intialize
-            this.executionStatus = ExecutionStatus.createExecutionStatusFromJson(this, executionStatusSnapshot);
-            // here we restore metaInfoByJsonPointer from the executionStatus
-            this.templateMeta = {};
-
-            // compiles jsonata expressions and recreates templateMeta
-            this.executionStatus.metaInfoByJsonPointer["/"]?.forEach(
-                (metaInfo) => {
-                    if (metaInfo.expr__ !== undefined) {
-                        metaInfo.compiledExpr__ = jsonata.default(metaInfo.expr__ as string);
-                    }
-
-                    jp.set(this.templateMeta, metaInfo.jsonPointer__ === "" ? "/" : metaInfo.jsonPointer__, metaInfo);
-
-                });
+    public async initialize(
+        importedSubtemplate: {} | undefined = undefined,
+        jsonPtr: string = "/",
+        executionStatusSnapshot: Snapshot | undefined = undefined
+    ): Promise<void> {
+        if (this.shouldResetInitialization(jsonPtr, executionStatusSnapshot)) {
+            this.resetInitialization();
         }
 
-         */
+        if (this.shouldResetTemplate(importedSubtemplate, jsonPtr)) {
+            this.resetTemplate(importedSubtemplate!);
+        }
 
-        if (jsonPtr === "/" && this.isInitializing) {
+        if (this.isConcurrentInitialization(jsonPtr)) {
             this.logger.error("-----Initialization '/' is already in progress. Ignoring concurrent call to initialize!!!! Strongly consider checking your JS code for errors.-----");
             return;
         }
 
-        // Set the lock
-        this.isInitializing = true;
-        //run all initialization plugins
+        this.isInitializing = true; // Set the lock
+
+        await this.runInitializationPlugins();
+        await this.lifecycleManager.runCallbacks(LifecycleState.StartInitialize);
+
+        try {
+            await this.setupLogger();
+            this.logger.debug(`initializing (uid=${this.uniqueId})...`);
+            this.logger.debug(`tags: ${JSON.stringify(Array.from(this.tagSet))}`);
+
+            if (executionStatusSnapshot === undefined) {
+                this.executionPlans = {};
+            }
+
+            await this.processInitialization(importedSubtemplate, jsonPtr, executionStatusSnapshot);
+            await this.postInitialize();
+
+            await this.lifecycleManager.runCallbacks(LifecycleState.PreTmpVarRemoval);
+            this.removeTemporaryVariables(this.tempVars, jsonPtr);
+
+            this.logger.verbose("initialization complete...");
+            this.logOutput(this.output);
+
+            await this.lifecycleManager.runCallbacks(LifecycleState.Initialized);
+        } finally {
+            this.isInitializing = false;
+        }
+    }
+
+    // Determines if initialization should reset execution status
+    private shouldResetInitialization(jsonPtr: string, executionStatusSnapshot: Snapshot | undefined): boolean {
+        return jsonPtr === "/" && !executionStatusSnapshot;
+    }
+
+    // Clears timer manager and execution status
+    private resetInitialization(): void {
+        this.timerManager.clear();
+        this.executionStatus.clear();
+    }
+
+    // Determines if the imported template should be reset
+    private shouldResetTemplate(importedSubtemplate: {} | undefined, jsonPtr: string): boolean {
+        return importedSubtemplate !== undefined && jsonPtr === "/";
+    }
+
+    // Determines if concurrent initialization is in progress
+    private isConcurrentInitialization(jsonPtr: string): boolean {
+        return jsonPtr === "/" && this.isInitializing;
+    }
+
+    // Runs all initialization plugins
+    private async runInitializationPlugins(): Promise<void> {
         for (const [name, task] of this.onInitialize) {
             this.logger.debug(`Running onInitialize plugin '${name}'...`);
             await task();
         }
-        await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.StartInitialize);
-        try {
-            if (jsonPtr === "/") {
-                this.errorReport = {}; //clear the error report when we initialize a root importedSubtemplate
-            }
+    }
 
-            if (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web') {
-                const _level = this.logger.level; //carry the ConsoleLogger level over to the fancy logger
-                this.logger = await FancyLogger.getLogger() as StatedLogger;
-                this.logger.level = _level;
-            }
-
-            this.logger.debug(`initializing (uid=${this.uniqueId})...`);
-            this.logger.debug(`tags: ${JSON.stringify(Array.from(this.tagSet))}`);
-            if (executionStatusSnapshot === undefined) {
-                this.executionPlans = {}; //clear execution plans
-            }
-            let parsedJsonPtr:JsonPointerStructureArray = jp.parse(jsonPtr);
-            parsedJsonPtr = parsedJsonPtr.filter(e=>e!=="");//isEqual(parsedJsonPtr, [""]) ? [] : parsedJsonPtr; //correct [""] to []
-            let compilationTarget;
-            if(jsonPtr === "/"){ //this is the root, not an imported sub-importedSubtemplate
-                compilationTarget = this.input; //standard case
-            }else{
-                compilationTarget = importedSubtemplate; //the case where we already initialized once, and now we are initializing an imported sub-template
-            }
-            // Recreating the meta info if execution status is not provided
-            if (executionStatusSnapshot === undefined) {
-                const metaInfos = await this.createMetaInfos(compilationTarget, parsedJsonPtr);
-                this.metaInfoByJsonPointer[jsonPtr] = metaInfos; //dictionary for importedSubtemplate meta info, by import path (jsonPtr)
-                this.sortMetaInfos(metaInfos);
-                this.populateTemplateMeta(metaInfos);
-                this.setupDependees(metaInfos); //dependency <-> dependee is now bidirectional
-                this.propagateTags(metaInfos);
-            }
-                this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(this.metaInfoByJsonPointer[jsonPtr])];
-                this.isClosed = false; //open the execution queue for processing
-                await this.queueInitializationPlan(jsonPtr);
-            //}
-            //else {
-            //    this.isClosed = false;
-            //    await this.planner.restore(this.executionStatus);
-            //}
-            await this.postInitialize();
-            await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.PreTmpVarRemoval);
-            this.removeTemporaryVariables(this.tempVars, jsonPtr);
-            this.logger.verbose("initialization complete...");
-            this.logOutput(this.output);
-            await (this.lifecycleManager as LifecycleManager).runCallbacks(LifecycleState.Initialized);
-        }finally {
-            this.isInitializing = false;
+    // Sets up the logger if needed
+    private async setupLogger(): Promise<void> {
+        if (typeof BUILD_TARGET !== 'undefined' && BUILD_TARGET !== 'web') {
+            const _level = this.logger.level;
+            this.logger = await FancyLogger.getLogger() as StatedLogger;
+            this.logger.level = _level;
         }
     }
+
+    // Processes the initialization logic
+    private async processInitialization(
+        importedSubtemplate: {} | undefined,
+        jsonPtr: string,
+        executionStatusSnapshot: Snapshot | undefined
+    ): Promise<void> {
+        if (jsonPtr === "/") {
+            this.errorReport = {};
+        }
+
+        let parsedJsonPtr = this.parseJsonPointer(jsonPtr);
+        let compilationTarget = this.getCompilationTarget(jsonPtr, importedSubtemplate);
+
+        if (executionStatusSnapshot === undefined) {
+            await this.handleMetaInfoCreation(compilationTarget!, jsonPtr);
+        }
+
+        this.tempVars = [...this.tempVars, ...this.cacheTmpVarLocations(this.metaInfoByJsonPointer[jsonPtr])];
+        this.isClosed = false;
+
+        if (jsonPtr === "/") {
+            await this.queueInitializationPlan(jsonPtr);
+        } else {
+            await this.initializeImportedTemplate(jsonPtr);
+        }
+    }
+
+    // Parses the JSON pointer
+    private parseJsonPointer(jsonPtr: string): JsonPointerStructureArray {
+        let parsed = jp.parse(jsonPtr);
+        return parsed.filter(e => e !== "");
+    }
+
+    // Determines the compilation target
+    private getCompilationTarget(jsonPtr: string, importedSubtemplate: {} | undefined): {} | undefined {
+        return jsonPtr === "/" ? this.input : importedSubtemplate;
+    }
+
+    // Handles meta info creation if execution status is not provided
+    private async handleMetaInfoCreation(compilationTarget: {}, jsonPtr: string): Promise<void> {
+        const metaInfos = await this.createMetaInfos(compilationTarget, this.parseJsonPointer(jsonPtr));
+        this.metaInfoByJsonPointer[jsonPtr] = metaInfos;
+
+        this.sortMetaInfos(metaInfos);
+        this.populateTemplateMeta(metaInfos);
+        this.setupDependees(metaInfos);
+        this.propagateTags(metaInfos);
+    }
+
+    // Initializes an imported template
+    private async initializeImportedTemplate(jsonPtr: string): Promise<void> {
+        this.logger.verbose(`generating initialization plan for imported template ${jsonPtr} in template (uid=${this.uniqueId})...`);
+        const plan: ExecutionPlan = this.planner.getInitializationPlan(jsonPtr);
+        await this.executePlan(plan);
+    }
+
 
     async close():Promise<void>{
         this.isClosed = true;
@@ -590,7 +638,7 @@ export default class TemplateProcessor {
 
     private async queueInitializationPlan(jsonPtr:JsonPointerString) {
         const startTime = Date.now(); // Capture start time
-        this.logger.verbose(`generating initialization plan for template (uid=${this.uniqueId})...`);
+        this.logger.verbose(`generating initialization plan for ${jsonPtr} in template (uid=${this.uniqueId})...`);
         const plan:ExecutionPlan = this.planner.getInitializationPlan(jsonPtr);
         this.executionQueue.push(plan);
         await this.drainExecutionQueue(false);
@@ -677,8 +725,6 @@ export default class TemplateProcessor {
         jp.set(this.output, jsonPtrImportPath, template);
         await this.initialize(template, jsonPtrImportPath);
     }
-
-    public static NOOP = Symbol('NOOP');
 
     private getImport = (metaInfo: MetaInfo):(templateToImport:string, mergeMe?:object)=>Promise<symbol> => { //we provide the JSON Pointer that targets where the imported content will go
         //import the template to the location pointed to by jsonPtr. `mergeMe` is like props merges into the imported object before the object is loaded into the template
@@ -1063,21 +1109,34 @@ export default class TemplateProcessor {
     }
 
     private async drainExecutionQueue(removeTmpVars:boolean=true){
-        while (this.executionQueue.length > 0 && !this.isClosed) {
-            try {
-                const plan: ExecutionPlan| SerialPlan | SnapshotPlan | Transaction= this.executionQueue[0];
-                if (plan.op === "snapshot") {
-                    //(plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();
-                    throw new Error("Snapshots should not be placed in execution queue")
-                } else if(plan.op === "transaction" ){
-                    this.applyTransaction(plan as Transaction); //should this await?
-                }else{
-                    await this.executePlan(plan);
+        if(this.isExecutingPlan){
+            return;
+        }
+        this.isExecutingPlan = true;
+        try {
+            while (this.executionQueue.length > 0 && !this.isClosed) {
+                try {
+                    const plan: ExecutionPlan | SerialPlan | SnapshotPlan | Transaction = this.executionQueue[0];
+                    if (plan.op === "snapshot") {
+                        //(plan as SnapshotPlan).generatedSnapshot = this.executionStatus.toJsonString();
+                        throw new Error("Snapshots should not be placed in execution queue")
+                    } else if (plan.op === "transaction") {
+                        this.applyTransaction(plan as Transaction); //should this await?
+                    } else {
+                        await this.executePlan(plan);
+                    }
+                    removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
+                } finally {
+                    this.executionQueue.shift();
                 }
-                removeTmpVars && this.removeTemporaryVariables(this.tempVars, "/");
-            }finally {
-                this.executionQueue.shift();
             }
+        }finally {
+            this.isExecutingPlan = false;
+            // 🚀 If new plans were added while processing, restart the loop!
+            if (this.executionQueue.length > 0) {
+                await this.drainExecutionQueue(removeTmpVars);
+            }
+
         }
     }
 
@@ -1170,7 +1229,7 @@ export default class TemplateProcessor {
 
 
 
-    private isEnabled(logLevel:Levels):boolean{
+    public isEnabled(logLevel:Levels):boolean{
         return LOG_LEVELS[this.logger.level] >= LOG_LEVELS[logLevel];
     }
 
@@ -1873,7 +1932,7 @@ export default class TemplateProcessor {
                 try {
                     this.setData(jsonPtr, data, op); //return to 'normal' non-forked operation
                 }catch(error){
-                    console.error(`caught error from ${(planStep as any).callToJSON()}`);
+                    this.logger.error(`caught error from ${(planStep as any).callToJSON()}`);
                     throw error;
                 }
             }else{
