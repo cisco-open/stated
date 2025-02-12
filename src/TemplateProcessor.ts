@@ -1458,6 +1458,7 @@ export default class TemplateProcessor {
         this.planStepFunctionGenerators.set("set", this.generateSet);
         this.planStepFunctionGenerators.set("setInterval", this.timerManager.generateSetInterval);
         this.planStepFunctionGenerators.set("clearInterval", this.timerManager.generateClearInterval);
+        this.planStepFunctionGenerators.set("change", this.generateChange);
     }
 
     /**
@@ -1914,9 +1915,32 @@ export default class TemplateProcessor {
         if(!isInsideFork){
             return this.setData
         }
+        //fixme -- bro...this cannot possibly be right...and there are not any tests for it. How can we generate
+        //a function that ignores its arguments
         return async (jsonPtr: JsonPointerString, data:any, op:Op='set')=>{
             this.setDataForked(planStep); //behaves like setData, except operates on the forked output
         }
+    }
+
+    private generateChange = (planStep: PlanStep) => {
+        const isInsideFork = planStep.forkStack.length > 0;
+
+        return async (jsonPtr:JsonPointerString, {mutator, defaultVal=0}:{mutator:(v:any)=>Promise<any>, defaultVal:any}):Promise<any> =>{
+            let data;
+            if(jp.has(this.output, jsonPtr)) {
+                data = jp.get(this.output, jsonPtr);
+                data = await mutator(data);
+            }else{
+                data = await mutator(defaultVal);
+            }
+            if(!isInsideFork) {
+                return await this.setData(jsonPtr, data);
+            }else{
+                //have not tested this
+                return await this.setDataForked({...planStep, data});
+            }
+        }
+
     }
 
     /**

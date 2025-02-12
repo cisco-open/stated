@@ -1440,10 +1440,9 @@ test("local import with non-absolute --importPath", async () => {
 
     // Use jest.fn() to track calls
     const mockCallback = jest.fn((ptr, data)=>{
-        console.log(data);
+        //console.log(data);
     });
     tp.setDataChangeCallback("/once", mockCallback);
-    tp.logger.level = "debug";
     await tp.initialize();
 
     // Corrected assertion: Use toMatchObject instead of toContain for object comparison
@@ -3657,13 +3656,13 @@ test("repetitive snapshots stopped in random execution time", async () => {
         //we are expecting the homeworlds to not be set yet
         expect(snapshotObject.output.homeworlds.length).toEqual(0);
 
-        console.log(`restoring snapshot ${snapshot}`);
+        //console.log(`restoring snapshot ${snapshot}`);
         // Restore from snapshot
         const restoredTp = new TemplateProcessor();
 
         const convergencePromise = new Promise(resolve => {
             restoredTp.setDataChangeCallback('/homeworlds', (homeworlds) => {
-                console.log(`${restoredTp.uniqueId} ${homeworlds}`);
+                //console.log(`${restoredTp.uniqueId} ${homeworlds}`);
                 if (homeworlds.length === 10) { //both original template, and snapshot are pumping 5 items, for total of 10
                     resolve();
                 }
@@ -3672,11 +3671,11 @@ test("repetitive snapshots stopped in random execution time", async () => {
                 }
             });
         });
-        console.log(`restoring ${i}`)
+        //console.log(`restoring ${i}`)
         await restoredTp.restore(snapshot);
         await convergencePromise;
         await restoredTp?.close();
-        console.log(`restored ${i}`)
+        //console.log(`restored ${i}`)
 
         await convergencePromise;
         const expectedHomeworlds = [
@@ -5743,7 +5742,6 @@ test("test resourceMapperB example", async () => {
         "entities": "${ BEntities?BEntities:resourceMapperAFn(input)}"
     };
     const tp = new TemplateProcessor(o);
-    tp.logger.level = "debug";
     await tp.initialize();
     await new Promise(resolve => setTimeout(resolve, 1000));
     expect(tp.output.entities).toStrictEqual( [
@@ -5754,6 +5752,35 @@ test("test resourceMapperB example", async () => {
         }
     ]);
 });
+
+test("change with defaultVal", async () => {
+    let template = {
+        "mutateOpts": {
+            "mutator":"${function($v){$v+1}}",
+            "defaultVal": 42
+        },
+        "foo": "${$change('/bar', $$.mutateOpts)}",
+        "baz": 0,
+        "mutateOpts2": {
+            "mutator":"${function($v){$v+1}}",
+            "defaultVal": -100,
+        },
+        "zap": "${$change('/baz', $$.mutateOpts2)}",
+    };
+    let tp = new TemplateProcessor(template);
+    try {
+        await tp.initialize();
+        expect(tp.output.foo).toStrictEqual([
+            "/bar"
+        ]);
+        expect(tp.output.bar).toBe(43);
+        expect(tp.output.baz).toBe(1);
+    }finally{
+        await tp.close();
+    }
+});
+
+
 
 
 

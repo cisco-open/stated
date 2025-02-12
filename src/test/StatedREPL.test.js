@@ -78,14 +78,12 @@ if(typeof Bun === "undefined") { //run on node, not bun
       // we call restore on the repl, which will expect it to be defined in CliCore.
       await repl.cli('restore', '-f example/restoreSnapshot.json');
 
-      console.log(stringify(repl.cliCore.templateProcessor.output));
       expect(repl.cliCore.templateProcessor.output).toBeDefined();
       expect(repl.cliCore.templateProcessor.output.count).toBeGreaterThanOrEqual(3); // should be 3 or more right after restoring from the snapshot
       expect(repl.cliCore.templateProcessor.output.count).toBeLessThan(10); // ... but less than 10
 
 
       while (repl.cliCore.templateProcessor.output.count < 10) { // validates that templateProcessor picks up where it was left in the snapshot.
-        console.log("waiting for output.count to reach 10")
         await new Promise(resolve => setTimeout(resolve, 50));
       }
       expect(repl.cliCore.templateProcessor.output.count).toBe(10);
