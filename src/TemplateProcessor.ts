@@ -1670,10 +1670,11 @@ export default class TemplateProcessor {
     }
 
     out(jsonPointer:JsonPointerString){
-        if(jp.has(this.output, jsonPointer)){
-            return jp.get(this.output, jsonPointer)
-        }
-        return null;
+        try{
+            return jp.get(this.output, jsonPointer);
+        }catch(e){
+            return null;
+        } 
     }
 
     private async localImport(localPath: string) {
