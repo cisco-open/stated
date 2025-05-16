@@ -1,0 +1,5 @@
+{
+    "a": 42,
+    "⛔note": "${$string('should not be evaluated: ') & a}",
+    "c": "${a}"
+}

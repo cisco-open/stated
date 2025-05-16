@@ -872,6 +872,76 @@ expression are also tagged.
 }
 
 ```
+## Blocked Properties with ⛔
+Properties whose names start with "⛔" are completely ignored during template processing. This is useful for:
+
+1. Adding notes or comments that should not be evaluated
+2. Temporarily disabling parts of a template
+3. Keeping sensitive or debug information in the template but preventing its evaluation
+
+When a property name starts with "⛔", the MetaInfoProducer will skip that property and all of its children, effectively making them invisible to the template processor.
+
+```json
+> .init -f "example/ex25.json"
+{
+  "a": 42,
+  "⛔b": "${$string('should not be evaluated: ') & a}",
+  "c": "${a}"
+}
+> .out
+{
+  "a": 42,
+  "⛔b": "${$string('should not be evaluated: ') & a}",
+  "c": 42
+}
+> .init -f "example/ex26.json"
+{
+  "a": 42,
+  "⛔note": "${$string('Will NOT be evaluated: ') & a}",
+  "note": "${$string('Will be evaluated: ') & a}",
+  "config": {
+    "⛔productionDb": "${$env('DB_PROD_URL', 'mysql://prod.example.com:3306')}",
+    "productionDb": "${$env('DB_PROD_URL', 'mysql://prod.example.com:3306')}",
+    "localDb": "mysql://localhost:3306"
+  },
+  "features": {
+    "⛔experimental": {
+      "enabled": true,
+      "endpoint": "${$string('https://api.example.com/config/') & 'experimental'}"
+    },
+    "experimental": {
+      "enabled": true,
+      "endpoint": "${$string('https://api.example.com/config/') & 'experimental'}"
+    }
+  }
+}
+> .out
+{
+  "a": 42,
+  "⛔note": "${$string('Will NOT be evaluated: ') & a}",
+  "note": "Will be evaluated: 42",
+  "config": {
+    "⛔productionDb": "${$env('DB_PROD_URL', 'mysql://prod.example.com:3306')}",
+    "productionDb": "mysql://prod.example.com:3306",
+    "localDb": "mysql://localhost:3306"
+  },
+  "features": {
+    "⛔experimental": {
+      "enabled": true,
+      "endpoint": "${$string('https://api.example.com/config/') & 'experimental'}"
+    },
+    "experimental": {
+      "enabled": true,
+      "endpoint": "https://api.example.com/config/experimental"
+    }
+  }
+}
+```
+
+In these examples, `⛔...` will be completely ignored during template processing - the expression will not be evaluated.
+
+Note that array elements with "⛔" in their values will still be processed, as array indices are numbers, not property names. Only object properties that start with "⛔" are blocked.
+
 # Generative Templates
 Templates can contain generative expressions that cause their content to change over time. 
 For instance the `$setInterval` function behaves exactly as it does in Javascript. Below, 
