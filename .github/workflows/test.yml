@@ -43,5 +43,5 @@ jobs:
       - name: Deploy TypeDocs
         uses: peaceiris/actions-gh-pages@v3.9.3 
         with:
-          personal_token: ${{ secrets.GH_PAT }}
+          github_token: ${{ secrets.GH_PAT }}
           publish_dir: ./docs
