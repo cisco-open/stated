@@ -885,13 +885,13 @@ When a property name starts with "⛔", the MetaInfoProducer will skip that prop
 > .init -f "example/ex25.json"
 {
   "a": 42,
-  "⛔b": "${$string('should not be evaluated: ') & a}",
+  "⛔note": "${$string('should not be evaluated: ') & a}",
   "c": "${a}"
 }
 > .out
 {
   "a": 42,
-  "⛔b": "${$string('should not be evaluated: ') & a}",
+  "⛔note": "${$string('should not be evaluated: ') & a}",
   "c": 42
 }
 > .init -f "example/ex26.json"
