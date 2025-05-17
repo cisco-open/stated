@@ -42,7 +42,7 @@ jobs:
 
       - name: Show partial GH_PAT
         run: |
-        echo "GH_PAT prefix: ${GH_PAT:0:8}..."
+          echo "GH_PAT prefix: ${GH_PAT:0:8}..."
         env:
           GH_PAT: ${{ secrets.GH_PAT }}
 
