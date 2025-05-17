@@ -40,6 +40,12 @@ jobs:
       - name: Generate TypeDocs
         run: npm run docs
 
+      - name: Show partial GH_PAT
+        run: |
+        echo "GH_PAT prefix: ${GH_PAT:0:8}..."
+        env:
+          GH_PAT: ${{ secrets.GH_PAT }}
+
       - name: Deploy TypeDocs
         uses: peaceiris/actions-gh-pages@v3.9.3 
         with:
