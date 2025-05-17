@@ -19,12 +19,6 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Show partial GH_PAT
-        run: |
-          echo "GH_PAT prefix: ${GH_PAT:0:8}..."
-        env:
-          GH_PAT: ${{ secrets.GH_PAT }}
-
       - name: Set up Apache Pulsar
         uses: reugn/github-action-pulsar@v1
 
