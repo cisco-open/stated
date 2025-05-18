@@ -57,6 +57,8 @@ export default class MetaInfoProducer {
         const emit: MetaInfo[] = [];
 
         async function getPaths(o:any, path: JsonPointerStructureArray = [], isTemp=false) {
+            if (String(path.at(-1))[0] === '⛔') return;
+            
             const type = typeof o;
             const metaInfo: MetaInfo = {
                 "materialized__": true,

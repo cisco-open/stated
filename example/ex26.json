@@ -1,0 +1,20 @@
+{
+    "a": 42,
+    "⛔note": "${$string('Will NOT be evaluated: ') & a}",
+    "note": "${$string('Will be evaluated: ') & a}",
+    "config": {
+        "⛔productionDb": "${$env('DB_PROD_URL', 'mysql://prod.example.com:3306')}",
+        "productionDb": "${$env('DB_PROD_URL', 'mysql://prod.example.com:3306')}",
+        "localDb": "mysql://localhost:3306"
+    },
+    "features": {
+        "⛔experimental": {
+            "enabled": true,
+            "endpoint": "${$string('https://api.example.com/config/') & 'experimental'}"
+        },
+        "experimental": {
+            "enabled": true,
+            "endpoint": "${$string('https://api.example.com/config/') & 'experimental'}"
+        }
+    }
+}

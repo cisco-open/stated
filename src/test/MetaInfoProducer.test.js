@@ -1117,5 +1117,261 @@ test("temp vars 3", async () => {
     ]);
 });
 
+test("blocked paths with ⛔ character 1", async () => {
+    const template = {
+        "a": 42,
+        "⛔b": "Should be ignored",
+        "c": "${a}"
+    };
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "a"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
+            "expr__": "a",
+            "jsonPointer__": [
+                "c"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        }
+    ]);
+});
+
+test("blocked paths with ⛔ character 2", async () => {
+    const template = {
+        "a": 42,
+        "b": {
+            "normal": "value",
+            "⛔secret": {
+                "nested": "This should be ignored"
+            }
+        },
+        "c": "${a}"
+    };
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "a"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b",
+                "normal"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "b"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "b"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "exprRootPath__": null,
+            "exprTargetJsonPointer__": [],
+            "expr__": "a",
+            "jsonPointer__": [
+                "c"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": true
+        }
+    ]);
+});
+
+test("blocked paths with ⛔ character in array", async () => {
+    const template = {
+        "a": 42,
+        "arr": [
+            "normal",
+            "⛔blocked", // This should be included since array indices are numbers, not strings with ⛔
+            {
+                "⛔key": "blocked object key",
+                "normal": "normal object key"
+            }
+        ]
+    };
+    const metaInfos = await MetaInfoProducer.getMetaInfos(template);
+    expect(JSON.parse(stringify(metaInfos))).toEqual([
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "a"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "arr",
+                0
+            ],
+            "materialized__": true,
+            "parent__": [
+                "arr"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "arr",
+                1
+            ],
+            "materialized__": true,
+            "parent__": [
+                "arr"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "arr",
+                2,
+                "normal"
+            ],
+            "materialized__": true,
+            "parent__": [
+                "arr",
+                2
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "arr",
+                2
+            ],
+            "materialized__": true,
+            "parent__": [
+                "arr"
+            ],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [
+                "arr"
+            ],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        },
+        {
+            "absoluteDependencies__": [],
+            "dependees__": [],
+            "dependencies__": [],
+            "jsonPointer__": [],
+            "materialized__": true,
+            "parent__": [],
+            "tags__": [],
+            "temp__": false,
+            "treeHasExpressions__": false
+        }
+    ]);
+});
+
 
 
