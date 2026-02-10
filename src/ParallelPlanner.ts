@@ -35,7 +35,16 @@ export class ParallelPlanner implements Planner{
 
     //remember, initialization plan is not always for "/" because we can be initializing an imported template
     getInitializationPlan(jsonPtr:JsonPointerString): ExecutionPlan {
-         return this.makeInitializationPlan({jsonPtr}); 
+        const cached = this.planCache.get(jsonPtr);
+        let initPlan: ExecutionPlan;
+        if(cached) {
+            [initPlan] = cached;
+            (initPlan as ParallelExecutionPlanDefault).reinitialize(); //allow this plan to be re-run
+        } else {
+            initPlan = this.makeInitializationPlan({jsonPtr});
+            this.planCache.set("/", [initPlan, ['/']]);
+        }
+        return initPlan;
     }
 
 

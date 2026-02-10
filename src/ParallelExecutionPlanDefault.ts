@@ -17,8 +17,10 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
     didUpdate: boolean = false;
     restore?: boolean = false;
     circular?:boolean;
+    tp:TemplateProcessor
 
     constructor(tp: TemplateProcessor, parallelSteps: ParallelExecutionPlan[] = [], vals?: Partial<ParallelExecutionPlan> | null) {
+        this.tp = tp;
         this.output = tp.output;
         this.parallel = parallelSteps;
         // Copy properties from `vals` into `this`, while preserving existing defaults
@@ -89,6 +91,15 @@ export class ParallelExecutionPlanDefault implements ParallelExecutionPlan {
 
         // Convert Set to array before returning
         return Array.from(nodeSet);
+    }
+
+    reinitialize(): void {
+        const walkTree = (node: ParallelExecutionPlan) => {
+            node.completed = false;
+            node.output = this.tp.output;
+            node.parallel.forEach(child => walkTree(child));
+        };
+        walkTree(this);
     }
 
     /**

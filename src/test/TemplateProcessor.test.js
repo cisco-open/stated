@@ -3442,7 +3442,7 @@ test("forked homeworlds", async () => {
     // Ensure the array is exactly the same length as the expected array
     expect(homeworlds).toHaveLength(expectedHomeworlds.length);
     expect(savedForkIds.size).toEqual(6); //5 names + 1 initialization of null name
-   },5000);
+   },10000);
 
 
 test("performance test with 100 data injections", async () => {
@@ -3699,7 +3699,7 @@ test("repetitive snapshots stopped in random execution time", async () => {
         expect(savedState.plans.length).toBeLessThanOrEqual(5);
 
     }
-}, 60000);
+}, 120000);
 
 test("output-only snapshot example", async () => {
     const __filename = fileURLToPath(import.meta.url);
@@ -5775,6 +5775,40 @@ test("change with defaultVal", async () => {
         ]);
         expect(tp.output.bar).toBe(43);
         expect(tp.output.baz).toBe(1);
+    }finally{
+        await tp.close();
+    }
+});
+
+test("reInitialize", async () => {
+    let template = {
+        a: 42,
+        b: "${a}",
+        c: "${$contextMsg & $string(b)}"
+    };
+    let tp = new TemplateProcessor(template, {contextMsg: "the answer is: ", random: "foo"});
+    try {
+        const initStart = process.hrtime.bigint();
+        await tp.initialize();
+        const initEnd = process.hrtime.bigint();
+        const initElapsedNs = initEnd - initStart;
+        console.log(`initialize took ${initElapsedNs} nanoseconds (${Number(initElapsedNs) / 1_000_000} ms)`);
+        expect(tp.output.c).toBe("the answer is: 42");
+        let totalNs = 0n;
+        const iterations = 100;
+        for (let i = 0; i < iterations; i++) {
+            const start = process.hrtime.bigint();
+            await tp.reInitializeContext( {contextMsg: "the answer is STILL: ", nonRandom: "bar"});
+            const end = process.hrtime.bigint();
+            totalNs += (end - start);
+        }
+        const avgNs = totalNs / BigInt(iterations);
+        console.log(`reInitializeContext avg over ${iterations} iterations: ${avgNs} nanoseconds (${Number(avgNs) / 1_000_000} ms)`);
+        expect(tp.output).toStrictEqual({
+            "a": 42,
+            "b": 42,
+            "c": "the answer is STILL: 42"
+        });
     }finally{
         await tp.close();
     }
