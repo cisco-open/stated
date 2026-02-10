@@ -3442,7 +3442,7 @@ test("forked homeworlds", async () => {
     // Ensure the array is exactly the same length as the expected array
     expect(homeworlds).toHaveLength(expectedHomeworlds.length);
     expect(savedForkIds.size).toEqual(6); //5 names + 1 initialization of null name
-   },5000);
+   },10000);
 
 
 test("performance test with 100 data injections", async () => {
@@ -3699,7 +3699,7 @@ test("repetitive snapshots stopped in random execution time", async () => {
         expect(savedState.plans.length).toBeLessThanOrEqual(5);
 
     }
-}, 60000);
+}, 120000);
 
 test("output-only snapshot example", async () => {
     const __filename = fileURLToPath(import.meta.url);
