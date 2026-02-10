@@ -228,6 +228,7 @@ export default class TemplateProcessor {
     public static NOOP = Symbol('NOOP');
 
     private isExecutingPlan: boolean = false;
+    private providedContext: any; //the context provided by the owner of the template before we merge it into internal context
 
     /**
      * Loads a template and initializes a new template processor instance.
@@ -410,6 +411,7 @@ export default class TemplateProcessor {
     }
 
     constructor(template={}, context = {}, options={}) {
+        this.providedContext = context;
         this.timerManager = new TimerManager(this); //prevent leaks from $setTimeout and $setInterval
         this.generatorManager = new GeneratorManager(this);
         this.uniqueId = crypto.randomUUID();
@@ -471,6 +473,18 @@ export default class TemplateProcessor {
         this.setupFunctionGenerators();
     }
 
+
+    public async reInitializeContext(userProvidedContext:object){
+        this.output = JSON.parse(JSON.stringify(this.input)); //initial output is input template
+        for(const key in this.providedContext){ //at this point, providedContext is the OLD previously provided context
+            delete this.context[key]; //remove the previous user-provided context to clear out 'old' state
+        }
+        Object.assign(this.context, userProvidedContext); //spread the *new* context onto the existing context object
+        this.providedContext = userProvidedContext; //update providedContext
+        const plan:ExecutionPlan = this.planner.getInitializationPlan("/"); //will get cached initialization plan
+        this.executionQueue.push(plan);
+        await this.drainExecutionQueue(false);
+    }
 
     /**
      * Template processor initialize can be called from 2 major use cases

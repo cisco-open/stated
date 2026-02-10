@@ -5780,6 +5780,40 @@ test("change with defaultVal", async () => {
     }
 });
 
+test("reInitialize", async () => {
+    let template = {
+        a: 42,
+        b: "${a}",
+        c: "${$contextMsg & $string(b)}"
+    };
+    let tp = new TemplateProcessor(template, {contextMsg: "the answer is: ", random: "foo"});
+    try {
+        const initStart = process.hrtime.bigint();
+        await tp.initialize();
+        const initEnd = process.hrtime.bigint();
+        const initElapsedNs = initEnd - initStart;
+        console.log(`initialize took ${initElapsedNs} nanoseconds (${Number(initElapsedNs) / 1_000_000} ms)`);
+        expect(tp.output.c).toBe("the answer is: 42");
+        let totalNs = 0n;
+        const iterations = 100;
+        for (let i = 0; i < iterations; i++) {
+            const start = process.hrtime.bigint();
+            await tp.reInitializeContext( {contextMsg: "the answer is STILL: ", nonRandom: "bar"});
+            const end = process.hrtime.bigint();
+            totalNs += (end - start);
+        }
+        const avgNs = totalNs / BigInt(iterations);
+        console.log(`reInitializeContext avg over ${iterations} iterations: ${avgNs} nanoseconds (${Number(avgNs) / 1_000_000} ms)`);
+        expect(tp.output).toStrictEqual({
+            "a": 42,
+            "b": 42,
+            "c": "the answer is STILL: 42"
+        });
+    }finally{
+        await tp.close();
+    }
+});
+
 
 
 
